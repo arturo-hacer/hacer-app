@@ -333,20 +333,29 @@ textarea{resize:none;height:62px;}
       <div class="fl" style="flex:1"><label>Cliente</label><input type="text" id="pf-cli" placeholder="Cliente"></div>
     </div>
     <div class="fl"><label>Nombre *</label><input type="text" id="pf-nom2" placeholder="Nombre del proyecto"></div>
-    <div class="fl"><label>Etapas activas *</label><div style="display:flex;flex-wrap:wrap;gap:8px" id="pf-etapas2"></div></div>
-    <div class="fl"><label>Presupuesto total ($) *</label><input type="number" id="pf-presup2" placeholder="250000" oninput="actualizarDist2()"></div>
-    <div class="fl"><label>Fecha de inicio del proyecto</label>
-      <input type="date" id="pf-inicio">
-      <div style="font-size:9px;color:var(--ink3);margin-top:4px">Se usará para calcular fechas automáticamente en secuencia</div>
+    <div class="fl"><label>Tipo de proyecto</label>
+      <div style="display:flex;gap:8px">
+        <button type="button" class="rol-b2 on2" id="ptipo-prod" onclick="selTipoProy('productivo')">Productivo</button>
+        <button type="button" class="rol-b2" id="ptipo-blank" onclick="selTipoProy('en_blanco')">En blanco</button>
+      </div>
+      <div id="ptipo-desc" style="font-size:9px;color:var(--ink3);margin-top:6px;padding:6px 8px;background:var(--bg2);border-radius:6px">Proyecto con etapas DE/SD/DD/CD y presupuesto definido.</div>
     </div>
-    <div class="fl"><label>Gasto previo a esta app ($)</label>
-      <input type="number" id="pf-gasto" placeholder="0">
-      <div style="font-size:9px;color:var(--ink3);margin-top:4px">Para proyectos con consumo anterior</div>
-    </div>
-    <div class="fl" id="pf-dist2" style="display:none">
-      <label>Distribución por etapa</label>
-      <div id="pf-dist-cont"></div>
-      <div style="font-size:9px;margin-top:4px" id="pf-dist-total2"></div>
+    <div id="pf-section-etapas">
+      <div class="fl"><label>Etapas activas *</label><div style="display:flex;flex-wrap:wrap;gap:8px" id="pf-etapas2"></div></div>
+      <div class="fl"><label>Presupuesto total ($) *</label><input type="number" id="pf-presup2" placeholder="250000" oninput="actualizarDist2()"></div>
+      <div class="fl"><label>Fecha de inicio del proyecto</label>
+        <input type="date" id="pf-inicio">
+        <div style="font-size:9px;color:var(--ink3);margin-top:4px">Se usará para calcular fechas automáticamente en secuencia</div>
+      </div>
+      <div class="fl"><label>Gasto previo a esta app ($)</label>
+        <input type="number" id="pf-gasto" placeholder="0">
+        <div style="font-size:9px;color:var(--ink3);margin-top:4px">Para proyectos con consumo anterior</div>
+      </div>
+      <div class="fl" id="pf-dist2" style="display:none">
+        <label>Distribución por etapa</label>
+        <div id="pf-dist-cont"></div>
+        <div style="font-size:9px;margin-top:4px" id="pf-dist-total2"></div>
+      </div>
     </div>
     <button class="bsave" id="pf-save" onclick="guardarProy2()">Guardar proyecto</button>
     <button class="bdanger" id="pf-del" style="display:none" onclick="eliminarProy2()">Eliminar proyecto</button>
@@ -1088,16 +1097,22 @@ async function loadGProys(){
   const cont=document.getElementById('g-proys');if(!cont)return;
   const {data:ps}=await sb.from('proyectos').select('*').order('codigo');
   if(!ps||!ps.length){cont.innerHTML=`<div class="empty"><div class="empty-i">📁</div><div>Sin proyectos</div></div>`;return;}
-  cont.innerHTML=ps.map(p=>`<div class="card" style="padding:12px 14px;margin-bottom:8px;display:flex;align-items:center;gap:10px">
+  cont.innerHTML=ps.map(p=>{
+    const esBlanco=p.tipo==='en_blanco';
+    const sublinea=esBlanco
+      ?`<span style="font-size:9px;padding:2px 7px;border-radius:4px;background:var(--amb-lt);color:var(--amber)">en blanco</span>`
+      :`<span style="font-size:10px;color:var(--ink3)">${p.etapas_activas?.join(', ')||''} · $${Math.round(p.presupuesto_total||0).toLocaleString('es-MX')}</span>`;
+    return `<div class="card" style="padding:12px 14px;margin-bottom:8px;display:flex;align-items:center;gap:10px">
     <div style="flex:1;min-width:0">
       <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px">
         <span class="cod">${p.codigo}</span>
         <span style="font-size:12px;color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${p.nombre}</span>
       </div>
-      <div style="font-size:10px;color:var(--ink3)">${p.etapas_activas?.join(', ')||''} · $${Math.round(p.presupuesto_total).toLocaleString('es-MX')}</div>
+      <div style="display:flex;align-items:center;gap:6px">${sublinea}</div>
     </div>
     <button style="width:28px;height:28px;border-radius:6px;border:1.5px solid var(--border);background:none;font-size:13px;color:var(--ink2);display:flex;align-items:center;justify-content:center;cursor:pointer" onclick="abrirEditProy('${p.id}')">✏</button>
-  </div>`).join('');
+  </div>`;
+  }).join('');
 }
 
 // ── COLABORADOR FORM ──
@@ -1163,26 +1178,46 @@ async function eliminarColab2(){
 }
 
 // ── PROYECTO FORM ──
-let proyEditId2=null,etapasSel2=new Set();
+let proyEditId2=null,etapasSel2=new Set(),tipoProy='productivo';
+
+function selTipoProy(tipo){
+  tipoProy=tipo;
+  document.getElementById('ptipo-prod').classList.toggle('on2',tipo==='productivo');
+  document.getElementById('ptipo-blank').classList.toggle('on2',tipo==='en_blanco');
+  const sec=document.getElementById('pf-section-etapas');
+  const desc=document.getElementById('ptipo-desc');
+  if(tipo==='en_blanco'){
+    sec.style.display='none';
+    desc.textContent='Proyecto sin etapas ni presupuesto. Ideal para capacitaciones, cultura organizacional y actividades internas.';
+    desc.style.background='var(--amb-lt)';desc.style.color='var(--amber)';
+  } else {
+    sec.style.display='block';
+    desc.textContent='Proyecto con etapas DE/SD/DD/CD y presupuesto definido.';
+    desc.style.background='var(--bg2)';desc.style.color='var(--ink3)';
+  }
+}
+
 function abrirNuevoProy(){
-  proyEditId2=null;etapasSel2=new Set();
+  proyEditId2=null;etapasSel2=new Set();tipoProy='productivo';
   document.getElementById('pf-title2').textContent='Nuevo proyecto';
   ['pf-cod','pf-nom2','pf-cli','pf-presup2','pf-gasto','pf-inicio'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
   document.getElementById('pf-del').style.display='none';
+  selTipoProy('productivo');
   renderEtapasCheck2();actualizarDist2();
   document.getElementById('ov-proy2').classList.add('on');
 }
 async function abrirEditProy(id){
   const {data:p}=await sb.from('proyectos').select('*').eq('id',id).single();
   if(!p)return;
-  proyEditId2=id;etapasSel2=new Set(p.etapas_activas||[]);
+  proyEditId2=id;etapasSel2=new Set(p.etapas_activas||[]);tipoProy=p.tipo||'productivo';
   document.getElementById('pf-title2').textContent='Editar proyecto';
   document.getElementById('pf-cod').value=p.codigo;
   document.getElementById('pf-nom2').value=p.nombre;
   document.getElementById('pf-cli').value=p.cliente||'';
-  document.getElementById('pf-presup2').value=p.presupuesto_total;
+  document.getElementById('pf-presup2').value=p.presupuesto_total||'';
   document.getElementById('pf-gasto').value=p.gasto_previo||0;
   document.getElementById('pf-del').style.display='block';
+  selTipoProy(tipoProy);
   renderEtapasCheck2();actualizarDist2();
   document.getElementById('ov-proy2').classList.add('on');
 }
@@ -1229,28 +1264,31 @@ function recalcDist2(){
 async function guardarProy2(){
   const codigo=document.getElementById('pf-cod').value.trim();
   const nombre=document.getElementById('pf-nom2').value.trim();
-  const presup=parseFloat(document.getElementById('pf-presup2').value)||0;
-  if(!codigo||!nombre||!presup){toast('Completa los campos obligatorios');return;}
-  if(!etapasSel2.size){toast('Selecciona al menos una etapa');return;}
+  const esBlanco=tipoProy==='en_blanco';
+  const presup=esBlanco?0:parseFloat(document.getElementById('pf-presup2').value)||0;
+  if(!codigo||!nombre){toast('Completa los campos obligatorios');return;}
+  if(!esBlanco&&!presup){toast('Completa los campos obligatorios');return;}
+  if(!esBlanco&&!etapasSel2.size){toast('Selecciona al menos una etapa');return;}
   const btn=document.getElementById('pf-save');btn.disabled=true;btn.textContent='Guardando...';
-  const gastoPrevio=parseFloat(document.getElementById('pf-gasto').value)||0;
-  const fechaInicio=document.getElementById('pf-inicio').value||null;
+  const gastoPrevio=esBlanco?0:parseFloat(document.getElementById('pf-gasto').value)||0;
+  const fechaInicio=esBlanco?null:document.getElementById('pf-inicio').value||null;
   const presupEtapas={};
-  etapasSel2.forEach(k=>{const pct=parseFloat(document.getElementById(`dist2-${k}`)?.value)||0;presupEtapas[k]=Math.round(presup*pct/100);});
-  const datos={codigo,nombre,cliente:document.getElementById('pf-cli').value.trim(),presupuesto_total:presup,gasto_previo:gastoPrevio,etapas_activas:[...etapasSel2]};
+  if(!esBlanco)etapasSel2.forEach(k=>{const pct=parseFloat(document.getElementById(`dist2-${k}`)?.value)||0;presupEtapas[k]=Math.round(presup*pct/100);});
+  const datos={codigo,nombre,cliente:document.getElementById('pf-cli').value.trim(),presupuesto_total:presup,gasto_previo:gastoPrevio,etapas_activas:esBlanco?[]:[ ...etapasSel2],tipo:tipoProy};
 
   if(proyEditId2){
     await sb.from('proyectos').update(datos).eq('id',proyEditId2);
-    await sb.from('presupuesto_etapas').delete().eq('proyecto_id',proyEditId2);
-    const inserts=Object.entries(presupEtapas).map(([k,m])=>({proyecto_id:proyEditId2,etapa_clave:k,monto:m}));
-    if(inserts.length)await sb.from('presupuesto_etapas').insert(inserts);
+    if(!esBlanco){
+      await sb.from('presupuesto_etapas').delete().eq('proyecto_id',proyEditId2);
+      const inserts=Object.entries(presupEtapas).map(([k,m])=>({proyecto_id:proyEditId2,etapa_clave:k,monto:m}));
+      if(inserts.length)await sb.from('presupuesto_etapas').insert(inserts);
+    }
   } else {
     const {data:np}=await sb.from('proyectos').insert(datos).select().single();
-    if(np){
+    if(np&&!esBlanco){
       // cargar entregables template con fechas calculadas en secuencia
       const {data:tpls}=await sb.from('templates').select('*').in('etapa_clave',[...etapasSel2]).order('orden');
       if(tpls?.length){
-        // ordenar por catálogo: DE, SD, DD, CD, PC
         const ordenEtapas=['DE','SD','DD','CD','PC'];
         tpls.sort((a,b)=>{
           const ia=ordenEtapas.indexOf(a.etapa_clave), ib=ordenEtapas.indexOf(b.etapa_clave);
@@ -1266,7 +1304,7 @@ async function guardarProy2(){
             const fFinDate=new Date(fechaCursor);
             fFinDate.setDate(fFinDate.getDate()+Math.round(dur*7));
             fFin=fechaAStr(fFinDate);
-            fechaCursor=new Date(fFinDate); // siguiente empieza donde termina este
+            fechaCursor=new Date(fFinDate);
           }
           return {proyecto_id:np.id,etapa_clave:t.etapa_clave,grupo:t.grupo,nombre:t.nombre,done:false,eliminado:false,fecha_inicio:fIni,fecha_fin:fFin};
         });

@@ -633,7 +633,7 @@ let detProyTab='entregables';
 
 function switchDetProy(tab, btn){
   detProyTab=tab;
-  document.querySelectorAll('.det-tab').forEach(t=>t.classList.remove('on'));
+  document.querySelectorAll('#ov-det-proy .det-tab').forEach(t=>t.classList.remove('on'));
   btn.classList.add('on');
   renderDetProyBody();
 }
@@ -644,11 +644,9 @@ async function abrirDetalleProy(proyId){
   const {data:p}=await sb.from('proyectos').select('*').eq('id',proyId).single();
   document.getElementById('det-proy-title').textContent=p.nombre;
   document.getElementById('det-proy-sub').textContent=`${p.codigo} · ${p.cliente||''}`;
-  // mostrar tab horas solo para admin
   const esAdmin=PERFIL?.rol==='admin';
   document.getElementById('det-tab-horas').style.display=esAdmin?'block':'none';
-  // reset tabs
-  document.querySelectorAll('.det-tab').forEach((t,i)=>t.classList.toggle('on',i===0));
+  document.querySelectorAll('#ov-det-proy .det-tab').forEach((t,i)=>t.classList.toggle('on',i===0));
   document.getElementById('ov-det-proy').classList.add('on');
   await renderDetProyBody();
 }

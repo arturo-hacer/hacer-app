@@ -254,7 +254,7 @@ textarea{resize:none;height:62px;}
 </div>
 
 <!-- MODAL NUEVO ENTREGABLE EN PROYECTO -->
-<div class="ov" id="ov-ned" onclick="closeOv('ov-ned',event)">
+<div class="ov" id="ov-ned" onclick="closeOv('ov-ned',event)" style="z-index:500">
   <div class="sheet">
     <div class="sh"></div>
     <div class="stitle">Nuevo entregable</div>
@@ -266,7 +266,7 @@ textarea{resize:none;height:62px;}
 </div>
 
 <!-- MODAL EDITAR ENTREGABLE -->
-<div class="ov" id="ov-eed" onclick="closeOv('ov-eed',event)">
+<div class="ov" id="ov-eed" onclick="closeOv('ov-eed',event)" style="z-index:500">
   <div class="sheet">
     <div class="sh"></div>
     <div class="stitle">Editar entregable</div>
@@ -276,7 +276,7 @@ textarea{resize:none;height:62px;}
 </div>
 
 <!-- MODAL EDITAR TEMPLATE -->
-<div class="ov" id="ov-etpl" onclick="closeOv('ov-etpl',event)">
+<div class="ov" id="ov-etpl" onclick="closeOv('ov-etpl',event)" style="z-index:500">
   <div class="sheet">
     <div class="sh"></div>
     <div class="stitle">Editar entregable template</div>
@@ -847,8 +847,8 @@ async function renderEntregablesDetalle(){
           <div style="display:flex;align-items:center;gap:8px;padding:9px 16px">
             <div style="width:17px;height:17px;border-radius:50%;border:1.5px solid ${e.done?'var(--green)':'var(--border)'};background:${e.done?'var(--green)':'transparent'};display:flex;align-items:center;justify-content:center;font-size:9px;color:#fff;flex-shrink:0;cursor:pointer" onclick="toggleDoneDetalle('${e.id}',${e.done})">${e.done?'✓':''}</div>
             <span style="flex:1;font-size:11px;color:var(--ink);${e.done?'text-decoration:line-through;opacity:.5':''}">${e.nombre}</span>
-            ${esAdmin?`<button style="font-size:12px;color:var(--ink3);background:none;border:none;cursor:pointer;padding:2px 4px" onclick="abrirEditarEntregable('${e.id}','${e.nombre.replace(/'/g,"\\'")}')" title="Editar nombre">✏</button>
-            <button style="font-size:14px;color:var(--ink3);background:none;border:none;cursor:pointer;padding:2px 4px" onclick="eliminarEntregableDetalle('${e.id}')" title="Eliminar">×</button>`:''}
+            <button style="font-size:12px;color:var(--ink3);background:none;border:none;cursor:pointer;padding:2px 6px" data-edit-id="${e.id}" title="Editar nombre">✏</button>
+            <button style="font-size:16px;color:var(--ink3);background:none;border:none;cursor:pointer;padding:2px 4px" onclick="eliminarEntregableDetalle('${e.id}')" title="Eliminar">×</button>
           </div>
           <div style="display:flex;align-items:center;gap:8px;padding:0 16px 9px 41px">
             <span class="efecha ${fC}" onclick="abrirDPDetalle('${e.id}','${e.fecha_inicio||''}','${e.fecha_fin||''}')">${fT}</span>
@@ -878,6 +878,16 @@ async function renderEntregablesDetalle(){
 
   if(!html) html=`<div class="empty"><div class="empty-i">📋</div><div>Sin entregables</div></div>`;
   cont.innerHTML=html;
+
+  // Delegación de eventos para botones de editar (evita problemas con caracteres especiales en nombres)
+  cont.querySelectorAll('[data-edit-id]').forEach(btn=>{
+    btn.addEventListener('click',()=>{
+      const entId=btn.dataset.editId;
+      const nombreEl=btn.previousElementSibling;
+      const nombre=nombreEl?nombreEl.textContent.trim():'';
+      abrirEditarEntregable(entId, nombre);
+    });
+  });
 }
 
 // Agregar entregable desde detalle proyecto
@@ -1305,6 +1315,7 @@ async function loadGTemplates(){
           title="Duración en semanas">
         <span style="font-size:9px;color:var(--ink3)">sem</span>
       </div>
+      <button style="font-size:12px;color:var(--ink3);background:none;border:none;cursor:pointer;padding:2px 4px" onclick="abrirEditarTemplate('${e.id}','${e.nombre.replace(/'/g,"\\'")}','${e.grupo.replace(/'/g,"\\'")}')">✏</button>
       <button style="width:22px;height:22px;border-radius:4px;border:none;background:none;font-size:14px;color:var(--ink3);cursor:pointer" onclick="eliminarTemplate('${e.id}')">×</button>
     </div>`).join('');
     html+=`<div class="card" style="margin-bottom:10px">

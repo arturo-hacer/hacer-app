@@ -219,6 +219,34 @@ textarea{resize:none;height:62px;}
   </div>
 </div>
 
+<!-- MODAL DETALLE PROYECTO -->
+<div class="ov" id="ov-det-proy" style="align-items:stretch;z-index:350">
+  <div style="background:var(--bg);flex:1;margin-top:50px;border-radius:20px 20px 0 0;display:flex;flex-direction:column;transform:translateY(0);overflow:hidden">
+    <div style="padding:18px 18px 0;flex-shrink:0;background:var(--bg)">
+      <button onclick="document.getElementById('ov-det-proy').classList.remove('on')" style="width:30px;height:30px;border-radius:50%;background:var(--bg2);border:none;font-size:18px;color:var(--ink2);display:flex;align-items:center;justify-content:center;margin-bottom:10px;cursor:pointer">×</button>
+      <div style="font-family:'Fraunces',serif;font-size:18px;font-weight:300;margin-bottom:2px" id="det-proy-title"></div>
+      <div style="font-size:10px;color:var(--ink3);margin-bottom:14px" id="det-proy-sub"></div>
+      <div style="font-size:9px;color:var(--ink3);letter-spacing:.08em;padding-bottom:10px;border-bottom:1px solid var(--border)">Toca una fecha o responsable para editarlo</div>
+    </div>
+    <div style="flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch" id="det-proy-body"></div>
+  </div>
+</div>
+
+<!-- DATE PICKER DETALLE -->
+<div class="ov" id="ov-dpd" onclick="if(event.target.id==='ov-dpd')document.getElementById('ov-dpd').classList.remove('on')" style="align-items:center;justify-content:center;z-index:500">
+  <div style="background:#fff;border-radius:14px;padding:20px;width:calc(100% - 40px);max-width:300px;box-shadow:0 8px 32px rgba(0,0,0,.15)">
+    <div style="font-family:'Fraunces',serif;font-size:14px;font-weight:300;font-style:italic;margin-bottom:14px;color:var(--ink)">Fechas del entregable</div>
+    <div style="display:flex;flex-direction:column;gap:10px;margin-bottom:4px">
+      <div><div style="font-size:9px;letter-spacing:.1em;text-transform:uppercase;color:var(--ink3);margin-bottom:4px">Inicio</div><input type="date" id="dpd-inicio"></div>
+      <div><div style="font-size:9px;letter-spacing:.1em;text-transform:uppercase;color:var(--ink3);margin-bottom:4px">Entrega</div><input type="date" id="dpd-fin"></div>
+    </div>
+    <div style="display:flex;gap:8px;margin-top:16px">
+      <button onclick="document.getElementById('ov-dpd').classList.remove('on')" style="flex:1;padding:10px;border-radius:7px;border:1.5px solid var(--border);background:none;font-size:11px;color:var(--ink2);cursor:pointer">Cancelar</button>
+      <button onclick="guardarFechasDetalle()" style="flex:1;padding:10px;border-radius:7px;border:none;background:var(--accent);color:#fff;font-size:11px;cursor:pointer">Guardar</button>
+    </div>
+  </div>
+</div>
+
 <!-- MODAL TEMPLATE -->
 <div class="ov" id="ov-tpl" onclick="closeOv('ov-tpl',event)">
   <div class="sheet">
@@ -557,7 +585,7 @@ async function saveReg(){
 
 async function renderProy(){
   const cont=document.getElementById('pane-proyectos');
-  cont.innerHTML=`<div class="ldg">Cargando...</div>`;
+  cont.innerHTML=`<div style="padding:16px"><div class="ldg">Cargando...</div></div>`;
   const {data:ps}=await sb.from('proyectos').select('*').order('codigo');
   if(!ps||!ps.length){cont.innerHTML=`<div style="padding:16px"><div class="empty"><div class="empty-i">📁</div><div>Sin proyectos aún</div></div></div>`;return;}
   const {data:es}=await sb.from('entregables').select('proyecto_id,done,eliminado');
@@ -566,12 +594,126 @@ async function renderProy(){
   ps.forEach(p=>{
     const s=ep[p.id]||{t:0,d:0},av=s.t>0?Math.round(s.d/s.t*100):0;
     html+=`<div class="card" style="padding:14px;margin-bottom:12px">
-      <div style="display:flex;align-items:flex-start;gap:10px;margin-bottom:10px"><span class="cod">${p.codigo}</span><div><div style="font-family:'Fraunces',serif;font-size:14px;font-weight:300;color:var(--ink)">${p.nombre}</div><div style="font-size:10px;color:var(--ink3);margin-top:2px">${p.cliente||''}</div></div></div>
-      <div style="display:flex;align-items:center;gap:8px"><div style="flex:1;height:5px;background:var(--bg2);border-radius:3px;overflow:hidden"><div style="height:100%;width:${av}%;background:var(--accent);border-radius:3px"></div></div><span style="font-size:10px;color:var(--accent);font-weight:500">${av}%</span></div>
-      <div style="font-size:10px;color:var(--ink3);margin-top:4px">${s.d}/${s.t} entregables</div>
+      <div style="display:flex;align-items:flex-start;gap:10px;margin-bottom:10px">
+        <span class="cod">${p.codigo}</span>
+        <div style="flex:1;min-width:0">
+          <div style="font-family:'Fraunces',serif;font-size:14px;font-weight:300;color:var(--ink);cursor:pointer" onclick="abrirDetalleProy('${p.id}')">${p.nombre}</div>
+          <div style="font-size:10px;color:var(--ink3);margin-top:2px">${p.cliente||''}</div>
+        </div>
+      </div>
+      <div style="display:flex;align-items:center;gap:8px">
+        <div style="flex:1;height:5px;background:var(--bg2);border-radius:3px;overflow:hidden">
+          <div style="height:100%;width:${av}%;background:var(--accent);border-radius:3px"></div>
+        </div>
+        <span style="font-size:10px;color:var(--accent);font-weight:500">${av}%</span>
+      </div>
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-top:6px">
+        <div style="font-size:10px;color:var(--ink3)">${s.d}/${s.t} entregables</div>
+        <button style="font-size:10px;color:var(--accent);background:none;border:none;cursor:pointer;letter-spacing:.04em" onclick="abrirDetalleProy('${p.id}')">Ver entregables ›</button>
+      </div>
     </div>`;
   });
   cont.innerHTML=html+'</div>';
+}
+
+// ── DETALLE PROYECTO ──
+let proyDetalleId=null;
+
+async function abrirDetalleProy(proyId){
+  proyDetalleId=proyId;
+  const {data:p}=await sb.from('proyectos').select('*').eq('id',proyId).single();
+  document.getElementById('det-proy-title').textContent=p.nombre;
+  document.getElementById('det-proy-sub').textContent=`${p.codigo} · ${p.cliente||''}`;
+  document.getElementById('ov-det-proy').classList.add('on');
+  await renderDetProyBody();
+}
+
+async function renderDetProyBody(){
+  const cont=document.getElementById('det-proy-body');
+  cont.innerHTML=`<div class="ldg">Cargando entregables...</div>`;
+
+  const {data:ents}=await sb.from('entregables')
+    .select('*,colaboradores(nombre,apellido,color)')
+    .eq('proyecto_id',proyDetalleId)
+    .eq('eliminado',false)
+    .order('etapa_clave').order('grupo').order('created_at');
+
+  if(!ents||!ents.length){
+    cont.innerHTML=`<div class="empty"><div class="empty-i">📋</div><div>Sin entregables</div></div>`;
+    return;
+  }
+
+  // Cargar lista de colaboradores para asignar
+  const {data:colabs}=await sb.from('colaboradores').select('id,nombre,apellido,color').order('nombre');
+
+  // Agrupar por etapa → grupo
+  const porEtapa={};
+  ents.forEach(e=>{
+    if(!porEtapa[e.etapa_clave])porEtapa[e.etapa_clave]={};
+    if(!porEtapa[e.etapa_clave][e.grupo])porEtapa[e.etapa_clave][e.grupo]=[];
+    porEtapa[e.etapa_clave][e.grupo].push(e);
+  });
+
+  let html='';
+  // Ordenar por catálogo de etapas
+  ETAPAS_C.forEach(et=>{
+    if(!porEtapa[et.k])return;
+    html+=`<div style="padding:8px 16px;background:var(--bg2);font-size:9px;letter-spacing:.1em;text-transform:uppercase;color:var(--ink2);display:flex;align-items:center;gap:8px;position:sticky;top:0;z-index:2">
+      <span class="ec">${et.k}</span>${et.n}
+    </div>`;
+    Object.entries(porEtapa[et.k]).forEach(([grupo,es])=>{
+      html+=`<div style="padding:5px 16px 3px 16px;font-size:9px;color:var(--ink3);border-bottom:1px dashed var(--border)">${grupo}</div>`;
+      es.forEach(e=>{
+        const c=e.colaboradores;
+        const d=dH(e.fecha_fin);
+        let fC='sin',fT='+ fecha';
+        if(e.fecha_fin){fT=fF(e.fecha_fin);fC=e.done?'ok':d<0?'vencida':d<=5?'pronto':'ok';}
+
+        // Select de responsable
+        const optionsColab=`<option value="">Sin asignar</option>`+
+          (colabs||[]).map(c=>`<option value="${c.id}" ${e.asignado_id===c.id?'selected':''}>${c.nombre} ${c.apellido||''}</option>`).join('');
+
+        html+=`<div style="display:flex;align-items:center;gap:8px;padding:9px 16px;border-bottom:1px solid var(--border);background:${e.done?'rgba(58,122,74,.03)':'#fff'}">
+          <div style="width:17px;height:17px;border-radius:50%;border:1.5px solid ${e.done?'var(--green)':'var(--border)'};background:${e.done?'var(--green)':'transparent'};display:flex;align-items:center;justify-content:center;font-size:9px;color:#fff;flex-shrink:0;cursor:pointer" onclick="toggleDoneDetalle('${e.id}',${e.done})">${e.done?'✓':''}</div>
+          <span style="flex:1;font-size:11px;color:var(--ink);${e.done?'text-decoration:line-through;opacity:.5':''}">${e.nombre}</span>
+          <span class="efecha ${fC}" onclick="abrirDPDetalle('${e.id}','${e.fecha_inicio||''}','${e.fecha_fin||''}')">${fT}</span>
+          <select style="width:110px;font-size:10px;padding:3px 6px;border-radius:5px;flex-shrink:0" onchange="asignarDetalle('${e.id}',this.value)">${optionsColab}</select>
+        </div>`;
+      });
+    });
+  });
+
+  cont.innerHTML=html;
+}
+
+async function toggleDoneDetalle(entId, cur){
+  const done=cur===true||cur==='true'?false:true;
+  await sb.from('entregables').update({done}).eq('id',entId);
+  await renderDetProyBody();
+  toast(done?'✓ Completado':'Desmarcado');
+}
+
+async function asignarDetalle(entId, colabId){
+  await sb.from('entregables').update({asignado_id:colabId||null}).eq('id',entId);
+  toast('✓ Responsable actualizado');
+}
+
+// Date picker para detalle proyecto
+let dpDetalleEntId=null;
+function abrirDPDetalle(entId, inicio, fin){
+  dpDetalleEntId=entId;
+  document.getElementById('dpd-inicio').value=inicio||'';
+  document.getElementById('dpd-fin').value=fin||'';
+  document.getElementById('ov-dpd').classList.add('on');
+}
+async function guardarFechasDetalle(){
+  const ini=document.getElementById('dpd-inicio').value;
+  const fin=document.getElementById('dpd-fin').value;
+  if(ini&&fin&&fin<ini){toast('La entrega debe ser después del inicio');return;}
+  await sb.from('entregables').update({fecha_inicio:ini||null,fecha_fin:fin||null}).eq('id',dpDetalleEntId);
+  document.getElementById('ov-dpd').classList.remove('on');
+  await renderDetProyBody();
+  toast('✓ Fechas guardadas');
 }
 
 async function renderSemana(){

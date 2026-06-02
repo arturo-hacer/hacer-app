@@ -696,6 +696,7 @@ async function abrirDetalleProy(proyId){
   detProyTab='entregables';
   const {data:p}=await sb.from('proyectos').select('*').eq('id',proyId).single();
   proyDetalleTipo=p?.tipo||'productivo';
+  console.log('TIPO PROYECTO:', p?.tipo, '→ proyDetalleTipo:', proyDetalleTipo);
   document.getElementById('det-proy-title').textContent=p.nombre;
   document.getElementById('det-proy-sub').textContent=`${p.codigo}${p.cliente?' · '+p.cliente:''}${proyDetalleTipo==='en_blanco'?' · en blanco':''}`;
   const esAdmin=PERFIL?.rol==='admin';
@@ -874,6 +875,7 @@ async function renderEntregablesDetalle(){
 }
 
 async function _renderEntBlanco(cont,colabs,esAdmin){
+  console.log('_renderEntBlanco ejecutado, esAdmin:', esAdmin);
   const {data:ents}=await sb.from('entregables')
     .select('*,colaboradores(nombre,apellido,color)')
     .eq('proyecto_id',proyDetalleId)

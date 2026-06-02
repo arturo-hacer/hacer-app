@@ -126,6 +126,13 @@ textarea{resize:none;height:62px;}
 .fab{position:fixed;bottom:24px;right:18px;width:50px;height:50px;border-radius:50%;background:var(--accent);color:#fff;border:none;font-size:22px;display:flex;align-items:center;justify-content:center;box-shadow:0 4px 18px rgba(40,40,184,.35);z-index:200;transition:transform .15s;}
 .fab:hover{transform:scale(1.06);}
 .ldg{text-align:center;padding:24px;color:var(--ink3);font-size:11px;}
+.btn-nuevo{font-size:10px;letter-spacing:.06em;padding:6px 12px;border-radius:6px;border:1.5px solid var(--accent);color:var(--accent);background:none;transition:all .15s;cursor:pointer;}
+.btn-nuevo:hover{background:var(--accent);color:#fff;}
+.rol-b2{flex:1;padding:9px;border-radius:7px;border:1.5px solid var(--border);background:#fff;font-size:11px;color:var(--ink2);text-align:center;transition:all .15s;cursor:pointer;}
+.rol-b2.on2{border-color:var(--accent);background:var(--acc-lt);color:var(--accent);}
+.etapa-check-btn{padding:6px 12px;border-radius:6px;border:1.5px solid var(--border);background:#fff;font-size:10px;color:var(--ink2);transition:all .15s;cursor:pointer;}
+.etapa-check-btn.on{border-color:var(--accent);background:var(--acc-lt);color:var(--accent);}
+.bdanger{width:100%;padding:11px;background:none;color:var(--rose);border:1.5px solid var(--rose);border-radius:9px;font-size:11px;letter-spacing:.08em;text-transform:uppercase;margin-top:8px;cursor:pointer;}
 </style>
 </head>
 <body>
@@ -209,6 +216,57 @@ textarea{resize:none;height:62px;}
     <div class="fl"><label>Nota (opcional)</label>
       <textarea id="rnota" placeholder="¿En qué trabajaste?"></textarea></div>
     <button class="bsave" id="rsave" onclick="saveReg()">Guardar</button>
+  </div>
+</div>
+
+<!-- MODAL COLABORADOR -->
+<div class="ov" id="ov-colab2" onclick="closeOv('ov-colab2',event)">
+  <div class="sheet">
+    <div class="sh"></div>
+    <div class="stitle" id="cf-title2">Nuevo colaborador</div>
+    <div class="ssub">La tarifa es confidencial — solo el admin la ve</div>
+    <div style="display:flex;gap:10px">
+      <div class="fl" style="flex:1"><label>Nombre *</label><input type="text" id="cf-nom" placeholder="Valentina"></div>
+      <div class="fl" style="flex:1"><label>Apellido</label><input type="text" id="cf-ape" placeholder="Arce"></div>
+    </div>
+    <div class="fl"><label>Email *</label><input type="email" id="cf-email2" placeholder="val@hacer.mx"></div>
+    <div class="fl"><label>Tarifa ($/hr) *</label><input type="number" id="cf-tarifa2" placeholder="350"></div>
+    <div class="fl"><label>Tipo de perfil</label>
+      <div style="display:flex;gap:8px">
+        <button type="button" class="rol-b2 on2" data-rol="colaborador" onclick="selRol2('colaborador')">Colaborador</button>
+        <button type="button" class="rol-b2" data-rol="admin" onclick="selRol2('admin')">Admin</button>
+      </div>
+    </div>
+    <div class="fl"><label>Color</label><div style="display:flex;gap:8px;flex-wrap:wrap" id="cp2"></div></div>
+    <button class="bsave" id="cf-save" onclick="guardarColab2()">Guardar colaborador</button>
+    <button class="bdanger" id="cf-del" style="display:none" onclick="eliminarColab2()">Eliminar colaborador</button>
+  </div>
+</div>
+
+<!-- MODAL PROYECTO -->
+<div class="ov" id="ov-proy2" onclick="closeOv('ov-proy2',event)">
+  <div class="sheet">
+    <div class="sh"></div>
+    <div class="stitle" id="pf-title2">Nuevo proyecto</div>
+    <div class="ssub">Los campos * son obligatorios</div>
+    <div style="display:flex;gap:10px">
+      <div class="fl" style="flex:1"><label>Código *</label><input type="text" id="pf-cod" placeholder="AZ-03"></div>
+      <div class="fl" style="flex:1"><label>Cliente</label><input type="text" id="pf-cli" placeholder="Cliente"></div>
+    </div>
+    <div class="fl"><label>Nombre *</label><input type="text" id="pf-nom2" placeholder="Nombre del proyecto"></div>
+    <div class="fl"><label>Etapas activas *</label><div style="display:flex;flex-wrap:wrap;gap:8px" id="pf-etapas2"></div></div>
+    <div class="fl"><label>Presupuesto total ($) *</label><input type="number" id="pf-presup2" placeholder="250000" oninput="actualizarDist2()"></div>
+    <div class="fl"><label>Gasto previo a esta app ($)</label>
+      <input type="number" id="pf-gasto" placeholder="0">
+      <div style="font-size:9px;color:var(--ink3);margin-top:4px">Para proyectos con consumo anterior</div>
+    </div>
+    <div class="fl" id="pf-dist2" style="display:none">
+      <label>Distribución por etapa</label>
+      <div id="pf-dist-cont"></div>
+      <div style="font-size:9px;margin-top:4px" id="pf-dist-total2"></div>
+    </div>
+    <button class="bsave" id="pf-save" onclick="guardarProy2()">Guardar proyecto</button>
+    <button class="bdanger" id="pf-del" style="display:none" onclick="eliminarProy2()">Eliminar proyecto</button>
   </div>
 </div>
 
@@ -546,7 +604,221 @@ async function genRep(){
 
 async function renderGestion(){
   const cont=document.getElementById('pane-gestion');if(!cont)return;
-  cont.innerHTML=`<div style="padding:16px"><div class="sec">Gestión</div><div class="card" style="padding:14px"><div style="font-size:11px;color:var(--ink);margin-bottom:6px">Gestión completa de proyectos y colaboradores.</div><div style="font-size:10px;color:var(--ink3)">Esta sección se conectará completamente en la siguiente versión.</div></div></div>`;
+  cont.innerHTML=`<div style="padding:16px">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+      <div class="sec" style="margin:0">Colaboradores</div>
+      <button class="btn-nuevo" onclick="abrirNuevoColab()">+ Agregar</button>
+    </div>
+    <div id="g-colabs"><div class="ldg">Cargando...</div></div>
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;margin-top:20px">
+      <div class="sec" style="margin:0">Proyectos</div>
+      <button class="btn-nuevo" onclick="abrirNuevoProy()">+ Nuevo</button>
+    </div>
+    <div id="g-proys"><div class="ldg">Cargando...</div></div>
+  </div>`;
+  await loadGColabs();
+  await loadGProys();
+}
+
+async function loadGColabs(){
+  const cont=document.getElementById('g-colabs');if(!cont)return;
+  const {data:cs}=await sb.from('colaboradores').select('*').order('nombre');
+  if(!cs||!cs.length){cont.innerHTML=`<div class="empty"><div class="empty-i">👤</div><div>Sin colaboradores</div></div>`;return;}
+  cont.innerHTML=cs.map(c=>`<div class="card" style="padding:12px 14px;margin-bottom:8px;display:flex;align-items:center;gap:10px">
+    <div style="width:32px;height:32px;border-radius:50%;background:${c.color};display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:500;color:#fff;flex-shrink:0">${ini(c.nombre,c.apellido)}</div>
+    <div style="flex:1;min-width:0">
+      <div style="font-size:12px;color:var(--ink)">${c.nombre} ${c.apellido||''}</div>
+      <div style="font-size:10px;color:var(--ink3)">${c.email}</div>
+    </div>
+    <div style="display:flex;gap:6px;align-items:center">
+      <span style="font-size:9px;padding:2px 7px;border-radius:4px;background:${c.rol==='admin'?'var(--acc-lt)':'var(--bg2)'};color:${c.rol==='admin'?'var(--accent)':'var(--ink2)'}">${c.rol}</span>
+      <span style="font-size:9px;padding:2px 7px;border-radius:4px;background:var(--ink);color:var(--bg)">$${c.tarifa}/h</span>
+      <button style="width:28px;height:28px;border-radius:6px;border:1.5px solid var(--border);background:none;font-size:13px;color:var(--ink2);display:flex;align-items:center;justify-content:center;cursor:pointer" onclick="abrirEditColab('${c.id}')">✏</button>
+    </div>
+  </div>`).join('');
+}
+
+async function loadGProys(){
+  const cont=document.getElementById('g-proys');if(!cont)return;
+  const {data:ps}=await sb.from('proyectos').select('*').order('codigo');
+  if(!ps||!ps.length){cont.innerHTML=`<div class="empty"><div class="empty-i">📁</div><div>Sin proyectos</div></div>`;return;}
+  cont.innerHTML=ps.map(p=>`<div class="card" style="padding:12px 14px;margin-bottom:8px;display:flex;align-items:center;gap:10px">
+    <div style="flex:1;min-width:0">
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px">
+        <span class="cod">${p.codigo}</span>
+        <span style="font-size:12px;color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${p.nombre}</span>
+      </div>
+      <div style="font-size:10px;color:var(--ink3)">${p.etapas_activas?.join(', ')||''} · $${Math.round(p.presupuesto_total).toLocaleString('es-MX')}</div>
+    </div>
+    <button style="width:28px;height:28px;border-radius:6px;border:1.5px solid var(--border);background:none;font-size:13px;color:var(--ink2);display:flex;align-items:center;justify-content:center;cursor:pointer" onclick="abrirEditProy('${p.id}')">✏</button>
+  </div>`).join('');
+}
+
+// ── COLABORADOR FORM ──
+let colabEditId=null,colSel='#2828b8',rolSel2='colaborador';
+const COLS=['#2828b8','#ed254e','#3a7a4a','#c28a10','#7b6fa0','#2a7a8a','#8a5a2a'];
+const ETAPAS_C=[{k:'DE',n:'Definición'},{k:'SD',n:'Diseño Esquemático'},{k:'DD',n:'Desarrollo de Diseño'},{k:'CD',n:'Documentos Constructivos'},{k:'PC',n:'Planos Comerciales'}];
+
+function abrirNuevoColab(){
+  colabEditId=null;rolSel2='colaborador';colSel=COLS[0];
+  document.getElementById('cf-title2').textContent='Nuevo colaborador';
+  ['cf-nom','cf-ape','cf-email2','cf-tarifa2'].forEach(id=>document.getElementById(id).value='');
+  document.getElementById('cf-del').style.display='none';
+  renderRoles2();renderColPicker2(colSel);
+  document.getElementById('ov-colab2').classList.add('on');
+}
+async function abrirEditColab(id){
+  const {data:c}=await sb.from('colaboradores').select('*').eq('id',id).single();
+  if(!c)return;
+  colabEditId=id;rolSel2=c.rol;colSel=c.color;
+  document.getElementById('cf-title2').textContent='Editar colaborador';
+  document.getElementById('cf-nom').value=c.nombre;
+  document.getElementById('cf-ape').value=c.apellido||'';
+  document.getElementById('cf-email2').value=c.email;
+  document.getElementById('cf-tarifa2').value=c.tarifa;
+  document.getElementById('cf-del').style.display='block';
+  renderRoles2();renderColPicker2(colSel);
+  document.getElementById('ov-colab2').classList.add('on');
+}
+function renderRoles2(){
+  document.querySelectorAll('.rol-b2').forEach(b=>b.classList.toggle('on2',b.dataset.rol===rolSel2));
+}
+function selRol2(r){rolSel2=r;renderRoles2();}
+function renderColPicker2(sel){
+  const c=document.getElementById('cp2');c.innerHTML='';
+  COLS.forEach(col=>{const b=document.createElement('button');b.type='button';b.style.cssText=`width:28px;height:28px;border-radius:50%;background:${col};border:3px solid ${col===sel?'var(--ink)':'transparent'};cursor:pointer;`;b.onclick=()=>{colSel=col;renderColPicker2(col);};c.appendChild(b);});
+}
+async function guardarColab2(){
+  const nom=document.getElementById('cf-nom').value.trim();
+  const email=document.getElementById('cf-email2').value.trim();
+  const tarifa=parseFloat(document.getElementById('cf-tarifa2').value)||0;
+  if(!nom||!email||!tarifa){toast('Completa los campos obligatorios');return;}
+  const btn=document.getElementById('cf-save');btn.disabled=true;btn.textContent='Guardando...';
+  const datos={nombre:nom,apellido:document.getElementById('cf-ape').value.trim(),email,tarifa,color:colSel,rol:rolSel2};
+  if(colabEditId){
+    await sb.from('colaboradores').update(datos).eq('id',colabEditId);
+  } else {
+    // Crear usuario en Auth primero via Admin API no disponible en cliente
+    // Insertamos solo en colaboradores — el usuario debe crearse en Supabase Auth manualmente
+    const tempId=crypto.randomUUID();
+    await sb.from('colaboradores').insert({id:tempId,...datos});
+    toast('Colaborador agregado. Recuerda crear su usuario en Supabase Auth con el mismo email.');
+    closeOv('ov-colab2');btn.disabled=false;btn.textContent='Guardar';
+    await loadGColabs();return;
+  }
+  closeOv('ov-colab2');btn.disabled=false;btn.textContent='Guardar';
+  await loadGColabs();toast('✓ Colaborador guardado');
+}
+async function eliminarColab2(){
+  if(!colabEditId)return;
+  if(!confirm('¿Eliminar este colaborador?'))return;
+  await sb.from('colaboradores').delete().eq('id',colabEditId);
+  closeOv('ov-colab2');await loadGColabs();toast('Colaborador eliminado');
+}
+
+// ── PROYECTO FORM ──
+let proyEditId2=null,etapasSel2=new Set();
+function abrirNuevoProy(){
+  proyEditId2=null;etapasSel2=new Set();
+  document.getElementById('pf-title2').textContent='Nuevo proyecto';
+  ['pf-cod','pf-nom2','pf-cli','pf-presup2'].forEach(id=>document.getElementById(id).value='');
+  document.getElementById('pf-del').style.display='none';
+  renderEtapasCheck2();actualizarDist2();
+  document.getElementById('ov-proy2').classList.add('on');
+}
+async function abrirEditProy(id){
+  const {data:p}=await sb.from('proyectos').select('*').eq('id',id).single();
+  if(!p)return;
+  proyEditId2=id;etapasSel2=new Set(p.etapas_activas||[]);
+  document.getElementById('pf-title2').textContent='Editar proyecto';
+  document.getElementById('pf-cod').value=p.codigo;
+  document.getElementById('pf-nom2').value=p.nombre;
+  document.getElementById('pf-cli').value=p.cliente||'';
+  document.getElementById('pf-presup2').value=p.presupuesto_total;
+  document.getElementById('pf-gasto').value=p.gasto_previo||0;
+  document.getElementById('pf-del').style.display='block';
+  renderEtapasCheck2();actualizarDist2();
+  document.getElementById('ov-proy2').classList.add('on');
+}
+function renderEtapasCheck2(){
+  const c=document.getElementById('pf-etapas2');c.innerHTML='';
+  ETAPAS_C.forEach(et=>{
+    const b=document.createElement('button');b.type='button';
+    b.className='etapa-check-btn'+(etapasSel2.has(et.k)?' on':'');
+    b.textContent=`${et.k} · ${et.n}`;
+    b.onclick=()=>{etapasSel2.has(et.k)?etapasSel2.delete(et.k):etapasSel2.add(et.k);b.classList.toggle('on');actualizarDist2();};
+    c.appendChild(b);
+  });
+}
+function actualizarDist2(){
+  const presup=parseFloat(document.getElementById('pf-presup2')?.value)||0;
+  const wrap=document.getElementById('pf-dist2');
+  if(!etapasSel2.size||!presup){if(wrap)wrap.style.display='none';return;}
+  if(wrap)wrap.style.display='block';
+  const cont=document.getElementById('pf-dist-cont');if(!cont)return;
+  const pctDef=Math.round(100/etapasSel2.size);
+  cont.innerHTML='';
+  etapasSel2.forEach(k=>{
+    const et=ETAPAS_C.find(x=>x.k===k);
+    const monto=Math.round(presup*pctDef/100);
+    cont.innerHTML+=`<div style="display:flex;align-items:center;gap:8px;margin-bottom:10px">
+      <span style="font-size:10px;color:var(--ink2);width:100px;flex-shrink:0"><b style="color:var(--accent)">${k}</b> · ${et?.n}</span>
+      <input type="number" id="dist2-${k}" value="${pctDef}" min="0" max="100" style="width:60px;padding:6px 8px;text-align:right" oninput="recalcDist2()"> %
+      <span style="font-size:11px;color:var(--ink3);flex:1;text-align:right" id="dm2-${k}">$${monto.toLocaleString('es-MX')}</span>
+    </div>`;
+  });
+}
+function recalcDist2(){
+  const presup=parseFloat(document.getElementById('pf-presup2').value)||0;
+  let tot=0;
+  etapasSel2.forEach(k=>{
+    const pct=parseFloat(document.getElementById(`dist2-${k}`)?.value)||0;
+    tot+=pct;
+    const el=document.getElementById(`dm2-${k}`);
+    if(el)el.textContent='$'+Math.round(presup*pct/100).toLocaleString('es-MX');
+  });
+  const tel=document.getElementById('pf-dist-total2');
+  if(tel){tel.textContent=`Total: ${tot}%`;tel.style.color=Math.abs(tot-100)>1?'var(--rose)':'var(--green)';}
+}
+async function guardarProy2(){
+  const codigo=document.getElementById('pf-cod').value.trim();
+  const nombre=document.getElementById('pf-nom2').value.trim();
+  const presup=parseFloat(document.getElementById('pf-presup2').value)||0;
+  if(!codigo||!nombre||!presup){toast('Completa los campos obligatorios');return;}
+  if(!etapasSel2.size){toast('Selecciona al menos una etapa');return;}
+  const btn=document.getElementById('pf-save');btn.disabled=true;btn.textContent='Guardando...';
+  const gastoPrevio=parseFloat(document.getElementById('pf-gasto').value)||0;
+  const presupEtapas={};
+  etapasSel2.forEach(k=>{const pct=parseFloat(document.getElementById(`dist2-${k}`)?.value)||0;presupEtapas[k]=Math.round(presup*pct/100);});
+  const datos={codigo,nombre,cliente:document.getElementById('pf-cli').value.trim(),presupuesto_total:presup,gasto_previo:gastoPrevio,etapas_activas:[...etapasSel2]};
+
+  if(proyEditId2){
+    await sb.from('proyectos').update(datos).eq('id',proyEditId2);
+    // actualizar presupuesto por etapa
+    await sb.from('presupuesto_etapas').delete().eq('proyecto_id',proyEditId2);
+    const inserts=Object.entries(presupEtapas).map(([k,m])=>({proyecto_id:proyEditId2,etapa_clave:k,monto:m}));
+    if(inserts.length)await sb.from('presupuesto_etapas').insert(inserts);
+  } else {
+    const {data:np}=await sb.from('proyectos').insert(datos).select().single();
+    if(np){
+      // cargar entregables template
+      const {data:tpls}=await sb.from('templates').select('*').in('etapa_clave',[...etapasSel2]).order('orden');
+      if(tpls?.length){
+        const ents=tpls.map(t=>({proyecto_id:np.id,etapa_clave:t.etapa_clave,grupo:t.grupo,nombre:t.nombre,done:false,eliminado:false}));
+        await sb.from('entregables').insert(ents);
+      }
+      const inserts=Object.entries(presupEtapas).map(([k,m])=>({proyecto_id:np.id,etapa_clave:k,monto:m}));
+      if(inserts.length)await sb.from('presupuesto_etapas').insert(inserts);
+    }
+  }
+  closeOv('ov-proy2');btn.disabled=false;btn.textContent='Guardar';
+  await loadGProys();toast('✓ Proyecto guardado');
+}
+async function eliminarProy2(){
+  if(!proyEditId2)return;
+  if(!confirm('¿Eliminar este proyecto? Se eliminarán todos sus entregables y registros.'))return;
+  await sb.from('proyectos').delete().eq('id',proyEditId2);
+  closeOv('ov-proy2');await loadGProys();toast('Proyecto eliminado');
 }
 
 function closeOv(id,e){if(!e||e.target.id===id)document.getElementById(id).classList.remove('on');}

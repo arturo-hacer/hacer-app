@@ -1131,8 +1131,15 @@ async function guardarProy2(){
     const {data:np}=await sb.from('proyectos').insert(datos).select().single();
     if(np){
       // cargar entregables template con fechas calculadas en secuencia
-      const {data:tpls}=await sb.from('templates').select('*').in('etapa_clave',[...etapasSel2]).order('etapa_clave').order('orden');
+      const {data:tpls}=await sb.from('templates').select('*').in('etapa_clave',[...etapasSel2]).order('orden');
       if(tpls?.length){
+        // ordenar por catálogo: DE, SD, DD, CD, PC
+        const ordenEtapas=['DE','SD','DD','CD','PC'];
+        tpls.sort((a,b)=>{
+          const ia=ordenEtapas.indexOf(a.etapa_clave), ib=ordenEtapas.indexOf(b.etapa_clave);
+          if(ia!==ib)return ia-ib;
+          return (a.orden||0)-(b.orden||0);
+        });
         let fechaCursor=fechaInicio?new Date(fechaInicio+' 00:00'):null;
         const ents=tpls.map(t=>{
           let fIni=null,fFin=null;

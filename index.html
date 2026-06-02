@@ -299,7 +299,21 @@ function fS(s){return `${String(Math.floor(s/60)).padStart(2,'0')}:${String(s%60
 function hD(h){const hh=Math.floor(h),mm=Math.round((h-hh)*60);return `${hh}:${String(mm).padStart(2,'0')}`;}
 function hT(h){const hh=Math.floor(h),mm=Math.round((h-hh)*60);if(hh===0)return `${mm}min`;if(mm===0)return `${hh}h`;return `${hh}h ${mm}m`;}
 const DN=['Dom','Lun','Mar','Mié','Jue','Vie','Sáb'];
-function semana(){const dias=[],h=new Date(),dow=h.getDay();const lun=new Date(h);lun.setDate(h.getDate()-(dow===0?6:dow-1));for(let i=0;i<7;i++){const d=new Date(lun);d.setDate(lun.getDate()+i);dias.push(d.toISOString().slice(0,10));}return dias;}
+function semana(){
+  const dias=[];
+  const h=new Date();
+  const dow=h.getDay(); // 0=dom, 1=lun, ..., 6=sab
+  const lun=new Date(h);
+  // retroceder al lunes de esta semana
+  const diff=dow===0?-6:1-dow;
+  lun.setDate(h.getDate()+diff);
+  for(let i=0;i<7;i++){
+    const d=new Date(lun);
+    d.setDate(lun.getDate()+i);
+    dias.push(d.toISOString().slice(0,10));
+  }
+  return dias;
+}
 function ini(a,b){return((a||'')[0]+(b||'')[0]).toUpperCase();}
 
 async function init(){

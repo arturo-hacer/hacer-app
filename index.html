@@ -302,6 +302,10 @@ textarea{resize:none;height:62px;}
     <div class="fl"><label>Nombre *</label><input type="text" id="pf-nom2" placeholder="Nombre del proyecto"></div>
     <div class="fl"><label>Etapas activas *</label><div style="display:flex;flex-wrap:wrap;gap:8px" id="pf-etapas2"></div></div>
     <div class="fl"><label>Presupuesto total ($) *</label><input type="number" id="pf-presup2" placeholder="250000" oninput="actualizarDist2()"></div>
+    <div class="fl"><label>Fecha de inicio del proyecto</label>
+      <input type="date" id="pf-inicio">
+      <div style="font-size:9px;color:var(--ink3);margin-top:4px">Se usará para calcular fechas automáticamente en secuencia</div>
+    </div>
     <div class="fl"><label>Gasto previo a esta app ($)</label>
       <input type="number" id="pf-gasto" placeholder="0">
       <div style="font-size:9px;color:var(--ink3);margin-top:4px">Para proyectos con consumo anterior</div>
@@ -1048,7 +1052,7 @@ let proyEditId2=null,etapasSel2=new Set();
 function abrirNuevoProy(){
   proyEditId2=null;etapasSel2=new Set();
   document.getElementById('pf-title2').textContent='Nuevo proyecto';
-  ['pf-cod','pf-nom2','pf-cli','pf-presup2'].forEach(id=>document.getElementById(id).value='');
+  ['pf-cod','pf-nom2','pf-cli','pf-presup2','pf-gasto','pf-inicio'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
   document.getElementById('pf-del').style.display='none';
   renderEtapasCheck2();actualizarDist2();
   document.getElementById('ov-proy2').classList.add('on');
@@ -1115,23 +1119,35 @@ async function guardarProy2(){
   if(!etapasSel2.size){toast('Selecciona al menos una etapa');return;}
   const btn=document.getElementById('pf-save');btn.disabled=true;btn.textContent='Guardando...';
   const gastoPrevio=parseFloat(document.getElementById('pf-gasto').value)||0;
+  const fechaInicio=document.getElementById('pf-inicio').value||null;
   const presupEtapas={};
   etapasSel2.forEach(k=>{const pct=parseFloat(document.getElementById(`dist2-${k}`)?.value)||0;presupEtapas[k]=Math.round(presup*pct/100);});
   const datos={codigo,nombre,cliente:document.getElementById('pf-cli').value.trim(),presupuesto_total:presup,gasto_previo:gastoPrevio,etapas_activas:[...etapasSel2]};
 
   if(proyEditId2){
     await sb.from('proyectos').update(datos).eq('id',proyEditId2);
-    // actualizar presupuesto por etapa
     await sb.from('presupuesto_etapas').delete().eq('proyecto_id',proyEditId2);
     const inserts=Object.entries(presupEtapas).map(([k,m])=>({proyecto_id:proyEditId2,etapa_clave:k,monto:m}));
     if(inserts.length)await sb.from('presupuesto_etapas').insert(inserts);
   } else {
     const {data:np}=await sb.from('proyectos').insert(datos).select().single();
     if(np){
-      // cargar entregables template
-      const {data:tpls}=await sb.from('templates').select('*').in('etapa_clave',[...etapasSel2]).order('orden');
+      // cargar entregables template con fechas calculadas en secuencia
+      const {data:tpls}=await sb.from('templates').select('*').in('etapa_clave',[...etapasSel2]).order('etapa_clave').order('orden');
       if(tpls?.length){
-        const ents=tpls.map(t=>({proyecto_id:np.id,etapa_clave:t.etapa_clave,grupo:t.grupo,nombre:t.nombre,done:false,eliminado:false}));
+        let fechaCursor=fechaInicio?new Date(fechaInicio+' 00:00'):null;
+        const ents=tpls.map(t=>{
+          let fIni=null,fFin=null;
+          if(fechaCursor){
+            fIni=fechaAStr(fechaCursor);
+            const dur=t.duracion_semanas||1;
+            const fFinDate=new Date(fechaCursor);
+            fFinDate.setDate(fFinDate.getDate()+Math.round(dur*7));
+            fFin=fechaAStr(fFinDate);
+            fechaCursor=new Date(fFinDate); // siguiente empieza donde termina este
+          }
+          return {proyecto_id:np.id,etapa_clave:t.etapa_clave,grupo:t.grupo,nombre:t.nombre,done:false,eliminado:false,fecha_inicio:fIni,fecha_fin:fFin};
+        });
         await sb.from('entregables').insert(ents);
       }
       const inserts=Object.entries(presupEtapas).map(([k,m])=>({proyecto_id:np.id,etapa_clave:k,monto:m}));
@@ -1140,6 +1156,11 @@ async function guardarProy2(){
   }
   closeOv('ov-proy2');btn.disabled=false;btn.textContent='Guardar';
   await loadGProys();toast('✓ Proyecto guardado');
+}
+
+function fechaAStr(d){
+  const y=d.getFullYear(),m=String(d.getMonth()+1).padStart(2,'0'),dd=String(d.getDate()).padStart(2,'0');
+  return `${y}-${m}-${dd}`;
 }
 async function eliminarProy2(){
   if(!proyEditId2)return;
@@ -1155,16 +1176,9 @@ async function loadGTemplates(){
   const cont=document.getElementById('g-tpls');if(!cont)return;
   const {data:tpls}=await sb.from('templates').select('*').order('orden');
   if(!tpls||!tpls.length){cont.innerHTML=`<div class="empty"><div class="empty-i">📋</div><div>Sin templates</div></div>`;return;}
-
-  // Agrupar por etapa
   const porEtapa={};
-  tpls.forEach(t=>{
-    if(!porEtapa[t.etapa_clave])porEtapa[t.etapa_clave]=[];
-    porEtapa[t.etapa_clave].push(t);
-  });
-
+  tpls.forEach(t=>{if(!porEtapa[t.etapa_clave])porEtapa[t.etapa_clave]=[];porEtapa[t.etapa_clave].push(t);});
   let html='';
-  // Usar el orden del catálogo: DE, SD, DD, CD, PC
   ETAPAS_C.forEach(et=>{
     const ents=porEtapa[et.k]||[];
     let rowsHTML=ents.map(e=>`<div style="display:flex;align-items:center;gap:8px;padding:8px 14px;border-bottom:1px solid var(--border)">
@@ -1172,9 +1186,15 @@ async function loadGTemplates(){
         <div style="font-size:11px;color:var(--ink)">${e.nombre}</div>
         <div style="font-size:9px;color:var(--ink3);margin-top:1px">${e.grupo}</div>
       </div>
-      <button style="width:22px;height:22px;border-radius:4px;border:none;background:none;font-size:14px;color:var(--ink3);cursor:pointer;display:flex;align-items:center;justify-content:center" onclick="eliminarTemplate('${e.id}')" title="Eliminar">×</button>
+      <div style="display:flex;align-items:center;gap:4px;flex-shrink:0">
+        <input type="number" value="${e.duracion_semanas||1}" min="0.5" max="52" step="0.5"
+          style="width:48px;padding:4px 6px;font-size:11px;text-align:center;border:1.5px solid var(--border);border-radius:5px;background:#fff"
+          onchange="actualizarDuracion('${e.id}',this.value)"
+          title="Duración en semanas">
+        <span style="font-size:9px;color:var(--ink3)">sem</span>
+      </div>
+      <button style="width:22px;height:22px;border-radius:4px;border:none;background:none;font-size:14px;color:var(--ink3);cursor:pointer" onclick="eliminarTemplate('${e.id}')">×</button>
     </div>`).join('');
-
     html+=`<div class="card" style="margin-bottom:10px">
       <div style="padding:9px 14px;background:var(--bg2);display:flex;align-items:center;gap:8px;border-bottom:1px solid var(--border)">
         <span class="ec">${et.k}</span>
@@ -1184,8 +1204,17 @@ async function loadGTemplates(){
       ${rowsHTML||`<div style="padding:10px 14px;font-size:10px;color:var(--ink3)">Sin entregables — agrega el primero</div>`}
     </div>`;
   });
-
+  // nota explicativa
+  html=`<div style="background:var(--acc-lt);border-radius:8px;padding:10px 12px;margin-bottom:12px;font-size:10px;color:var(--ink2)">
+    📅 Asigna duración en semanas a cada entregable. Al crear un proyecto nuevo, las fechas se calcularán automáticamente en secuencia.
+  </div>`+html;
   cont.innerHTML=html;
+}
+
+async function actualizarDuracion(tplId, valor){
+  const dur=Math.max(0.5,parseFloat(valor)||1);
+  await sb.from('templates').update({duracion_semanas:dur}).eq('id',tplId);
+  toast('✓ Duración actualizada');
 }
 
 function abrirNuevoTemplate(clave){

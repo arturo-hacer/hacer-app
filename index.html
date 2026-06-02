@@ -623,7 +623,7 @@ async function rActEnts(pe=null,forceEc=null){
   s.innerHTML='<option value="">— entregable —</option>';
   if(!pid||!ec)return;
   let q=sb.from('entregables').select('id,nombre').eq('proyecto_id',pid).eq('eliminado',false);
-  if(ec==='_') q=q.is('etapa_clave',null);
+  if(ec==='_') q=q.eq('etapa_clave','_');
   else q=q.eq('etapa_clave',ec);
   const {data}=await q;
   (data||[]).forEach(e=>s.innerHTML+=`<option value="${e.id}">${e.nombre}</option>`);
@@ -637,7 +637,7 @@ async function saveReg(){
   const pid=document.getElementById('rp').value,ec=document.getElementById('re').value,eid=document.getElementById('rent').value;
   if(!pid||!ec||!eid){toast('Completa todos los campos');return;}
   const btn=document.getElementById('rsave');btn.disabled=true;btn.textContent='Guardando...';
-  const etapaClave=ec==='_'?null:ec;
+  const etapaClave=ec==='_'?'_':ec;
   const {data:ex}=await sb.from('registros_horas').select('id').eq('colaborador_id',USER.id).eq('entregable_id',eid).eq('fecha',diaAct).maybeSingle();
   if(ex)await sb.from('registros_horas').update({horas:rH,nota:document.getElementById('rnota').value}).eq('id',ex.id);
   else await sb.from('registros_horas').insert({colaborador_id:USER.id,entregable_id:eid,proyecto_id:pid,etapa_clave:etapaClave,fecha:diaAct,horas:rH,nota:document.getElementById('rnota').value});
@@ -696,7 +696,6 @@ async function abrirDetalleProy(proyId){
   detProyTab='entregables';
   const {data:p}=await sb.from('proyectos').select('*').eq('id',proyId).single();
   proyDetalleTipo=p?.tipo||'productivo';
-  console.log('TIPO PROYECTO:', p?.tipo, '→ proyDetalleTipo:', proyDetalleTipo);
   document.getElementById('det-proy-title').textContent=p.nombre;
   document.getElementById('det-proy-sub').textContent=`${p.codigo}${p.cliente?' · '+p.cliente:''}${proyDetalleTipo==='en_blanco'?' · en blanco':''}`;
   const esAdmin=PERFIL?.rol==='admin';
@@ -875,11 +874,11 @@ async function renderEntregablesDetalle(){
 }
 
 async function _renderEntBlanco(cont,colabs,esAdmin){
-  console.log('_renderEntBlanco ejecutado, esAdmin:', esAdmin);
   const {data:ents}=await sb.from('entregables')
     .select('*,colaboradores(nombre,apellido,color)')
     .eq('proyecto_id',proyDetalleId)
     .eq('eliminado',false)
+    .eq('etapa_clave','_')
     .order('grupo').order('created_at');
   const porGrupo={};
   (ents||[]).forEach(e=>{ const g=e.grupo||'General'; if(!porGrupo[g])porGrupo[g]=[]; porGrupo[g].push(e); });
@@ -963,7 +962,7 @@ async function guardarNuevoEntDetalle(){
   const grupo=document.getElementById('ned-grupo').value.trim()||'General';
   if(!nombre){toast('Escribe el nombre');return;}
   const btn=document.getElementById('ned-save');btn.disabled=true;btn.textContent='Guardando...';
-  const etapaClave=(nuevoEntEtapa===null||nuevoEntEtapa==='_')?null:nuevoEntEtapa;
+  const etapaClave=(nuevoEntEtapa===null||nuevoEntEtapa==='_')?'_':nuevoEntEtapa;
   await sb.from('entregables').insert({proyecto_id:proyDetalleId,etapa_clave:etapaClave,grupo,nombre,done:false,eliminado:false});
   btn.disabled=false;btn.textContent='Agregar';
   closeOv('ov-ned');

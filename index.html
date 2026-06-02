@@ -783,24 +783,19 @@ async function renderEntregablesDetalle(){
     .eq('eliminado',false)
     .order('etapa_clave').order('grupo').order('created_at');
 
-  if(!ents||!ents.length){
-    cont.innerHTML=`<div class="empty"><div class="empty-i">📋</div><div>Sin entregables</div></div>`;
-    return;
-  }
-
-  // Cargar lista de colaboradores para asignar
   const {data:colabs}=await sb.from('colaboradores').select('id,nombre,apellido,color').order('nombre');
 
   // Agrupar por etapa → grupo
   const porEtapa={};
-  ents.forEach(e=>{
+  (ents||[]).forEach(e=>{
     if(!porEtapa[e.etapa_clave])porEtapa[e.etapa_clave]={};
     if(!porEtapa[e.etapa_clave][e.grupo])porEtapa[e.etapa_clave][e.grupo]=[];
     porEtapa[e.etapa_clave][e.grupo].push(e);
   });
 
   let html='';
-  // Ordenar por catálogo de etapas
+  const esAdmin=PERFIL?.rol==='admin';
+
   ETAPAS_C.forEach(et=>{
     if(!porEtapa[et.k])return;
     html+=`<div style="padding:8px 16px;background:var(--bg2);font-size:9px;letter-spacing:.1em;text-transform:uppercase;color:var(--ink2);display:flex;align-items:center;gap:8px;position:sticky;top:0;z-index:2">
@@ -809,26 +804,105 @@ async function renderEntregablesDetalle(){
     Object.entries(porEtapa[et.k]).forEach(([grupo,es])=>{
       html+=`<div style="padding:5px 16px 3px 16px;font-size:9px;color:var(--ink3);border-bottom:1px dashed var(--border)">${grupo}</div>`;
       es.forEach(e=>{
-        const c=e.colaboradores;
         const d=dH(e.fecha_fin);
         let fC='sin',fT='+ fecha';
         if(e.fecha_fin){fT=fF(e.fecha_fin);fC=e.done?'ok':d<0?'vencida':d<=5?'pronto':'ok';}
-
-        // Select de responsable
         const optionsColab=`<option value="">Sin asignar</option>`+
           (colabs||[]).map(c=>`<option value="${c.id}" ${e.asignado_id===c.id?'selected':''}>${c.nombre} ${c.apellido||''}</option>`).join('');
 
-        html+=`<div style="display:flex;align-items:center;gap:8px;padding:9px 16px;border-bottom:1px solid var(--border);background:${e.done?'rgba(58,122,74,.03)':'#fff'}">
-          <div style="width:17px;height:17px;border-radius:50%;border:1.5px solid ${e.done?'var(--green)':'var(--border)'};background:${e.done?'var(--green)':'transparent'};display:flex;align-items:center;justify-content:center;font-size:9px;color:#fff;flex-shrink:0;cursor:pointer" onclick="toggleDoneDetalle('${e.id}',${e.done})">${e.done?'✓':''}</div>
-          <span style="flex:1;font-size:11px;color:var(--ink);${e.done?'text-decoration:line-through;opacity:.5':''}">${e.nombre}</span>
-          <span class="efecha ${fC}" onclick="abrirDPDetalle('${e.id}','${e.fecha_inicio||''}','${e.fecha_fin||''}')">${fT}</span>
-          <select style="width:110px;font-size:10px;padding:3px 6px;border-radius:5px;flex-shrink:0" onchange="asignarDetalle('${e.id}',this.value)">${optionsColab}</select>
+        html+=`<div style="border-bottom:1px solid var(--border);background:${e.done?'rgba(58,122,74,.03)':'#fff'}">
+          <div style="display:flex;align-items:center;gap:8px;padding:9px 16px">
+            <div style="width:17px;height:17px;border-radius:50%;border:1.5px solid ${e.done?'var(--green)':'var(--border)'};background:${e.done?'var(--green)':'transparent'};display:flex;align-items:center;justify-content:center;font-size:9px;color:#fff;flex-shrink:0;cursor:pointer" onclick="toggleDoneDetalle('${e.id}',${e.done})">${e.done?'✓':''}</div>
+            <span style="flex:1;font-size:11px;color:var(--ink);${e.done?'text-decoration:line-through;opacity:.5':''}">${e.nombre}</span>
+            ${esAdmin?`<button style="font-size:12px;color:var(--ink3);background:none;border:none;cursor:pointer;padding:2px 4px" onclick="abrirEditarEntregable('${e.id}','${e.nombre.replace(/'/g,"\\'")}')" title="Editar nombre">✏</button>
+            <button style="font-size:14px;color:var(--ink3);background:none;border:none;cursor:pointer;padding:2px 4px" onclick="eliminarEntregableDetalle('${e.id}')" title="Eliminar">×</button>`:''}
+          </div>
+          <div style="display:flex;align-items:center;gap:8px;padding:0 16px 9px 41px">
+            <span class="efecha ${fC}" onclick="abrirDPDetalle('${e.id}','${e.fecha_inicio||''}','${e.fecha_fin||''}')">${fT}</span>
+            <select style="flex:1;font-size:10px;padding:3px 6px;border-radius:5px;border:1.5px solid var(--border);background:#fff" onchange="asignarDetalle('${e.id}',this.value)">${optionsColab}</select>
+          </div>
         </div>`;
       });
+      // botón agregar entregable al grupo
+      if(esAdmin) html+=`<button onclick="abrirNuevoEntDetalle('${et.k}','${grupo.replace(/'/g,"\\'")}')" style="display:flex;align-items:center;gap:6px;padding:8px 16px;font-size:10px;color:var(--accent);background:none;border:none;border-top:1px dashed var(--border);width:100%;cursor:pointer">+ Agregar entregable</button>`;
     });
+    // botón agregar a grupo nuevo
+    if(esAdmin) html+=`<button onclick="abrirNuevoEntDetalle('${et.k}','')" style="display:flex;align-items:center;gap:6px;padding:8px 16px;font-size:10px;color:var(--ink3);background:var(--bg);border:none;border-top:1px dashed var(--border);width:100%;cursor:pointer">+ Agregar en grupo nuevo</button>`;
   });
 
+  // Si hay etapas activas sin entregables, mostrar opción de agregar
+  if(esAdmin){
+    const {data:proy}=await sb.from('proyectos').select('etapas_activas').eq('id',proyDetalleId).single();
+    (proy?.etapas_activas||[]).forEach(k=>{
+      if(porEtapa[k])return;
+      const et=ETAPAS_C.find(x=>x.k===k);
+      html+=`<div style="padding:8px 16px;background:var(--bg2);font-size:9px;letter-spacing:.1em;text-transform:uppercase;color:var(--ink2);display:flex;align-items:center;gap:8px">
+        <span class="ec">${k}</span>${et?.n||k}
+      </div>
+      <button onclick="abrirNuevoEntDetalle('${k}','')" style="display:flex;align-items:center;gap:6px;padding:10px 16px;font-size:10px;color:var(--accent);background:#fff;border:none;border-top:1px dashed var(--border);width:100%;cursor:pointer">+ Agregar entregable</button>`;
+    });
+  }
+
+  if(!html) html=`<div class="empty"><div class="empty-i">📋</div><div>Sin entregables</div></div>`;
   cont.innerHTML=html;
+}
+
+// Agregar entregable desde detalle proyecto
+let nuevoEntEtapa=null, nuevoEntGrupo=null;
+function abrirNuevoEntDetalle(etapaClave, grupo){
+  nuevoEntEtapa=etapaClave;nuevoEntGrupo=grupo;
+  document.getElementById('ned-etapa').textContent=`${etapaClave} · ${ETAPAS_C.find(x=>x.k===etapaClave)?.n||etapaClave}`;
+  document.getElementById('ned-nom').value='';
+  document.getElementById('ned-grupo').value=grupo;
+  document.getElementById('ov-ned').classList.add('on');
+}
+async function guardarNuevoEntDetalle(){
+  const nombre=document.getElementById('ned-nom').value.trim();
+  const grupo=document.getElementById('ned-grupo').value.trim()||'General';
+  if(!nombre){toast('Escribe el nombre del entregable');return;}
+  const btn=document.getElementById('ned-save');btn.disabled=true;btn.textContent='Guardando...';
+  await sb.from('entregables').insert({proyecto_id:proyDetalleId,etapa_clave:nuevoEntEtapa,grupo,nombre,done:false,eliminado:false});
+  btn.disabled=false;btn.textContent='Agregar';
+  closeOv('ov-ned');
+  await renderDetProyBody();
+  toast('✓ Entregable agregado');
+}
+
+// Editar nombre de entregable
+let editEntId=null;
+function abrirEditarEntregable(entId, nombreActual){
+  editEntId=entId;
+  document.getElementById('eed-nom').value=nombreActual;
+  document.getElementById('ov-eed').classList.add('on');
+}
+async function guardarEditarEntregable(){
+  const nombre=document.getElementById('eed-nom').value.trim();
+  if(!nombre){toast('El nombre no puede estar vacío');return;}
+  const btn=document.getElementById('eed-save');btn.disabled=true;btn.textContent='Guardando...';
+  await sb.from('entregables').update({nombre}).eq('id',editEntId);
+  btn.disabled=false;btn.textContent='Guardar';
+  closeOv('ov-eed');
+  await renderDetProyBody();
+  toast('✓ Entregable actualizado');
+}
+
+// Eliminar entregable desde detalle
+async function eliminarEntregableDetalle(entId){
+  const row=document.querySelector(`[data-ent-id="${entId}"]`);
+  // doble tap para confirmar
+  if(!eliminarEntregableDetalle._pending) eliminarEntregableDetalle._pending={};
+  if(eliminarEntregableDetalle._pending[entId]){
+    clearTimeout(eliminarEntregableDetalle._pending[entId]);
+    delete eliminarEntregableDetalle._pending[entId];
+    await sb.from('entregables').update({eliminado:true}).eq('id',entId);
+    await renderDetProyBody();
+    toast('Entregable eliminado');
+  } else {
+    eliminarEntregableDetalle._pending[entId]=setTimeout(()=>{
+      delete eliminarEntregableDetalle._pending[entId];
+    },3000);
+    toast('Toca × de nuevo para confirmar');
+  }
 }
 
 async function toggleDoneDetalle(entId, cur){

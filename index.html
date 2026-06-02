@@ -219,6 +219,18 @@ textarea{resize:none;height:62px;}
   </div>
 </div>
 
+<!-- MODAL TEMPLATE -->
+<div class="ov" id="ov-tpl" onclick="closeOv('ov-tpl',event)">
+  <div class="sheet">
+    <div class="sh"></div>
+    <div class="stitle">Nuevo entregable template</div>
+    <div class="ssub" id="tf-ctx"></div>
+    <div class="fl"><label>Nombre del entregable *</label><input type="text" id="tf-nom" placeholder="Planta de conjunto"></div>
+    <div class="fl"><label>Grupo / categoría</label><input type="text" id="tf-grupo" placeholder="Proyecto Arquitectónico"></div>
+    <button class="bsave" id="tf-save" onclick="guardarTemplate()">Agregar</button>
+  </div>
+</div>
+
 <!-- MODAL COLABORADOR -->
 <div class="ov" id="ov-colab2" onclick="closeOv('ov-colab2',event)">
   <div class="sheet">
@@ -287,7 +299,7 @@ function fS(s){return `${String(Math.floor(s/60)).padStart(2,'0')}:${String(s%60
 function hD(h){const hh=Math.floor(h),mm=Math.round((h-hh)*60);return `${hh}:${String(mm).padStart(2,'0')}`;}
 function hT(h){const hh=Math.floor(h),mm=Math.round((h-hh)*60);if(hh===0)return `${mm}min`;if(mm===0)return `${hh}h`;return `${hh}h ${mm}m`;}
 const DN=['Dom','Lun','Mar','Mié','Jue','Vie','Sáb'];
-function semana(){const dias=[],h=new Date(),dow=h.getDay(),lun=new Date(h);lun.setDate(h.getDate()-((dow+6)%7));for(let i=0;i<6;i++){const d=new Date(lun);d.setDate(lun.getDate()+i);dias.push(d.toISOString().slice(0,10));}return dias;}
+function semana(){const dias=[],h=new Date(),dow=h.getDay();const lun=new Date(h);lun.setDate(h.getDate()-(dow===0?6:dow-1));for(let i=0;i<7;i++){const d=new Date(lun);d.setDate(lun.getDate()+i);dias.push(d.toISOString().slice(0,10));}return dias;}
 function ini(a,b){return((a||'')[0]+(b||'')[0]).toUpperCase();}
 
 async function init(){
@@ -615,9 +627,14 @@ async function renderGestion(){
       <button class="btn-nuevo" onclick="abrirNuevoProy()">+ Nuevo</button>
     </div>
     <div id="g-proys"><div class="ldg">Cargando...</div></div>
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;margin-top:20px">
+      <div class="sec" style="margin:0">Templates de entregables</div>
+    </div>
+    <div id="g-tpls"><div class="ldg">Cargando...</div></div>
   </div>`;
   await loadGColabs();
   await loadGProys();
+  await loadGTemplates();
 }
 
 async function loadGColabs(){
@@ -819,6 +836,90 @@ async function eliminarProy2(){
   if(!confirm('¿Eliminar este proyecto? Se eliminarán todos sus entregables y registros.'))return;
   await sb.from('proyectos').delete().eq('id',proyEditId2);
   closeOv('ov-proy2');await loadGProys();toast('Proyecto eliminado');
+}
+
+// ── TEMPLATES ──
+let tplEtapaSel=null;
+
+async function loadGTemplates(){
+  const cont=document.getElementById('g-tpls');if(!cont)return;
+  const {data:tpls}=await sb.from('templates').select('*').order('etapa_clave').order('orden');
+  if(!tpls||!tpls.length){cont.innerHTML=`<div class="empty"><div class="empty-i">📋</div><div>Sin templates</div></div>`;return;}
+
+  // Agrupar por etapa
+  const porEtapa={};
+  tpls.forEach(t=>{
+    if(!porEtapa[t.etapa_clave])porEtapa[t.etapa_clave]=[];
+    porEtapa[t.etapa_clave].push(t);
+  });
+
+  let html='';
+  Object.entries(porEtapa).forEach(([clave,ents])=>{
+    const et=ETAPAS_C.find(x=>x.k===clave);
+    let rowsHTML=ents.map(e=>`<div style="display:flex;align-items:center;gap:8px;padding:8px 14px;border-bottom:1px solid var(--border)">
+      <div style="flex:1;min-width:0">
+        <div style="font-size:11px;color:var(--ink)">${e.nombre}</div>
+        <div style="font-size:9px;color:var(--ink3);margin-top:1px">${e.grupo}</div>
+      </div>
+      <button style="width:22px;height:22px;border-radius:4px;border:none;background:none;font-size:14px;color:var(--ink3);cursor:pointer;display:flex;align-items:center;justify-content:center" onclick="eliminarTemplate('${e.id}')" title="Eliminar">×</button>
+    </div>`).join('');
+
+    html+=`<div class="card" style="margin-bottom:10px">
+      <div style="padding:9px 14px;background:var(--bg2);display:flex;align-items:center;gap:8px;border-bottom:1px solid var(--border)">
+        <span class="ec">${clave}</span>
+        <span style="font-size:11px;color:var(--ink2);flex:1">${et?.n||clave}</span>
+        <button class="btn-nuevo" style="padding:4px 10px;font-size:9px" onclick="abrirNuevoTemplate('${clave}')">+ Agregar</button>
+      </div>
+      ${rowsHTML}
+    </div>`;
+  });
+
+  // Botón para agregar a etapa sin entregables aún
+  const etapasSinTemplate=ETAPAS_C.filter(et=>!porEtapa[et.k]);
+  if(etapasSinTemplate.length){
+    html+=`<div style="font-size:10px;color:var(--ink3);margin-bottom:8px">Etapas sin template:</div>`;
+    etapasSinTemplate.forEach(et=>{
+      html+=`<div class="card" style="margin-bottom:8px">
+        <div style="padding:9px 14px;background:var(--bg2);display:flex;align-items:center;gap:8px">
+          <span class="ec">${et.k}</span>
+          <span style="font-size:11px;color:var(--ink2);flex:1">${et.n}</span>
+          <button class="btn-nuevo" style="padding:4px 10px;font-size:9px" onclick="abrirNuevoTemplate('${et.k}')">+ Agregar</button>
+        </div>
+      </div>`;
+    });
+  }
+
+  cont.innerHTML=html;
+}
+
+function abrirNuevoTemplate(clave){
+  tplEtapaSel=clave;
+  const et=ETAPAS_C.find(x=>x.k===clave);
+  document.getElementById('tf-ctx').textContent=`${clave} · ${et?.n}`;
+  document.getElementById('tf-nom').value='';
+  document.getElementById('tf-grupo').value='';
+  document.getElementById('ov-tpl').classList.add('on');
+}
+
+async function guardarTemplate(){
+  const nombre=document.getElementById('tf-nom').value.trim();
+  const grupo=document.getElementById('tf-grupo').value.trim()||'General';
+  if(!nombre){toast('Escribe el nombre del entregable');return;}
+  const btn=document.getElementById('tf-save');btn.disabled=true;btn.textContent='Guardando...';
+  // obtener el orden máximo actual para esta etapa
+  const {data:last}=await sb.from('templates').select('orden').eq('etapa_clave',tplEtapaSel).order('orden',{ascending:false}).limit(1).maybeSingle();
+  const orden=(last?.orden||0)+1;
+  await sb.from('templates').insert({etapa_clave:tplEtapaSel,grupo,nombre,orden});
+  btn.disabled=false;btn.textContent='Agregar';
+  closeOv('ov-tpl');
+  await loadGTemplates();
+  toast('✓ Entregable agregado al template');
+}
+
+async function eliminarTemplate(id){
+  await sb.from('templates').delete().eq('id',id);
+  await loadGTemplates();
+  toast('Entregable eliminado del template');
 }
 
 function closeOv(id,e){if(!e||e.target.id===id)document.getElementById(id).classList.remove('on');}

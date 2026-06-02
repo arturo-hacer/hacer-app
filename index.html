@@ -253,6 +253,39 @@ textarea{resize:none;height:62px;}
   </div>
 </div>
 
+<!-- MODAL NUEVO ENTREGABLE EN PROYECTO -->
+<div class="ov" id="ov-ned" onclick="closeOv('ov-ned',event)">
+  <div class="sheet">
+    <div class="sh"></div>
+    <div class="stitle">Nuevo entregable</div>
+    <div class="ssub" id="ned-etapa"></div>
+    <div class="fl"><label>Nombre *</label><input type="text" id="ned-nom" placeholder="Planta de conjunto"></div>
+    <div class="fl"><label>Grupo / categoría</label><input type="text" id="ned-grupo" placeholder="Proyecto Arquitectónico"></div>
+    <button class="bsave" id="ned-save" onclick="guardarNuevoEntDetalle()">Agregar</button>
+  </div>
+</div>
+
+<!-- MODAL EDITAR ENTREGABLE -->
+<div class="ov" id="ov-eed" onclick="closeOv('ov-eed',event)">
+  <div class="sheet">
+    <div class="sh"></div>
+    <div class="stitle">Editar entregable</div>
+    <div class="fl"><label>Nombre *</label><input type="text" id="eed-nom" placeholder="Nombre del entregable"></div>
+    <button class="bsave" id="eed-save" onclick="guardarEditarEntregable()">Guardar</button>
+  </div>
+</div>
+
+<!-- MODAL EDITAR TEMPLATE -->
+<div class="ov" id="ov-etpl" onclick="closeOv('ov-etpl',event)">
+  <div class="sheet">
+    <div class="sh"></div>
+    <div class="stitle">Editar entregable template</div>
+    <div class="fl"><label>Nombre *</label><input type="text" id="etpl-nom" placeholder="Nombre del entregable"></div>
+    <div class="fl"><label>Grupo / categoría</label><input type="text" id="etpl-grupo" placeholder="Proyecto Arquitectónico"></div>
+    <button class="bsave" id="etpl-save" onclick="guardarEditarTemplate()">Guardar</button>
+  </div>
+</div>
+
 <!-- MODAL TEMPLATE -->
 <div class="ov" id="ov-tpl" onclick="closeOv('ov-tpl',event)">
   <div class="sheet">
@@ -1294,6 +1327,26 @@ async function actualizarDuracion(tplId, valor){
   const dur=Math.max(0.5,parseFloat(valor)||1);
   await sb.from('templates').update({duracion_semanas:dur}).eq('id',tplId);
   toast('✓ Duración actualizada');
+}
+
+// Editar template
+let editTplId=null;
+function abrirEditarTemplate(tplId, nombre, grupo){
+  editTplId=tplId;
+  document.getElementById('etpl-nom').value=nombre;
+  document.getElementById('etpl-grupo').value=grupo;
+  document.getElementById('ov-etpl').classList.add('on');
+}
+async function guardarEditarTemplate(){
+  const nombre=document.getElementById('etpl-nom').value.trim();
+  const grupo=document.getElementById('etpl-grupo').value.trim()||'General';
+  if(!nombre){toast('El nombre no puede estar vacío');return;}
+  const btn=document.getElementById('etpl-save');btn.disabled=true;btn.textContent='Guardando...';
+  await sb.from('templates').update({nombre,grupo}).eq('id',editTplId);
+  btn.disabled=false;btn.textContent='Guardar';
+  closeOv('ov-etpl');
+  await loadGTemplates();
+  toast('✓ Template actualizado');
 }
 
 function abrirNuevoTemplate(clave){

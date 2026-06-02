@@ -230,7 +230,7 @@ textarea{resize:none;height:62px;}
       <div style="font-size:10px;color:var(--ink3);margin-bottom:12px" id="det-proy-sub"></div>
       <div style="display:flex;gap:2px;border-bottom:1px solid var(--border);overflow-x:auto;scrollbar-width:none">
         <button class="det-tab on" onclick="switchDetProy('entregables',this)">Entregables</button>
-        <button class="det-tab" onclick="switchDetProy('gantt',this)">Gantt</button>
+        <button class="det-tab" id="det-tab-gantt" onclick="switchDetProy('gantt',this)">Gantt</button>
         <button class="det-tab" id="det-tab-horas" onclick="switchDetProy('horas',this)" style="display:none">Horas × persona</button>
       </div>
     </div>
@@ -260,7 +260,7 @@ textarea{resize:none;height:62px;}
     <div class="stitle">Nuevo entregable</div>
     <div class="ssub" id="ned-etapa"></div>
     <div class="fl"><label>Nombre *</label><input type="text" id="ned-nom" placeholder="Planta de conjunto"></div>
-    <div class="fl"><label>Grupo / categoría</label><input type="text" id="ned-grupo" placeholder="Proyecto Arquitectónico"></div>
+    <div class="fl" id="ned-grupo-wrap"><label>Grupo / categoría</label><input type="text" id="ned-grupo" placeholder="Proyecto Arquitectónico"></div>
     <button class="bsave" id="ned-save" onclick="guardarNuevoEntDetalle()">Agregar</button>
   </div>
 </div>
@@ -333,29 +333,20 @@ textarea{resize:none;height:62px;}
       <div class="fl" style="flex:1"><label>Cliente</label><input type="text" id="pf-cli" placeholder="Cliente"></div>
     </div>
     <div class="fl"><label>Nombre *</label><input type="text" id="pf-nom2" placeholder="Nombre del proyecto"></div>
-    <div class="fl"><label>Tipo de proyecto</label>
-      <div style="display:flex;gap:8px">
-        <button type="button" class="rol-b2 on2" id="ptipo-prod" onclick="selTipoProy('productivo')">Productivo</button>
-        <button type="button" class="rol-b2" id="ptipo-blank" onclick="selTipoProy('en_blanco')">En blanco</button>
-      </div>
-      <div id="ptipo-desc" style="font-size:9px;color:var(--ink3);margin-top:6px;padding:6px 8px;background:var(--bg2);border-radius:6px">Proyecto con etapas DE/SD/DD/CD y presupuesto definido.</div>
+    <div class="fl"><label>Etapas activas *</label><div style="display:flex;flex-wrap:wrap;gap:8px" id="pf-etapas2"></div></div>
+    <div class="fl"><label>Presupuesto total ($) *</label><input type="number" id="pf-presup2" placeholder="250000" oninput="actualizarDist2()"></div>
+    <div class="fl"><label>Fecha de inicio del proyecto</label>
+      <input type="date" id="pf-inicio">
+      <div style="font-size:9px;color:var(--ink3);margin-top:4px">Se usará para calcular fechas automáticamente en secuencia</div>
     </div>
-    <div id="pf-section-etapas">
-      <div class="fl"><label>Etapas activas *</label><div style="display:flex;flex-wrap:wrap;gap:8px" id="pf-etapas2"></div></div>
-      <div class="fl"><label>Presupuesto total ($) *</label><input type="number" id="pf-presup2" placeholder="250000" oninput="actualizarDist2()"></div>
-      <div class="fl"><label>Fecha de inicio del proyecto</label>
-        <input type="date" id="pf-inicio">
-        <div style="font-size:9px;color:var(--ink3);margin-top:4px">Se usará para calcular fechas automáticamente en secuencia</div>
-      </div>
-      <div class="fl"><label>Gasto previo a esta app ($)</label>
-        <input type="number" id="pf-gasto" placeholder="0">
-        <div style="font-size:9px;color:var(--ink3);margin-top:4px">Para proyectos con consumo anterior</div>
-      </div>
-      <div class="fl" id="pf-dist2" style="display:none">
-        <label>Distribución por etapa</label>
-        <div id="pf-dist-cont"></div>
-        <div style="font-size:9px;margin-top:4px" id="pf-dist-total2"></div>
-      </div>
+    <div class="fl"><label>Gasto previo a esta app ($)</label>
+      <input type="number" id="pf-gasto" placeholder="0">
+      <div style="font-size:9px;color:var(--ink3);margin-top:4px">Para proyectos con consumo anterior</div>
+    </div>
+    <div class="fl" id="pf-dist2" style="display:none">
+      <label>Distribución por etapa</label>
+      <div id="pf-dist-cont"></div>
+      <div style="font-size:9px;margin-top:4px" id="pf-dist-total2"></div>
     </div>
     <button class="bsave" id="pf-save" onclick="guardarProy2()">Guardar proyecto</button>
     <button class="bdanger" id="pf-del" style="display:none" onclick="eliminarProy2()">Eliminar proyecto</button>
@@ -606,16 +597,27 @@ async function rActEtapas(pe=null,pent=null){
   s.innerHTML='<option value="">— etapa —</option>';
   document.getElementById('rent').innerHTML='<option value="">— entregable —</option>';
   if(!pid)return;
+  const {data:proy}=await sb.from('proyectos').select('tipo').eq('id',pid).single();
   const {data}=await sb.from('entregables').select('etapa_clave').eq('proyecto_id',pid).eq('eliminado',false);
-  [...new Set((data||[]).map(e=>e.etapa_clave))].forEach(c=>s.innerHTML+=`<option value="${c}">${c}</option>`);
+  if(proy?.tipo==='en_blanco'){
+    // proyecto en blanco: no hay etapas, un solo "grupo" virtual
+    s.innerHTML='<option value="_">Tareas del proyecto</option>';
+    s.value='_';
+    await rActEnts(pent,'_');
+    return;
+  }
+  [...new Set((data||[]).map(e=>e.etapa_clave).filter(Boolean))].forEach(c=>s.innerHTML+=`<option value="${c}">${c}</option>`);
   if(pe){s.value=pe;await rActEnts(pent);}
 }
-async function rActEnts(pe=null){
-  const pid=document.getElementById('rp').value,ec=document.getElementById('re').value;
+async function rActEnts(pe=null,forceEc=null){
+  const pid=document.getElementById('rp').value,ec=forceEc||document.getElementById('re').value;
   const s=document.getElementById('rent');
   s.innerHTML='<option value="">— entregable —</option>';
   if(!pid||!ec)return;
-  const {data}=await sb.from('entregables').select('id,nombre').eq('proyecto_id',pid).eq('etapa_clave',ec).eq('eliminado',false);
+  let q=sb.from('entregables').select('id,nombre').eq('proyecto_id',pid).eq('eliminado',false);
+  if(ec==='_') q=q.is('etapa_clave',null);
+  else q=q.eq('etapa_clave',ec);
+  const {data}=await q;
   (data||[]).forEach(e=>s.innerHTML+=`<option value="${e.id}">${e.nombre}</option>`);
   if(pe)s.value=pe;
 }
@@ -627,9 +629,10 @@ async function saveReg(){
   const pid=document.getElementById('rp').value,ec=document.getElementById('re').value,eid=document.getElementById('rent').value;
   if(!pid||!ec||!eid){toast('Completa todos los campos');return;}
   const btn=document.getElementById('rsave');btn.disabled=true;btn.textContent='Guardando...';
+  const etapaClave=ec==='_'?null:ec;
   const {data:ex}=await sb.from('registros_horas').select('id').eq('colaborador_id',USER.id).eq('entregable_id',eid).eq('fecha',diaAct).maybeSingle();
   if(ex)await sb.from('registros_horas').update({horas:rH,nota:document.getElementById('rnota').value}).eq('id',ex.id);
-  else await sb.from('registros_horas').insert({colaborador_id:USER.id,entregable_id:eid,proyecto_id:pid,etapa_clave:ec,fecha:diaAct,horas:rH,nota:document.getElementById('rnota').value});
+  else await sb.from('registros_horas').insert({colaborador_id:USER.id,entregable_id:eid,proyecto_id:pid,etapa_clave:etapaClave,fecha:diaAct,horas:rH,nota:document.getElementById('rnota').value});
   btn.disabled=false;btn.textContent='Guardar';
   closeOv('ov-reg');updateCounter();renderMisTareas();
   toast(`✓ ${hT(rH)} guardadas`);
@@ -669,7 +672,7 @@ async function renderProy(){
 }
 
 // ── DETALLE PROYECTO ──
-let proyDetalleId=null;
+let proyDetalleId=null, proyDetalleTipo='productivo';
 
 let detProyTab='entregables';
 
@@ -684,10 +687,13 @@ async function abrirDetalleProy(proyId){
   proyDetalleId=proyId;
   detProyTab='entregables';
   const {data:p}=await sb.from('proyectos').select('*').eq('id',proyId).single();
+  proyDetalleTipo=p?.tipo||'productivo';
   document.getElementById('det-proy-title').textContent=p.nombre;
-  document.getElementById('det-proy-sub').textContent=`${p.codigo} · ${p.cliente||''}`;
+  document.getElementById('det-proy-sub').textContent=`${p.codigo}${p.cliente?' · '+p.cliente:''}${proyDetalleTipo==='en_blanco'?' · proyecto en blanco':''}`;
   const esAdmin=PERFIL?.rol==='admin';
   document.getElementById('det-tab-horas').style.display=esAdmin?'block':'none';
+  // Gantt no aplica en proyectos en blanco
+  document.getElementById('det-tab-gantt').style.display=proyDetalleTipo==='en_blanco'?'none':'block';
   document.querySelectorAll('#ov-det-proy .det-tab').forEach((t,i)=>t.classList.toggle('on',i===0));
   document.getElementById('ov-det-proy').classList.add('on');
   await renderDetProyBody();
@@ -815,19 +821,101 @@ async function renderHorasDetalle(){
   cont.innerHTML=html;
 }
 
+// ── Fila de entregable reutilizable ──
+function _filaEnt(e, colabs, esAdmin, sinGrupo=false){
+  const d=dH(e.fecha_fin);
+  let fC='sin',fT='+ fecha';
+  if(e.fecha_fin){fT=fF(e.fecha_fin);fC=e.done?'ok':d<0?'vencida':d<=5?'pronto':'ok';}
+  const optionsColab=`<option value="">Sin asignar</option>`+
+    (colabs||[]).map(c=>`<option value="${c.id}" ${e.asignado_id===c.id?'selected':''}>${c.nombre} ${c.apellido||''}</option>`).join('');
+  return `<div style="border-bottom:1px solid var(--border);background:${e.done?'rgba(58,122,74,.03)':'#fff'}">
+    <div style="display:flex;align-items:center;gap:8px;padding:9px 16px">
+      <div style="width:17px;height:17px;border-radius:50%;border:1.5px solid ${e.done?'var(--green)':'var(--border)'};background:${e.done?'var(--green)':'transparent'};display:flex;align-items:center;justify-content:center;font-size:9px;color:#fff;flex-shrink:0;cursor:pointer" onclick="toggleDoneDetalle('${e.id}',${e.done})">${e.done?'✓':''}</div>
+      <span style="flex:1;font-size:11px;color:var(--ink);${e.done?'text-decoration:line-through;opacity:.5':''}">${e.nombre}</span>
+      ${esAdmin?`<button style="font-size:12px;color:var(--ink3);background:none;border:none;cursor:pointer;padding:2px 6px" data-edit-id="${e.id}" title="Editar nombre">✏</button>
+      <button style="font-size:16px;color:var(--ink3);background:none;border:none;cursor:pointer;padding:2px 4px" onclick="eliminarEntregableDetalle('${e.id}')" title="Eliminar">×</button>`:''}
+    </div>
+    <div style="display:flex;align-items:center;gap:8px;padding:0 16px 9px 41px">
+      <span class="efecha ${fC}" onclick="abrirDPDetalle('${e.id}','${e.fecha_inicio||''}','${e.fecha_fin||''}')">${fT}</span>
+      <select style="flex:1;font-size:10px;padding:3px 6px;border-radius:5px;border:1.5px solid var(--border);background:#fff" onchange="asignarDetalle('${e.id}',this.value)">${optionsColab}</select>
+      <button style="width:26px;height:26px;border-radius:50%;border:1.5px solid var(--border);background:#fff;font-size:12px;display:flex;align-items:center;justify-content:center;cursor:pointer;color:var(--ink2);flex-shrink:0" onclick="openReg('${e.proyecto_id}','${e.etapa_clave||'_'}','${e.id}')" title="Registrar horas">+</button>
+    </div>
+  </div>`;
+}
+
 async function renderEntregablesDetalle(){
   const cont=document.getElementById('det-proy-body');
   cont.innerHTML=`<div class="ldg">Cargando entregables...</div>`;
+  const esAdmin=PERFIL?.rol==='admin';
+  const {data:colabs}=await sb.from('colaboradores').select('id,nombre,apellido,color').order('nombre');
 
+  if(proyDetalleTipo==='en_blanco'){
+    await _renderEntBlanco(cont, colabs, esAdmin);
+  } else {
+    await _renderEntProductivo(cont, colabs, esAdmin);
+  }
+
+  // Delegación de eventos para botones de editar
+  cont.querySelectorAll('[data-edit-id]').forEach(btn=>{
+    btn.addEventListener('click',()=>{
+      const entId=btn.dataset.editId;
+      const nombreEl=btn.previousElementSibling;
+      const nombre=nombreEl?nombreEl.textContent.trim():'';
+      abrirEditarEntregable(entId, nombre);
+    });
+  });
+}
+
+// Vista entregables para proyectos en blanco (sin etapas, agrupado por grupo libre)
+async function _renderEntBlanco(cont, colabs, esAdmin){
+  const {data:ents}=await sb.from('entregables')
+    .select('*,colaboradores(nombre,apellido,color)')
+    .eq('proyecto_id',proyDetalleId)
+    .eq('eliminado',false)
+    .order('grupo').order('created_at');
+
+  const porGrupo={};
+  (ents||[]).forEach(e=>{
+    const g=e.grupo||'General';
+    if(!porGrupo[g])porGrupo[g]=[];
+    porGrupo[g].push(e);
+  });
+
+  let html='';
+  const grupos=Object.keys(porGrupo);
+
+  if(grupos.length){
+    grupos.forEach(grupo=>{
+      const pend=porGrupo[grupo].filter(e=>!e.done);
+      const comp=porGrupo[grupo].filter(e=>e.done);
+      html+=`<div style="padding:5px 16px 3px;font-size:9px;color:var(--ink3);background:var(--bg2);border-bottom:1px dashed var(--border);letter-spacing:.05em">${grupo}</div>`;
+      pend.forEach(e=>{ html+=_filaEnt(e, colabs, esAdmin); });
+      if(comp.length){
+        html+=`<div style="padding:6px 16px;font-size:9px;color:var(--ink3);cursor:pointer;display:flex;align-items:center;gap:6px;background:var(--bg)" onclick="this.nextElementSibling.style.display=this.nextElementSibling.style.display==='none'?'block':'none';this.querySelector('.ccount').style.display=this.nextElementSibling.style.display==='block'?'none':'inline'">
+          ▼ Completadas <span class="ccount">${comp.length}</span>
+        </div><div style="display:none">`;
+        comp.forEach(e=>{ html+=_filaEnt(e, colabs, esAdmin); });
+        html+=`</div>`;
+      }
+      if(esAdmin) html+=`<button onclick="abrirNuevoEntBlanco('${grupo.replace(/'/g,"\\'")}')" style="display:flex;align-items:center;gap:6px;padding:8px 16px;font-size:10px;color:var(--accent);background:none;border:none;border-top:1px dashed var(--border);width:100%;cursor:pointer">+ Agregar tarea aquí</button>`;
+    });
+  } else {
+    html=`<div class="empty"><div class="empty-i">📋</div><div style="margin-bottom:12px">Sin tareas todavía</div></div>`;
+  }
+
+  if(esAdmin) html+=`<button onclick="abrirNuevoEntBlanco('')" style="display:flex;align-items:center;gap:6px;padding:12px 16px;font-size:10px;color:var(--accent);background:var(--acc-lt);border:none;border-top:1.5px dashed rgba(40,40,184,.2);width:100%;cursor:pointer;letter-spacing:.04em">+ Nueva tarea${grupos.length?' en grupo nuevo':''}</button>`;
+
+  cont.innerHTML=html;
+}
+
+// Vista entregables para proyectos productivos (etapas DE/SD/DD/CD)
+async function _renderEntProductivo(cont, colabs, esAdmin){
   const {data:ents}=await sb.from('entregables')
     .select('*,colaboradores(nombre,apellido,color)')
     .eq('proyecto_id',proyDetalleId)
     .eq('eliminado',false)
     .order('etapa_clave').order('grupo').order('created_at');
 
-  const {data:colabs}=await sb.from('colaboradores').select('id,nombre,apellido,color').order('nombre');
-
-  // Agrupar por etapa → grupo
   const porEtapa={};
   (ents||[]).forEach(e=>{
     if(!porEtapa[e.etapa_clave])porEtapa[e.etapa_clave]={};
@@ -836,7 +924,6 @@ async function renderEntregablesDetalle(){
   });
 
   let html='';
-  const esAdmin=PERFIL?.rol==='admin';
 
   ETAPAS_C.forEach(et=>{
     if(!porEtapa[et.k])return;
@@ -845,34 +932,12 @@ async function renderEntregablesDetalle(){
     </div>`;
     Object.entries(porEtapa[et.k]).forEach(([grupo,es])=>{
       html+=`<div style="padding:5px 16px 3px 16px;font-size:9px;color:var(--ink3);border-bottom:1px dashed var(--border)">${grupo}</div>`;
-      es.forEach(e=>{
-        const d=dH(e.fecha_fin);
-        let fC='sin',fT='+ fecha';
-        if(e.fecha_fin){fT=fF(e.fecha_fin);fC=e.done?'ok':d<0?'vencida':d<=5?'pronto':'ok';}
-        const optionsColab=`<option value="">Sin asignar</option>`+
-          (colabs||[]).map(c=>`<option value="${c.id}" ${e.asignado_id===c.id?'selected':''}>${c.nombre} ${c.apellido||''}</option>`).join('');
-
-        html+=`<div style="border-bottom:1px solid var(--border);background:${e.done?'rgba(58,122,74,.03)':'#fff'}">
-          <div style="display:flex;align-items:center;gap:8px;padding:9px 16px">
-            <div style="width:17px;height:17px;border-radius:50%;border:1.5px solid ${e.done?'var(--green)':'var(--border)'};background:${e.done?'var(--green)':'transparent'};display:flex;align-items:center;justify-content:center;font-size:9px;color:#fff;flex-shrink:0;cursor:pointer" onclick="toggleDoneDetalle('${e.id}',${e.done})">${e.done?'✓':''}</div>
-            <span style="flex:1;font-size:11px;color:var(--ink);${e.done?'text-decoration:line-through;opacity:.5':''}">${e.nombre}</span>
-            <button style="font-size:12px;color:var(--ink3);background:none;border:none;cursor:pointer;padding:2px 6px" data-edit-id="${e.id}" title="Editar nombre">✏</button>
-            <button style="font-size:16px;color:var(--ink3);background:none;border:none;cursor:pointer;padding:2px 4px" onclick="eliminarEntregableDetalle('${e.id}')" title="Eliminar">×</button>
-          </div>
-          <div style="display:flex;align-items:center;gap:8px;padding:0 16px 9px 41px">
-            <span class="efecha ${fC}" onclick="abrirDPDetalle('${e.id}','${e.fecha_inicio||''}','${e.fecha_fin||''}')">${fT}</span>
-            <select style="flex:1;font-size:10px;padding:3px 6px;border-radius:5px;border:1.5px solid var(--border);background:#fff" onchange="asignarDetalle('${e.id}',this.value)">${optionsColab}</select>
-          </div>
-        </div>`;
-      });
-      // botón agregar entregable al grupo
+      es.forEach(e=>{ html+=_filaEnt(e, colabs, esAdmin); });
       if(esAdmin) html+=`<button onclick="abrirNuevoEntDetalle('${et.k}','${grupo.replace(/'/g,"\\'")}')" style="display:flex;align-items:center;gap:6px;padding:8px 16px;font-size:10px;color:var(--accent);background:none;border:none;border-top:1px dashed var(--border);width:100%;cursor:pointer">+ Agregar entregable</button>`;
     });
-    // botón agregar a grupo nuevo
     if(esAdmin) html+=`<button onclick="abrirNuevoEntDetalle('${et.k}','')" style="display:flex;align-items:center;gap:6px;padding:8px 16px;font-size:10px;color:var(--ink3);background:var(--bg);border:none;border-top:1px dashed var(--border);width:100%;cursor:pointer">+ Agregar en grupo nuevo</button>`;
   });
 
-  // Si hay etapas activas sin entregables, mostrar opción de agregar
   if(esAdmin){
     const {data:proy}=await sb.from('proyectos').select('etapas_activas').eq('id',proyDetalleId).single();
     (proy?.etapas_activas||[]).forEach(k=>{
@@ -887,25 +952,27 @@ async function renderEntregablesDetalle(){
 
   if(!html) html=`<div class="empty"><div class="empty-i">📋</div><div>Sin entregables</div></div>`;
   cont.innerHTML=html;
-
-  // Delegación de eventos para botones de editar (evita problemas con caracteres especiales en nombres)
-  cont.querySelectorAll('[data-edit-id]').forEach(btn=>{
-    btn.addEventListener('click',()=>{
-      const entId=btn.dataset.editId;
-      const nombreEl=btn.previousElementSibling;
-      const nombre=nombreEl?nombreEl.textContent.trim():'';
-      abrirEditarEntregable(entId, nombre);
-    });
-  });
 }
 
-// Agregar entregable desde detalle proyecto
+// Agregar tarea en proyecto en blanco
+function abrirNuevoEntBlanco(grupo){
+  nuevoEntEtapa='_';nuevoEntGrupo=grupo;
+  document.getElementById('ned-etapa').textContent=grupo?`Grupo: ${grupo}`:'Nueva tarea';
+  document.getElementById('ned-nom').value='';
+  document.getElementById('ned-grupo').value=grupo;
+  // En blanco: el campo grupo es el principal agrupador, mostrarlo prominente
+  document.getElementById('ned-grupo-wrap').style.display='block';
+  document.getElementById('ov-ned').classList.add('on');
+}
+
+// Agregar entregable desde detalle proyecto (productivo)
 let nuevoEntEtapa=null, nuevoEntGrupo=null;
 function abrirNuevoEntDetalle(etapaClave, grupo){
   nuevoEntEtapa=etapaClave;nuevoEntGrupo=grupo;
   document.getElementById('ned-etapa').textContent=`${etapaClave} · ${ETAPAS_C.find(x=>x.k===etapaClave)?.n||etapaClave}`;
   document.getElementById('ned-nom').value='';
   document.getElementById('ned-grupo').value=grupo;
+  document.getElementById('ned-grupo-wrap').style.display=grupo?'none':'block';
   document.getElementById('ov-ned').classList.add('on');
 }
 async function guardarNuevoEntDetalle(){
@@ -913,11 +980,12 @@ async function guardarNuevoEntDetalle(){
   const grupo=document.getElementById('ned-grupo').value.trim()||'General';
   if(!nombre){toast('Escribe el nombre del entregable');return;}
   const btn=document.getElementById('ned-save');btn.disabled=true;btn.textContent='Guardando...';
-  await sb.from('entregables').insert({proyecto_id:proyDetalleId,etapa_clave:nuevoEntEtapa,grupo,nombre,done:false,eliminado:false});
+  const etapaClave=nuevoEntEtapa==='_'?null:nuevoEntEtapa;
+  await sb.from('entregables').insert({proyecto_id:proyDetalleId,etapa_clave:etapaClave,grupo,nombre,done:false,eliminado:false});
   btn.disabled=false;btn.textContent='Agregar';
   closeOv('ov-ned');
   await renderDetProyBody();
-  toast('✓ Entregable agregado');
+  toast('✓ Tarea agregada');
 }
 
 // Editar nombre de entregable
@@ -1097,22 +1165,16 @@ async function loadGProys(){
   const cont=document.getElementById('g-proys');if(!cont)return;
   const {data:ps}=await sb.from('proyectos').select('*').order('codigo');
   if(!ps||!ps.length){cont.innerHTML=`<div class="empty"><div class="empty-i">📁</div><div>Sin proyectos</div></div>`;return;}
-  cont.innerHTML=ps.map(p=>{
-    const esBlanco=p.tipo==='en_blanco';
-    const sublinea=esBlanco
-      ?`<span style="font-size:9px;padding:2px 7px;border-radius:4px;background:var(--amb-lt);color:var(--amber)">en blanco</span>`
-      :`<span style="font-size:10px;color:var(--ink3)">${p.etapas_activas?.join(', ')||''} · $${Math.round(p.presupuesto_total||0).toLocaleString('es-MX')}</span>`;
-    return `<div class="card" style="padding:12px 14px;margin-bottom:8px;display:flex;align-items:center;gap:10px">
+  cont.innerHTML=ps.map(p=>`<div class="card" style="padding:12px 14px;margin-bottom:8px;display:flex;align-items:center;gap:10px">
     <div style="flex:1;min-width:0">
       <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px">
         <span class="cod">${p.codigo}</span>
         <span style="font-size:12px;color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${p.nombre}</span>
       </div>
-      <div style="display:flex;align-items:center;gap:6px">${sublinea}</div>
+      <div style="font-size:10px;color:var(--ink3)">${p.etapas_activas?.join(', ')||''} · $${Math.round(p.presupuesto_total).toLocaleString('es-MX')}</div>
     </div>
     <button style="width:28px;height:28px;border-radius:6px;border:1.5px solid var(--border);background:none;font-size:13px;color:var(--ink2);display:flex;align-items:center;justify-content:center;cursor:pointer" onclick="abrirEditProy('${p.id}')">✏</button>
-  </div>`;
-  }).join('');
+  </div>`).join('');
 }
 
 // ── COLABORADOR FORM ──
@@ -1178,46 +1240,26 @@ async function eliminarColab2(){
 }
 
 // ── PROYECTO FORM ──
-let proyEditId2=null,etapasSel2=new Set(),tipoProy='productivo';
-
-function selTipoProy(tipo){
-  tipoProy=tipo;
-  document.getElementById('ptipo-prod').classList.toggle('on2',tipo==='productivo');
-  document.getElementById('ptipo-blank').classList.toggle('on2',tipo==='en_blanco');
-  const sec=document.getElementById('pf-section-etapas');
-  const desc=document.getElementById('ptipo-desc');
-  if(tipo==='en_blanco'){
-    sec.style.display='none';
-    desc.textContent='Proyecto sin etapas ni presupuesto. Ideal para capacitaciones, cultura organizacional y actividades internas.';
-    desc.style.background='var(--amb-lt)';desc.style.color='var(--amber)';
-  } else {
-    sec.style.display='block';
-    desc.textContent='Proyecto con etapas DE/SD/DD/CD y presupuesto definido.';
-    desc.style.background='var(--bg2)';desc.style.color='var(--ink3)';
-  }
-}
-
+let proyEditId2=null,etapasSel2=new Set();
 function abrirNuevoProy(){
-  proyEditId2=null;etapasSel2=new Set();tipoProy='productivo';
+  proyEditId2=null;etapasSel2=new Set();
   document.getElementById('pf-title2').textContent='Nuevo proyecto';
   ['pf-cod','pf-nom2','pf-cli','pf-presup2','pf-gasto','pf-inicio'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
   document.getElementById('pf-del').style.display='none';
-  selTipoProy('productivo');
   renderEtapasCheck2();actualizarDist2();
   document.getElementById('ov-proy2').classList.add('on');
 }
 async function abrirEditProy(id){
   const {data:p}=await sb.from('proyectos').select('*').eq('id',id).single();
   if(!p)return;
-  proyEditId2=id;etapasSel2=new Set(p.etapas_activas||[]);tipoProy=p.tipo||'productivo';
+  proyEditId2=id;etapasSel2=new Set(p.etapas_activas||[]);
   document.getElementById('pf-title2').textContent='Editar proyecto';
   document.getElementById('pf-cod').value=p.codigo;
   document.getElementById('pf-nom2').value=p.nombre;
   document.getElementById('pf-cli').value=p.cliente||'';
-  document.getElementById('pf-presup2').value=p.presupuesto_total||'';
+  document.getElementById('pf-presup2').value=p.presupuesto_total;
   document.getElementById('pf-gasto').value=p.gasto_previo||0;
   document.getElementById('pf-del').style.display='block';
-  selTipoProy(tipoProy);
   renderEtapasCheck2();actualizarDist2();
   document.getElementById('ov-proy2').classList.add('on');
 }
@@ -1264,31 +1306,28 @@ function recalcDist2(){
 async function guardarProy2(){
   const codigo=document.getElementById('pf-cod').value.trim();
   const nombre=document.getElementById('pf-nom2').value.trim();
-  const esBlanco=tipoProy==='en_blanco';
-  const presup=esBlanco?0:parseFloat(document.getElementById('pf-presup2').value)||0;
-  if(!codigo||!nombre){toast('Completa los campos obligatorios');return;}
-  if(!esBlanco&&!presup){toast('Completa los campos obligatorios');return;}
-  if(!esBlanco&&!etapasSel2.size){toast('Selecciona al menos una etapa');return;}
+  const presup=parseFloat(document.getElementById('pf-presup2').value)||0;
+  if(!codigo||!nombre||!presup){toast('Completa los campos obligatorios');return;}
+  if(!etapasSel2.size){toast('Selecciona al menos una etapa');return;}
   const btn=document.getElementById('pf-save');btn.disabled=true;btn.textContent='Guardando...';
-  const gastoPrevio=esBlanco?0:parseFloat(document.getElementById('pf-gasto').value)||0;
-  const fechaInicio=esBlanco?null:document.getElementById('pf-inicio').value||null;
+  const gastoPrevio=parseFloat(document.getElementById('pf-gasto').value)||0;
+  const fechaInicio=document.getElementById('pf-inicio').value||null;
   const presupEtapas={};
-  if(!esBlanco)etapasSel2.forEach(k=>{const pct=parseFloat(document.getElementById(`dist2-${k}`)?.value)||0;presupEtapas[k]=Math.round(presup*pct/100);});
-  const datos={codigo,nombre,cliente:document.getElementById('pf-cli').value.trim(),presupuesto_total:presup,gasto_previo:gastoPrevio,etapas_activas:esBlanco?[]:[ ...etapasSel2],tipo:tipoProy};
+  etapasSel2.forEach(k=>{const pct=parseFloat(document.getElementById(`dist2-${k}`)?.value)||0;presupEtapas[k]=Math.round(presup*pct/100);});
+  const datos={codigo,nombre,cliente:document.getElementById('pf-cli').value.trim(),presupuesto_total:presup,gasto_previo:gastoPrevio,etapas_activas:[...etapasSel2]};
 
   if(proyEditId2){
     await sb.from('proyectos').update(datos).eq('id',proyEditId2);
-    if(!esBlanco){
-      await sb.from('presupuesto_etapas').delete().eq('proyecto_id',proyEditId2);
-      const inserts=Object.entries(presupEtapas).map(([k,m])=>({proyecto_id:proyEditId2,etapa_clave:k,monto:m}));
-      if(inserts.length)await sb.from('presupuesto_etapas').insert(inserts);
-    }
+    await sb.from('presupuesto_etapas').delete().eq('proyecto_id',proyEditId2);
+    const inserts=Object.entries(presupEtapas).map(([k,m])=>({proyecto_id:proyEditId2,etapa_clave:k,monto:m}));
+    if(inserts.length)await sb.from('presupuesto_etapas').insert(inserts);
   } else {
     const {data:np}=await sb.from('proyectos').insert(datos).select().single();
-    if(np&&!esBlanco){
+    if(np){
       // cargar entregables template con fechas calculadas en secuencia
       const {data:tpls}=await sb.from('templates').select('*').in('etapa_clave',[...etapasSel2]).order('orden');
       if(tpls?.length){
+        // ordenar por catálogo: DE, SD, DD, CD, PC
         const ordenEtapas=['DE','SD','DD','CD','PC'];
         tpls.sort((a,b)=>{
           const ia=ordenEtapas.indexOf(a.etapa_clave), ib=ordenEtapas.indexOf(b.etapa_clave);
@@ -1304,7 +1343,7 @@ async function guardarProy2(){
             const fFinDate=new Date(fechaCursor);
             fFinDate.setDate(fFinDate.getDate()+Math.round(dur*7));
             fFin=fechaAStr(fFinDate);
-            fechaCursor=new Date(fFinDate);
+            fechaCursor=new Date(fFinDate); // siguiente empieza donde termina este
           }
           return {proyecto_id:np.id,etapa_clave:t.etapa_clave,grupo:t.grupo,nombre:t.nombre,done:false,eliminado:false,fecha_inicio:fIni,fecha_fin:fFin};
         });

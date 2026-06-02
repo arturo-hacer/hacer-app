@@ -598,14 +598,13 @@ async function rActEtapas(pe=null,pent=null){
   document.getElementById('rent').innerHTML='<option value="">— entregable —</option>';
   if(!pid)return;
   const {data:proy}=await sb.from('proyectos').select('tipo').eq('id',pid).single();
-  const {data}=await sb.from('entregables').select('etapa_clave').eq('proyecto_id',pid).eq('eliminado',false);
   if(proy?.tipo==='en_blanco'){
-    // proyecto en blanco: no hay etapas, un solo "grupo" virtual
     s.innerHTML='<option value="_">Tareas del proyecto</option>';
     s.value='_';
     await rActEnts(pent,'_');
     return;
   }
+  const {data}=await sb.from('entregables').select('etapa_clave').eq('proyecto_id',pid).eq('eliminado',false);
   [...new Set((data||[]).map(e=>e.etapa_clave).filter(Boolean))].forEach(c=>s.innerHTML+=`<option value="${c}">${c}</option>`);
   if(pe){s.value=pe;await rActEnts(pent);}
 }
@@ -689,10 +688,9 @@ async function abrirDetalleProy(proyId){
   const {data:p}=await sb.from('proyectos').select('*').eq('id',proyId).single();
   proyDetalleTipo=p?.tipo||'productivo';
   document.getElementById('det-proy-title').textContent=p.nombre;
-  document.getElementById('det-proy-sub').textContent=`${p.codigo}${p.cliente?' · '+p.cliente:''}${proyDetalleTipo==='en_blanco'?' · proyecto en blanco':''}`;
+  document.getElementById('det-proy-sub').textContent=`${p.codigo}${p.cliente?' · '+p.cliente:''}${proyDetalleTipo==='en_blanco'?' · en blanco':''}`;
   const esAdmin=PERFIL?.rol==='admin';
   document.getElementById('det-tab-horas').style.display=esAdmin?'block':'none';
-  // Gantt no aplica en proyectos en blanco
   document.getElementById('det-tab-gantt').style.display=proyDetalleTipo==='en_blanco'?'none':'block';
   document.querySelectorAll('#ov-det-proy .det-tab').forEach((t,i)=>t.classList.toggle('on',i===0));
   document.getElementById('ov-det-proy').classList.add('on');
@@ -822,151 +820,125 @@ async function renderHorasDetalle(){
 }
 
 // ── Fila de entregable reutilizable ──
-function _filaEnt(e, colabs, esAdmin, sinGrupo=false){
+function _filaEnt(e,colabs,esAdmin){
   const d=dH(e.fecha_fin);
   let fC='sin',fT='+ fecha';
   if(e.fecha_fin){fT=fF(e.fecha_fin);fC=e.done?'ok':d<0?'vencida':d<=5?'pronto':'ok';}
-  const optionsColab=`<option value="">Sin asignar</option>`+
-    (colabs||[]).map(c=>`<option value="${c.id}" ${e.asignado_id===c.id?'selected':''}>${c.nombre} ${c.apellido||''}</option>`).join('');
-  return `<div style="border-bottom:1px solid var(--border);background:${e.done?'rgba(58,122,74,.03)':'#fff'}">
-    <div style="display:flex;align-items:center;gap:8px;padding:9px 16px">
-      <div style="width:17px;height:17px;border-radius:50%;border:1.5px solid ${e.done?'var(--green)':'var(--border)'};background:${e.done?'var(--green)':'transparent'};display:flex;align-items:center;justify-content:center;font-size:9px;color:#fff;flex-shrink:0;cursor:pointer" onclick="toggleDoneDetalle('${e.id}',${e.done})">${e.done?'✓':''}</div>
-      <span style="flex:1;font-size:11px;color:var(--ink);${e.done?'text-decoration:line-through;opacity:.5':''}">${e.nombre}</span>
-      ${esAdmin?`<button style="font-size:12px;color:var(--ink3);background:none;border:none;cursor:pointer;padding:2px 6px" data-edit-id="${e.id}" title="Editar nombre">✏</button>
-      <button style="font-size:16px;color:var(--ink3);background:none;border:none;cursor:pointer;padding:2px 4px" onclick="eliminarEntregableDetalle('${e.id}')" title="Eliminar">×</button>`:''}
-    </div>
-    <div style="display:flex;align-items:center;gap:8px;padding:0 16px 9px 41px">
-      <span class="efecha ${fC}" onclick="abrirDPDetalle('${e.id}','${e.fecha_inicio||''}','${e.fecha_fin||''}')">${fT}</span>
-      <select style="flex:1;font-size:10px;padding:3px 6px;border-radius:5px;border:1.5px solid var(--border);background:#fff" onchange="asignarDetalle('${e.id}',this.value)">${optionsColab}</select>
-      <button style="width:26px;height:26px;border-radius:50%;border:1.5px solid var(--border);background:#fff;font-size:12px;display:flex;align-items:center;justify-content:center;cursor:pointer;color:var(--ink2);flex-shrink:0" onclick="openReg('${e.proyecto_id}','${e.etapa_clave||'_'}','${e.id}')" title="Registrar horas">+</button>
-    </div>
-  </div>`;
+  const optionsColab='<option value="">Sin asignar</option>'+
+    (colabs||[]).map(c=>'<option value="'+c.id+'" '+(e.asignado_id===c.id?'selected':'')+'>'+c.nombre+' '+(c.apellido||'')+'</option>').join('');
+  const checkStyle='width:17px;height:17px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:9px;color:#fff;flex-shrink:0;cursor:pointer;border:1.5px solid '+(e.done?'var(--green)':'var(--border)')+';background:'+(e.done?'var(--green)':'transparent');
+  const etClave=e.etapa_clave||'_';
+  let row='<div style="border-bottom:1px solid var(--border);background:'+(e.done?'rgba(58,122,74,.03)':'#fff')+'">';
+  row+='<div style="display:flex;align-items:center;gap:8px;padding:9px 16px">';
+  row+='<div style="'+checkStyle+'" onclick="toggleDoneDetalle(\''+e.id+'\','+e.done+')">'+(e.done?'✓':'')+'</div>';
+  row+='<span style="flex:1;font-size:11px;color:var(--ink);'+(e.done?'text-decoration:line-through;opacity:.5':'')+'">' +e.nombre+'</span>';
+  if(esAdmin){
+    row+='<button style="font-size:12px;color:var(--ink3);background:none;border:none;cursor:pointer;padding:2px 6px" data-edit-id="'+e.id+'" title="Editar nombre">✏</button>';
+    row+='<button style="font-size:16px;color:var(--ink3);background:none;border:none;cursor:pointer;padding:2px 4px" onclick="eliminarEntregableDetalle(\''+e.id+'\')" title="Eliminar">×</button>';
+  }
+  row+='</div>';
+  row+='<div style="display:flex;align-items:center;gap:8px;padding:0 16px 9px 41px">';
+  row+='<span class="efecha '+fC+'" onclick="abrirDPDetalle(\''+e.id+'\',\''+(e.fecha_inicio||'')+'\',\''+(e.fecha_fin||'')+'\')">' +fT+'</span>';
+  row+='<select style="flex:1;font-size:10px;padding:3px 6px;border-radius:5px;border:1.5px solid var(--border);background:#fff" onchange="asignarDetalle(\''+e.id+'\',this.value)">'+optionsColab+'</select>';
+  row+='<button style="width:26px;height:26px;border-radius:50%;border:1.5px solid var(--border);background:#fff;font-size:14px;display:flex;align-items:center;justify-content:center;cursor:pointer;color:var(--ink2);flex-shrink:0" onclick="openReg(\''+e.proyecto_id+'\',\''+etClave+'\',\''+e.id+'\')" title="Registrar horas">+</button>';
+  row+='</div></div>';
+  return row;
 }
-
 async function renderEntregablesDetalle(){
   const cont=document.getElementById('det-proy-body');
   cont.innerHTML=`<div class="ldg">Cargando entregables...</div>`;
   const esAdmin=PERFIL?.rol==='admin';
   const {data:colabs}=await sb.from('colaboradores').select('id,nombre,apellido,color').order('nombre');
-
   if(proyDetalleTipo==='en_blanco'){
-    await _renderEntBlanco(cont, colabs, esAdmin);
+    await _renderEntBlanco(cont,colabs,esAdmin);
   } else {
-    await _renderEntProductivo(cont, colabs, esAdmin);
+    await _renderEntProductivo(cont,colabs,esAdmin);
   }
-
-  // Delegación de eventos para botones de editar
   cont.querySelectorAll('[data-edit-id]').forEach(btn=>{
     btn.addEventListener('click',()=>{
       const entId=btn.dataset.editId;
       const nombreEl=btn.previousElementSibling;
       const nombre=nombreEl?nombreEl.textContent.trim():'';
-      abrirEditarEntregable(entId, nombre);
+      abrirEditarEntregable(entId,nombre);
     });
   });
 }
 
-// Vista entregables para proyectos en blanco (sin etapas, agrupado por grupo libre)
-async function _renderEntBlanco(cont, colabs, esAdmin){
+async function _renderEntBlanco(cont,colabs,esAdmin){
   const {data:ents}=await sb.from('entregables')
     .select('*,colaboradores(nombre,apellido,color)')
     .eq('proyecto_id',proyDetalleId)
     .eq('eliminado',false)
     .order('grupo').order('created_at');
-
   const porGrupo={};
-  (ents||[]).forEach(e=>{
-    const g=e.grupo||'General';
-    if(!porGrupo[g])porGrupo[g]=[];
-    porGrupo[g].push(e);
-  });
-
+  (ents||[]).forEach(e=>{ const g=e.grupo||'General'; if(!porGrupo[g])porGrupo[g]=[]; porGrupo[g].push(e); });
   let html='';
   const grupos=Object.keys(porGrupo);
-
-  if(grupos.length){
-    grupos.forEach(grupo=>{
-      const pend=porGrupo[grupo].filter(e=>!e.done);
-      const comp=porGrupo[grupo].filter(e=>e.done);
-      html+=`<div style="padding:5px 16px 3px;font-size:9px;color:var(--ink3);background:var(--bg2);border-bottom:1px dashed var(--border);letter-spacing:.05em">${grupo}</div>`;
-      pend.forEach(e=>{ html+=_filaEnt(e, colabs, esAdmin); });
-      if(comp.length){
-        html+=`<div style="padding:6px 16px;font-size:9px;color:var(--ink3);cursor:pointer;display:flex;align-items:center;gap:6px;background:var(--bg)" onclick="this.nextElementSibling.style.display=this.nextElementSibling.style.display==='none'?'block':'none';this.querySelector('.ccount').style.display=this.nextElementSibling.style.display==='block'?'none':'inline'">
-          ▼ Completadas <span class="ccount">${comp.length}</span>
-        </div><div style="display:none">`;
-        comp.forEach(e=>{ html+=_filaEnt(e, colabs, esAdmin); });
-        html+=`</div>`;
-      }
-      if(esAdmin) html+=`<button onclick="abrirNuevoEntBlanco('${grupo.replace(/'/g,"\\'")}')" style="display:flex;align-items:center;gap:6px;padding:8px 16px;font-size:10px;color:var(--accent);background:none;border:none;border-top:1px dashed var(--border);width:100%;cursor:pointer">+ Agregar tarea aquí</button>`;
-    });
-  } else {
-    html=`<div class="empty"><div class="empty-i">📋</div><div style="margin-bottom:12px">Sin tareas todavía</div></div>`;
-  }
-
-  if(esAdmin) html+=`<button onclick="abrirNuevoEntBlanco('')" style="display:flex;align-items:center;gap:6px;padding:12px 16px;font-size:10px;color:var(--accent);background:var(--acc-lt);border:none;border-top:1.5px dashed rgba(40,40,184,.2);width:100%;cursor:pointer;letter-spacing:.04em">+ Nueva tarea${grupos.length?' en grupo nuevo':''}</button>`;
-
+  grupos.forEach(grupo=>{
+    const pend=porGrupo[grupo].filter(e=>!e.done);
+    const comp=porGrupo[grupo].filter(e=>e.done);
+    html+=`<div style="padding:5px 16px 3px;font-size:9px;color:var(--ink3);background:var(--bg2);border-bottom:1px dashed var(--border);letter-spacing:.05em">${grupo}</div>`;
+    pend.forEach(e=>{ html+=_filaEnt(e,colabs,esAdmin); });
+    if(comp.length){
+      html+=`<div style="padding:6px 16px;font-size:9px;color:var(--ink3);cursor:pointer;display:flex;align-items:center;gap:6px;background:var(--bg)" onclick="const s=this.nextElementSibling;s.style.display=s.style.display==='none'?'block':'none'">▼ Completadas <span class="ccount">${comp.length}</span></div><div style="display:none">`;
+      comp.forEach(e=>{ html+=_filaEnt(e,colabs,esAdmin); });
+      html+=`</div>`;
+    }
+    if(esAdmin) html+=`<button onclick="abrirNuevoEntBlanco('${grupo}')" style="display:flex;align-items:center;gap:6px;padding:8px 16px;font-size:10px;color:var(--accent);background:none;border:none;border-top:1px dashed var(--border);width:100%;cursor:pointer">+ Agregar tarea aquí</button>`;
+  });
+  if(!grupos.length) html=`<div class="empty"><div class="empty-i">📋</div><div style="margin-bottom:4px">Sin tareas todavía</div></div>`;
+  if(esAdmin) html+=`<button onclick="abrirNuevoEntBlanco('')" style="display:flex;align-items:center;gap:6px;padding:12px 16px;font-size:10px;color:var(--accent);background:var(--acc-lt);border:none;border-top:1.5px dashed rgba(40,40,184,.2);width:100%;cursor:pointer">+ Nueva tarea${grupos.length?' en grupo nuevo':''}</button>`;
   cont.innerHTML=html;
 }
 
-// Vista entregables para proyectos productivos (etapas DE/SD/DD/CD)
-async function _renderEntProductivo(cont, colabs, esAdmin){
+async function _renderEntProductivo(cont,colabs,esAdmin){
   const {data:ents}=await sb.from('entregables')
     .select('*,colaboradores(nombre,apellido,color)')
     .eq('proyecto_id',proyDetalleId)
     .eq('eliminado',false)
     .order('etapa_clave').order('grupo').order('created_at');
-
   const porEtapa={};
   (ents||[]).forEach(e=>{
     if(!porEtapa[e.etapa_clave])porEtapa[e.etapa_clave]={};
     if(!porEtapa[e.etapa_clave][e.grupo])porEtapa[e.etapa_clave][e.grupo]=[];
     porEtapa[e.etapa_clave][e.grupo].push(e);
   });
-
   let html='';
-
   ETAPAS_C.forEach(et=>{
     if(!porEtapa[et.k])return;
-    html+=`<div style="padding:8px 16px;background:var(--bg2);font-size:9px;letter-spacing:.1em;text-transform:uppercase;color:var(--ink2);display:flex;align-items:center;gap:8px;position:sticky;top:0;z-index:2">
-      <span class="ec">${et.k}</span>${et.n}
-    </div>`;
+    html+=`<div style="padding:8px 16px;background:var(--bg2);font-size:9px;letter-spacing:.1em;text-transform:uppercase;color:var(--ink2);display:flex;align-items:center;gap:8px;position:sticky;top:0;z-index:2"><span class="ec">${et.k}</span>${et.n}</div>`;
     Object.entries(porEtapa[et.k]).forEach(([grupo,es])=>{
       html+=`<div style="padding:5px 16px 3px 16px;font-size:9px;color:var(--ink3);border-bottom:1px dashed var(--border)">${grupo}</div>`;
-      es.forEach(e=>{ html+=_filaEnt(e, colabs, esAdmin); });
-      if(esAdmin) html+=`<button onclick="abrirNuevoEntDetalle('${et.k}','${grupo.replace(/'/g,"\\'")}')" style="display:flex;align-items:center;gap:6px;padding:8px 16px;font-size:10px;color:var(--accent);background:none;border:none;border-top:1px dashed var(--border);width:100%;cursor:pointer">+ Agregar entregable</button>`;
+      es.forEach(e=>{ html+=_filaEnt(e,colabs,esAdmin); });
+      if(esAdmin) html+=`<button onclick="abrirNuevoEntDetalle('${et.k}','${grupo}')" style="display:flex;align-items:center;gap:6px;padding:8px 16px;font-size:10px;color:var(--accent);background:none;border:none;border-top:1px dashed var(--border);width:100%;cursor:pointer">+ Agregar entregable</button>`;
     });
     if(esAdmin) html+=`<button onclick="abrirNuevoEntDetalle('${et.k}','')" style="display:flex;align-items:center;gap:6px;padding:8px 16px;font-size:10px;color:var(--ink3);background:var(--bg);border:none;border-top:1px dashed var(--border);width:100%;cursor:pointer">+ Agregar en grupo nuevo</button>`;
   });
-
   if(esAdmin){
     const {data:proy}=await sb.from('proyectos').select('etapas_activas').eq('id',proyDetalleId).single();
     (proy?.etapas_activas||[]).forEach(k=>{
       if(porEtapa[k])return;
       const et=ETAPAS_C.find(x=>x.k===k);
-      html+=`<div style="padding:8px 16px;background:var(--bg2);font-size:9px;letter-spacing:.1em;text-transform:uppercase;color:var(--ink2);display:flex;align-items:center;gap:8px">
-        <span class="ec">${k}</span>${et?.n||k}
-      </div>
-      <button onclick="abrirNuevoEntDetalle('${k}','')" style="display:flex;align-items:center;gap:6px;padding:10px 16px;font-size:10px;color:var(--accent);background:#fff;border:none;border-top:1px dashed var(--border);width:100%;cursor:pointer">+ Agregar entregable</button>`;
+      html+=`<div style="padding:8px 16px;background:var(--bg2);font-size:9px;letter-spacing:.1em;text-transform:uppercase;color:var(--ink2);display:flex;align-items:center;gap:8px"><span class="ec">${k}</span>${et?.n||k}</div><button onclick="abrirNuevoEntDetalle('${k}','')" style="display:flex;align-items:center;gap:6px;padding:10px 16px;font-size:10px;color:var(--accent);background:#fff;border:none;border-top:1px dashed var(--border);width:100%;cursor:pointer">+ Agregar entregable</button>`;
     });
   }
-
   if(!html) html=`<div class="empty"><div class="empty-i">📋</div><div>Sin entregables</div></div>`;
   cont.innerHTML=html;
 }
 
+
+
 // Agregar tarea en proyecto en blanco
+let nuevoEntEtapa=null, nuevoEntGrupo=null;
 function abrirNuevoEntBlanco(grupo){
   nuevoEntEtapa='_';nuevoEntGrupo=grupo;
   document.getElementById('ned-etapa').textContent=grupo?`Grupo: ${grupo}`:'Nueva tarea';
   document.getElementById('ned-nom').value='';
   document.getElementById('ned-grupo').value=grupo;
-  // En blanco: el campo grupo es el principal agrupador, mostrarlo prominente
   document.getElementById('ned-grupo-wrap').style.display='block';
   document.getElementById('ov-ned').classList.add('on');
 }
 
-// Agregar entregable desde detalle proyecto (productivo)
-let nuevoEntEtapa=null, nuevoEntGrupo=null;
 function abrirNuevoEntDetalle(etapaClave, grupo){
   nuevoEntEtapa=etapaClave;nuevoEntGrupo=grupo;
   document.getElementById('ned-etapa').textContent=`${etapaClave} · ${ETAPAS_C.find(x=>x.k===etapaClave)?.n||etapaClave}`;
@@ -978,9 +950,9 @@ function abrirNuevoEntDetalle(etapaClave, grupo){
 async function guardarNuevoEntDetalle(){
   const nombre=document.getElementById('ned-nom').value.trim();
   const grupo=document.getElementById('ned-grupo').value.trim()||'General';
-  if(!nombre){toast('Escribe el nombre del entregable');return;}
+  if(!nombre){toast('Escribe el nombre');return;}
   const btn=document.getElementById('ned-save');btn.disabled=true;btn.textContent='Guardando...';
-  const etapaClave=nuevoEntEtapa==='_'?null:nuevoEntEtapa;
+  const etapaClave=(nuevoEntEtapa===null||nuevoEntEtapa==='_')?null:nuevoEntEtapa;
   await sb.from('entregables').insert({proyecto_id:proyDetalleId,etapa_clave:etapaClave,grupo,nombre,done:false,eliminado:false});
   btn.disabled=false;btn.textContent='Agregar';
   closeOv('ov-ned');
@@ -1392,7 +1364,7 @@ async function loadGTemplates(){
           title="Duración en semanas">
         <span style="font-size:9px;color:var(--ink3)">sem</span>
       </div>
-      <button style="font-size:12px;color:var(--ink3);background:none;border:none;cursor:pointer;padding:2px 4px" onclick="abrirEditarTemplate('${e.id}','${e.nombre.replace(/'/g,"\\'")}','${e.grupo.replace(/'/g,"\\'")}')">✏</button>
+      <button style="font-size:12px;color:var(--ink3);background:none;border:none;cursor:pointer;padding:2px 4px" onclick="abrirEditarTemplate('${e.id}','${e.nombre}','${e.grupo}')">✏</button>
       <button style="width:22px;height:22px;border-radius:4px;border:none;background:none;font-size:14px;color:var(--ink3);cursor:pointer" onclick="eliminarTemplate('${e.id}')">×</button>
     </div>`).join('');
     html+=`<div class="card" style="margin-bottom:10px">

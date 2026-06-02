@@ -132,6 +132,8 @@ textarea{resize:none;height:62px;}
 .rol-b2.on2{border-color:var(--accent);background:var(--acc-lt);color:var(--accent);}
 .etapa-check-btn{padding:6px 12px;border-radius:6px;border:1.5px solid var(--border);background:#fff;font-size:10px;color:var(--ink2);transition:all .15s;cursor:pointer;}
 .etapa-check-btn.on{border-color:var(--accent);background:var(--acc-lt);color:var(--accent);}
+.det-tab{flex-shrink:0;padding:8px 12px;font-size:10px;letter-spacing:.07em;text-transform:uppercase;color:var(--ink3);background:none;border:none;border-bottom:2px solid transparent;cursor:pointer;white-space:nowrap;}
+.det-tab.on{color:var(--accent);border-bottom-color:var(--accent);}
 .bdanger{width:100%;padding:11px;background:none;color:var(--rose);border:1.5px solid var(--rose);border-radius:9px;font-size:11px;letter-spacing:.08em;text-transform:uppercase;margin-top:8px;cursor:pointer;}
 </style>
 </head>
@@ -221,12 +223,16 @@ textarea{resize:none;height:62px;}
 
 <!-- MODAL DETALLE PROYECTO -->
 <div class="ov" id="ov-det-proy" style="align-items:stretch;z-index:350">
-  <div style="background:var(--bg);flex:1;margin-top:50px;border-radius:20px 20px 0 0;display:flex;flex-direction:column;transform:translateY(0);overflow:hidden">
+  <div style="background:var(--bg);flex:1;margin-top:50px;border-radius:20px 20px 0 0;display:flex;flex-direction:column;overflow:hidden">
     <div style="padding:18px 18px 0;flex-shrink:0;background:var(--bg)">
       <button onclick="document.getElementById('ov-det-proy').classList.remove('on')" style="width:30px;height:30px;border-radius:50%;background:var(--bg2);border:none;font-size:18px;color:var(--ink2);display:flex;align-items:center;justify-content:center;margin-bottom:10px;cursor:pointer">×</button>
       <div style="font-family:'Fraunces',serif;font-size:18px;font-weight:300;margin-bottom:2px" id="det-proy-title"></div>
-      <div style="font-size:10px;color:var(--ink3);margin-bottom:14px" id="det-proy-sub"></div>
-      <div style="font-size:9px;color:var(--ink3);letter-spacing:.08em;padding-bottom:10px;border-bottom:1px solid var(--border)">Toca una fecha o responsable para editarlo</div>
+      <div style="font-size:10px;color:var(--ink3);margin-bottom:12px" id="det-proy-sub"></div>
+      <div style="display:flex;gap:2px;border-bottom:1px solid var(--border);overflow-x:auto;scrollbar-width:none">
+        <button class="det-tab on" onclick="switchDetProy('entregables',this)">Entregables</button>
+        <button class="det-tab" onclick="switchDetProy('gantt',this)">Gantt</button>
+        <button class="det-tab" id="det-tab-horas" onclick="switchDetProy('horas',this)" style="display:none">Horas × persona</button>
+      </div>
     </div>
     <div style="flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch" id="det-proy-body"></div>
   </div>
@@ -619,13 +625,150 @@ async function renderProy(){
 // ── DETALLE PROYECTO ──
 let proyDetalleId=null;
 
+let detProyTab='entregables';
+
+function switchDetProy(tab, btn){
+  detProyTab=tab;
+  document.querySelectorAll('.det-tab').forEach(t=>t.classList.remove('on'));
+  btn.classList.add('on');
+  renderDetProyBody();
+}
+
 async function abrirDetalleProy(proyId){
   proyDetalleId=proyId;
+  detProyTab='entregables';
   const {data:p}=await sb.from('proyectos').select('*').eq('id',proyId).single();
   document.getElementById('det-proy-title').textContent=p.nombre;
   document.getElementById('det-proy-sub').textContent=`${p.codigo} · ${p.cliente||''}`;
+  // mostrar tab horas solo para admin
+  const esAdmin=PERFIL?.rol==='admin';
+  document.getElementById('det-tab-horas').style.display=esAdmin?'block':'none';
+  // reset tabs
+  document.querySelectorAll('.det-tab').forEach((t,i)=>t.classList.toggle('on',i===0));
   document.getElementById('ov-det-proy').classList.add('on');
   await renderDetProyBody();
+}
+
+async function renderDetProyBody(){
+  if(detProyTab==='entregables') await renderEntregablesDetalle();
+  else if(detProyTab==='gantt') await renderGanttDetalle();
+  else await renderHorasDetalle();
+}
+
+async function renderGanttDetalle(){
+  const cont=document.getElementById('det-proy-body');
+  cont.innerHTML=`<div class="ldg">Cargando Gantt...</div>`;
+
+  const {data:ents}=await sb.from('entregables')
+    .select('*')
+    .eq('proyecto_id',proyDetalleId)
+    .eq('eliminado',false)
+    .order('etapa_clave').order('grupo').order('created_at');
+
+  const conFecha=(ents||[]).filter(e=>e.fecha_inicio&&e.fecha_fin);
+  if(!conFecha.length){
+    cont.innerHTML=`<div class="empty"><div class="empty-i">📅</div><div>Sin fechas asignadas todavía</div><div style="font-size:10px;color:var(--ink3);margin-top:6px">Ve a Entregables y agrega fechas de inicio y entrega</div></div>`;
+    return;
+  }
+
+  // Calcular rango
+  const fechas=conFecha.flatMap(e=>[e.fecha_inicio,e.fecha_fin]);
+  const minD=fechas.reduce((a,b)=>a<b?a:b);
+  const maxD=fechas.reduce((a,b)=>a>b?a:b);
+  const start=new Date(minD+' 00:00'), end=new Date(maxD+' 00:00');
+  const span=Math.max(1,end-start);
+  const hoyD=new Date(hoy()+' 00:00');
+  const hoyPct=Math.max(0,Math.min(100,((hoyD-start)/span)*100));
+
+  // Agrupar por etapa
+  const porEtapa={};
+  conFecha.forEach(e=>{
+    if(!porEtapa[e.etapa_clave])porEtapa[e.etapa_clave]=[];
+    porEtapa[e.etapa_clave].push(e);
+  });
+
+  const coloresBarra={DE:'#7b9ec0',SD:'#9e7bc0',DD:'#7bc09e',CD:'#c0a77b',PC:'#c07b9e'};
+
+  let html=`<div style="padding:14px;overflow-x:auto">
+    <div style="display:flex;justify-content:space-between;font-size:8px;color:var(--ink3);padding:0 0 8px;letter-spacing:.03em">
+      <span>${fF(minD)}</span><span style="color:var(--rose)">Hoy</span><span>${fF(maxD)}</span>
+    </div>`;
+
+  ETAPAS_C.forEach(et=>{
+    if(!porEtapa[et.k])return;
+    html+=`<div style="font-size:9px;letter-spacing:.1em;text-transform:uppercase;color:var(--ink3);padding:8px 0 4px">${et.k} · ${et.n}</div>`;
+    porEtapa[et.k].forEach(e=>{
+      const eS=new Date(e.fecha_inicio+' 00:00'), eE=new Date(e.fecha_fin+' 00:00');
+      const left=((eS-start)/span)*100;
+      const width=Math.max(1.5,((eE-eS)/span)*100);
+      const color=coloresBarra[et.k]||'var(--accent)';
+      html+=`<div style="display:flex;align-items:center;gap:8px;margin-bottom:5px">
+        <div style="font-size:10px;color:var(--ink2);width:110px;flex-shrink:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis" title="${e.nombre}">${e.nombre}</div>
+        <div style="flex:1;height:20px;background:var(--bg2);border-radius:4px;position:relative;min-width:80px;cursor:pointer" onclick="abrirDPDetalle('${e.id}','${e.fecha_inicio}','${e.fecha_fin}')" title="Click para editar fechas">
+          <div style="position:absolute;height:100%;left:${left}%;width:${width}%;border-radius:4px;background:${color};opacity:${e.done?.45:1}" title="${fF(e.fecha_inicio)} → ${fF(e.fecha_fin)}"></div>
+          <div style="position:absolute;top:-2px;bottom:-2px;left:${hoyPct}%;width:2px;background:var(--rose);opacity:.8;border-radius:1px"></div>
+        </div>
+      </div>`;
+    });
+  });
+
+  html+=`</div><div style="padding:4px 14px 12px;font-size:9px;color:var(--ink3)">Click en cualquier barra para editar fechas · línea roja = hoy</div>`;
+  cont.innerHTML=html;
+}
+
+async function renderHorasDetalle(){
+  const cont=document.getElementById('det-proy-body');
+  cont.innerHTML=`<div class="ldg">Cargando...</div>`;
+
+  const {data:regs}=await sb.from('registros_horas')
+    .select('horas,etapa_clave,colaborador_id,colaboradores(nombre,apellido,color)')
+    .eq('proyecto_id',proyDetalleId);
+
+  if(!regs||!regs.length){
+    cont.innerHTML=`<div class="empty"><div class="empty-i">⏱</div><div>Sin horas registradas aún</div></div>`;
+    return;
+  }
+
+  // Agrupar por colaborador
+  const porColab={};
+  regs.forEach(r=>{
+    const cid=r.colaborador_id;
+    if(!porColab[cid])porColab[cid]={col:r.colaboradores,horas:0,etapas:{}};
+    porColab[cid].horas+=r.horas;
+    if(!porColab[cid].etapas[r.etapa_clave])porColab[cid].etapas[r.etapa_clave]=0;
+    porColab[cid].etapas[r.etapa_clave]+=r.horas;
+  });
+
+  const totalH=Object.values(porColab).reduce((s,d)=>s+d.horas,0);
+
+  let html='';
+  Object.entries(porColab).sort((a,b)=>b[1].horas-a[1].horas).forEach(([cid,data])=>{
+    const c=data.col;
+    const pct=Math.round(data.horas/totalH*100);
+    const etStr=Object.entries(data.etapas).map(([k,h])=>`${k}: ${hT(h)}`).join(' · ');
+    html+=`<div style="display:flex;align-items:center;gap:10px;padding:12px 16px;border-bottom:1px solid var(--border)">
+      <div style="width:32px;height:32px;border-radius:50%;background:${c?.color||'var(--accent)'};display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:500;color:#fff;flex-shrink:0">${ini(c?.nombre,c?.apellido)}</div>
+      <div style="flex:1;min-width:0">
+        <div style="font-size:11px;color:var(--ink)">${c?.nombre} ${c?.apellido||''}</div>
+        <div style="font-size:9px;color:var(--ink3);margin-top:2px">${etStr}</div>
+        <div style="height:4px;background:var(--bg2);border-radius:2px;overflow:hidden;margin-top:5px">
+          <div style="height:100%;width:${pct}%;background:var(--accent);border-radius:2px"></div>
+        </div>
+      </div>
+      <div style="text-align:right;flex-shrink:0">
+        <div style="font-size:14px;font-weight:500;color:var(--accent)">${hT(data.horas)}</div>
+        <div style="font-size:9px;color:var(--ink3)">${pct}%</div>
+      </div>
+    </div>`;
+  });
+
+  // Total
+  html+=`<div style="display:flex;justify-content:space-between;align-items:center;padding:12px 16px;background:var(--ink)">
+    <span style="font-size:10px;letter-spacing:.08em;text-transform:uppercase;color:var(--ink3)">Total proyecto</span>
+    <span style="font-family:'Fraunces',serif;font-size:22px;font-weight:300;color:#fff">${hT(totalH)}</span>
+  </div>`;
+
+  cont.innerHTML=html;
 }
 
 async function renderDetProyBody(){

@@ -245,15 +245,64 @@ textarea{resize:none;height:62px;}
 </div>
 
 <!-- DATE PICKER DETALLE -->
-<div class="ov" id="ov-dpd" onclick="if(event.target.id==='ov-dpd')document.getElementById('ov-dpd').classList.remove('on')" style="align-items:center;justify-content:center;z-index:500">
-  <div style="background:#fff;border-radius:14px;padding:20px;width:calc(100% - 40px);max-width:300px;box-shadow:0 8px 32px rgba(0,0,0,.15)">
-    <div style="font-family:'Fraunces',serif;font-size:14px;font-weight:300;font-style:italic;margin-bottom:14px;color:var(--ink)">Fechas del entregable</div>
-    <div style="display:flex;flex-direction:column;gap:10px;margin-bottom:4px">
-      <div><div style="font-size:9px;letter-spacing:.1em;text-transform:uppercase;color:var(--ink3);margin-bottom:4px">Inicio</div><input type="date" id="dpd-inicio"></div>
-      <div><div style="font-size:9px;letter-spacing:.1em;text-transform:uppercase;color:var(--ink3);margin-bottom:4px">Entrega</div><input type="date" id="dpd-fin"></div>
+<div class="ov" id="ov-dpd" onclick="if(event.target.id==='ov-dpd')document.getElementById('ov-dpd').classList.remove('on')" style="align-items:flex-end;justify-content:center;z-index:500">
+  <div style="background:#fff;border-radius:14px 14px 0 0;padding:20px;width:100%;max-width:380px;box-shadow:0 -4px 32px rgba(0,0,0,.12)">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">
+      <div style="font-family:'Fraunces',serif;font-size:14px;font-weight:300;font-style:italic;color:var(--ink)" id="dpd-title">Fecha del entregable</div>
+      <button onclick="document.getElementById('ov-dpd').classList.remove('on')" style="background:none;border:none;font-size:18px;color:var(--ink3);cursor:pointer">×</button>
     </div>
+
+    <!-- Tabs: fecha única vs inicio/fin -->
+    <div style="display:flex;gap:2px;background:var(--bg2);border-radius:8px;padding:3px;margin-bottom:14px" id="dpd-tabs">
+      <button id="dpd-tab-unica" onclick="dpSetMode('unica')" style="flex:1;padding:6px;border-radius:6px;border:none;font-size:10px;cursor:pointer;background:var(--accent);color:#fff">Fecha única</button>
+      <button id="dpd-tab-rango" onclick="dpSetMode('rango')" style="flex:1;padding:6px;border-radius:6px;border:none;font-size:10px;cursor:pointer;background:none;color:var(--ink2)">Inicio · Fin</button>
+    </div>
+
+    <!-- Fecha única -->
+    <div id="dpd-sec-unica">
+      <div style="font-size:9px;letter-spacing:.1em;text-transform:uppercase;color:var(--ink3);margin-bottom:6px">Fecha</div>
+      <input type="date" id="dpd-unica" style="width:100%;padding:8px 10px;border:1.5px solid var(--border);border-radius:8px;font-size:12px">
+
+      <!-- Recurrencia -->
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-top:14px;padding-top:14px;border-top:1px solid var(--border)">
+        <span style="font-size:11px;color:var(--ink2)">Repetir</span>
+        <select id="dpd-frecuencia" onchange="dpFrecChange()" style="font-size:11px;padding:5px 8px;border:1.5px solid var(--border);border-radius:7px;background:#fff;color:var(--ink)">
+          <option value="">No se repite</option>
+          <option value="daily">Diario</option>
+          <option value="weekly">Semanal</option>
+          <option value="monthly">Mensual</option>
+          <option value="yearly">Anual</option>
+        </select>
+      </div>
+
+      <!-- Días de la semana (solo weekly) -->
+      <div id="dpd-dias-semana" style="display:none;margin-top:12px">
+        <div style="font-size:9px;letter-spacing:.1em;text-transform:uppercase;color:var(--ink3);margin-bottom:8px">En estos días</div>
+        <div style="display:flex;gap:4px;justify-content:space-between">
+          <button id="dpd-dia-0" onclick="dpToggleDia(0)" style="width:34px;height:34px;border-radius:50%;border:1.5px solid var(--border);background:#fff;font-size:10px;font-weight:500;cursor:pointer;color:var(--ink2)">D</button>
+          <button id="dpd-dia-1" onclick="dpToggleDia(1)" style="width:34px;height:34px;border-radius:50%;border:1.5px solid var(--border);background:#fff;font-size:10px;font-weight:500;cursor:pointer;color:var(--ink2)">L</button>
+          <button id="dpd-dia-2" onclick="dpToggleDia(2)" style="width:34px;height:34px;border-radius:50%;border:1.5px solid var(--border);background:#fff;font-size:10px;font-weight:500;cursor:pointer;color:var(--ink2)">M</button>
+          <button id="dpd-dia-3" onclick="dpToggleDia(3)" style="width:34px;height:34px;border-radius:50%;border:1.5px solid var(--border);background:#fff;font-size:10px;font-weight:500;cursor:pointer;color:var(--ink2)">X</button>
+          <button id="dpd-dia-4" onclick="dpToggleDia(4)" style="width:34px;height:34px;border-radius:50%;border:1.5px solid var(--border);background:#fff;font-size:10px;font-weight:500;cursor:pointer;color:var(--ink2)">J</button>
+          <button id="dpd-dia-5" onclick="dpToggleDia(5)" style="width:34px;height:34px;border-radius:50%;border:1.5px solid var(--border);background:#fff;font-size:10px;font-weight:500;cursor:pointer;color:var(--ink2)">V</button>
+          <button id="dpd-dia-6" onclick="dpToggleDia(6)" style="width:34px;height:34px;border-radius:50%;border:1.5px solid var(--border);background:#fff;font-size:10px;font-weight:500;cursor:pointer;color:var(--ink2)">S</button>
+        </div>
+      </div>
+
+      <!-- Preview fechas futuras -->
+      <div id="dpd-preview" style="display:none;margin-top:12px;font-size:10px;color:var(--ink3)"></div>
+    </div>
+
+    <!-- Rango inicio/fin -->
+    <div id="dpd-sec-rango" style="display:none">
+      <div style="display:flex;flex-direction:column;gap:10px">
+        <div><div style="font-size:9px;letter-spacing:.1em;text-transform:uppercase;color:var(--ink3);margin-bottom:4px">Inicio</div><input type="date" id="dpd-inicio" style="width:100%;padding:8px 10px;border:1.5px solid var(--border);border-radius:8px;font-size:12px"></div>
+        <div><div style="font-size:9px;letter-spacing:.1em;text-transform:uppercase;color:var(--ink3);margin-bottom:4px">Entrega</div><input type="date" id="dpd-fin" style="width:100%;padding:8px 10px;border:1.5px solid var(--border);border-radius:8px;font-size:12px"></div>
+      </div>
+    </div>
+
     <div style="display:flex;gap:8px;margin-top:16px">
-      <button onclick="document.getElementById('ov-dpd').classList.remove('on')" style="flex:1;padding:10px;border-radius:7px;border:1.5px solid var(--border);background:none;font-size:11px;color:var(--ink2);cursor:pointer">Cancelar</button>
+      <button onclick="dpLimpiar()" style="padding:10px 14px;border-radius:7px;border:1.5px solid var(--border);background:none;font-size:11px;color:var(--ink3);cursor:pointer">Limpiar</button>
       <button onclick="guardarFechasDetalle()" style="flex:1;padding:10px;border-radius:7px;border:none;background:var(--accent);color:#fff;font-size:11px;cursor:pointer">Guardar</button>
     </div>
   </div>
@@ -960,9 +1009,16 @@ async function renderHorasDetalle(){
 
 // ── Fila de entregable reutilizable ──
 function _filaEnt(e,colabs,esAdmin){
-  const d=dH(e.fecha_fin);
+  // Soportar fecha_unica (recurrente) y fecha_fin (rango)
+  const fechaRef=e.fecha_unica||e.fecha_fin;
+  const d=dH(fechaRef);
   let fC='sin',fT='+ fecha';
-  if(e.fecha_fin){fT=fF(e.fecha_fin);fC=e.done?'ok':d<0?'vencida':d<=5?'pronto':'ok';}
+  if(e.fecha_unica){
+    fT=(e.recurrente?'↻ ':'')+fF(e.fecha_unica);
+    fC=e.done?'ok':d<0?'vencida':d<=5?'pronto':'ok';
+  } else if(e.fecha_fin){
+    fT=fF(e.fecha_fin);fC=e.done?'ok':d<0?'vencida':d<=5?'pronto':'ok';
+  }
   const optionsColab='<option value="">Sin asignar</option>'+
     (colabs||[]).map(c=>'<option value="'+c.id+'" '+(e.asignado_id===c.id?'selected':'')+'>'+c.nombre+' '+(c.apellido||'')+'</option>').join('');
   const checkStyle='width:17px;height:17px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:9px;color:#fff;flex-shrink:0;cursor:pointer;border:1.5px solid '+(e.done?'var(--green)':'var(--border)')+';background:'+(e.done?'var(--green)':'transparent');
@@ -1166,8 +1222,49 @@ async function eliminarEntregableDetalle(entId){
 async function toggleDoneDetalle(entId, cur){
   const done=cur===true||cur==='true'?false:true;
   await sb.from('entregables').update({done}).eq('id',entId);
+
+  // Si se marca como completada y es recurrente, crear la siguiente ocurrencia
+  if(done){
+    const {data:e}=await sb.from('entregables').select('*').eq('id',entId).single();
+    if(e?.recurrente&&e?.frecuencia){
+      const baseDate=e.fecha_unica?new Date(e.fecha_unica+'T12:00:00'):new Date();
+      const dias=new Set(e.dias_semana||[]);
+      const siguiente=dpSiguienteFecha(baseDate, e.frecuencia, dias);
+      if(siguiente){
+        const sigStr=fechaAStr(siguiente);
+        // Verificar que no exista ya una tarea igual pendiente
+        const {data:exist}=await sb.from('entregables')
+          .select('id').eq('proyecto_id',e.proyecto_id)
+          .eq('nombre',e.nombre).eq('fecha_unica',sigStr).eq('done',false).maybeSingle();
+        if(!exist){
+          await sb.from('entregables').insert({
+            proyecto_id:e.proyecto_id,
+            etapa_clave:e.etapa_clave,
+            grupo:e.grupo,
+            nombre:e.nombre,
+            done:false,
+            eliminado:false,
+            recurrente:true,
+            frecuencia:e.frecuencia,
+            dias_semana:e.dias_semana,
+            fecha_unica:sigStr,
+            asignado_id:e.asignado_id,
+            orden:e.orden
+          });
+          toast(`✓ Completado · Próxima: ${fF(sigStr)}`);
+        } else {
+          toast('✓ Completado');
+        }
+      } else {
+        toast('✓ Completado');
+      }
+    } else {
+      toast('✓ Completado');
+    }
+  } else {
+    toast('Desmarcado');
+  }
   await renderDetProyBody();
-  toast(done?'✓ Completado':'Desmarcado');
 }
 
 async function asignarDetalle(entId, colabId){
@@ -1177,17 +1274,127 @@ async function asignarDetalle(entId, colabId){
 
 // Date picker para detalle proyecto
 let dpDetalleEntId=null;
-function abrirDPDetalle(entId, inicio, fin){
+// ── DATE PICKER CON RECURRENCIA ──
+let dpMode='unica', dpDiasSel=new Set();
+
+function dpSetMode(mode){
+  dpMode=mode;
+  document.getElementById('dpd-sec-unica').style.display=mode==='unica'?'block':'none';
+  document.getElementById('dpd-sec-rango').style.display=mode==='rango'?'block':'none';
+  document.getElementById('dpd-tab-unica').style.background=mode==='unica'?'var(--accent)':'none';
+  document.getElementById('dpd-tab-unica').style.color=mode==='unica'?'#fff':'var(--ink2)';
+  document.getElementById('dpd-tab-rango').style.background=mode==='rango'?'var(--accent)':'none';
+  document.getElementById('dpd-tab-rango').style.color=mode==='rango'?'#fff':'var(--ink2)';
+}
+
+function dpFrecChange(){
+  const frec=document.getElementById('dpd-frecuencia').value;
+  document.getElementById('dpd-dias-semana').style.display=frec==='weekly'?'block':'none';
+  dpUpdatePreview();
+}
+
+function dpToggleDia(i){
+  const btn=document.getElementById('dpd-dia-'+i);
+  if(dpDiasSel.has(i)){dpDiasSel.delete(i);btn.style.background='#fff';btn.style.color='var(--ink2)';}
+  else{dpDiasSel.add(i);btn.style.background='var(--accent)';btn.style.color='#fff';}
+  dpUpdatePreview();
+}
+
+function dpUpdatePreview(){
+  const frec=document.getElementById('dpd-frecuencia').value;
+  const fecha=document.getElementById('dpd-unica').value;
+  const prev=document.getElementById('dpd-preview');
+  if(!frec||!fecha){prev.style.display='none';return;}
+  const meses=['ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic'];
+  const siguientes=[];
+  let d=new Date(fecha+'T12:00:00');
+  for(let i=0;i<4;i++){
+    d=dpSiguienteFecha(d,frec,dpDiasSel);
+    if(!d)break;
+    siguientes.push(`${d.getDate()} ${meses[d.getMonth()]}`);
+  }
+  if(siguientes.length){
+    prev.style.display='block';
+    prev.textContent='Próximas: '+siguientes.join(', ')+'...';
+  }
+}
+
+function dpSiguienteFecha(desde, frec, dias){
+  const d=new Date(desde);
+  if(frec==='daily'){d.setDate(d.getDate()+1);return d;}
+  if(frec==='weekly'){
+    const diasArr=[...dias].sort();
+    if(!diasArr.length)return null;
+    // Buscar el siguiente día de la semana seleccionado
+    for(let i=1;i<=7;i++){
+      const nd=new Date(d);nd.setDate(nd.getDate()+i);
+      if(diasArr.includes(nd.getDay()))return nd;
+    }
+    return null;
+  }
+  if(frec==='monthly'){d.setMonth(d.getMonth()+1);return d;}
+  if(frec==='yearly'){d.setFullYear(d.getFullYear()+1);return d;}
+  return null;
+}
+
+function dpLimpiar(){
+  document.getElementById('dpd-unica').value='';
+  document.getElementById('dpd-inicio').value='';
+  document.getElementById('dpd-fin').value='';
+  document.getElementById('dpd-frecuencia').value='';
+  dpDiasSel=new Set();
+  [0,1,2,3,4,5,6].forEach(i=>{
+    const btn=document.getElementById('dpd-dia-'+i);
+    if(btn){btn.style.background='#fff';btn.style.color='var(--ink2)';}
+  });
+  document.getElementById('dpd-dias-semana').style.display='none';
+  document.getElementById('dpd-preview').style.display='none';
+}
+
+async function abrirDPDetalle(entId, inicio, fin){
   dpDetalleEntId=entId;
-  document.getElementById('dpd-inicio').value=inicio||'';
-  document.getElementById('dpd-fin').value=fin||'';
+  // Cargar datos actuales del entregable
+  const {data:e}=await sb.from('entregables').select('fecha_unica,fecha_inicio,fecha_fin,recurrente,frecuencia,dias_semana').eq('id',entId).single();
+  dpDiasSel=new Set(e?.dias_semana||[]);
+  // Resetear UI
+  dpLimpiar();
+  // Determinar modo
+  if(e?.fecha_unica||e?.recurrente){
+    dpSetMode('unica');
+    document.getElementById('dpd-unica').value=e.fecha_unica||'';
+    if(e.frecuencia){
+      document.getElementById('dpd-frecuencia').value=e.frecuencia;
+      dpFrecChange();
+    }
+    if(e.dias_semana?.length){
+      dpDiasSel=new Set(e.dias_semana);
+      e.dias_semana.forEach(i=>{
+        const btn=document.getElementById('dpd-dia-'+i);
+        if(btn){btn.style.background='var(--accent)';btn.style.color='#fff';}
+      });
+    }
+    dpUpdatePreview();
+  } else {
+    dpSetMode('rango');
+    document.getElementById('dpd-inicio').value=e?.fecha_inicio||inicio||'';
+    document.getElementById('dpd-fin').value=e?.fecha_fin||fin||'';
+  }
   document.getElementById('ov-dpd').classList.add('on');
 }
+
 async function guardarFechasDetalle(){
-  const ini=document.getElementById('dpd-inicio').value;
-  const fin=document.getElementById('dpd-fin').value;
-  if(ini&&fin&&fin<ini){toast('La entrega debe ser después del inicio');return;}
-  await sb.from('entregables').update({fecha_inicio:ini||null,fecha_fin:fin||null}).eq('id',dpDetalleEntId);
+  const btn=document.querySelector('#ov-dpd .bsave')||document.querySelector('#ov-dpd button[onclick="guardarFechasDetalle()"]');
+  if(dpMode==='rango'){
+    const ini=document.getElementById('dpd-inicio').value;
+    const fin=document.getElementById('dpd-fin').value;
+    if(ini&&fin&&fin<ini){toast('La entrega debe ser después del inicio');return;}
+    await sb.from('entregables').update({fecha_inicio:ini||null,fecha_fin:fin||null,fecha_unica:null,recurrente:false,frecuencia:null,dias_semana:null}).eq('id',dpDetalleEntId);
+  } else {
+    const fecha=document.getElementById('dpd-unica').value||null;
+    const frec=document.getElementById('dpd-frecuencia').value||null;
+    const dias=frec==='weekly'&&dpDiasSel.size?[...dpDiasSel]:null;
+    await sb.from('entregables').update({fecha_unica:fecha,fecha_inicio:null,fecha_fin:null,recurrente:!!frec,frecuencia:frec,dias_semana:dias}).eq('id',dpDetalleEntId);
+  }
   document.getElementById('ov-dpd').classList.remove('on');
   await renderDetProyBody();
   toast('✓ Fechas guardadas');

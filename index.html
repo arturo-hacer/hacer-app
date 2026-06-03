@@ -1041,7 +1041,8 @@ function _filaEnt(e,colabs,esAdmin){
   row+='<div style="display:flex;align-items:center;gap:8px;padding:0 16px 9px 41px">';
   row+='<span class="efecha '+fC+'" onclick="abrirDPDetalle(\''+e.id+'\',\''+(e.fecha_inicio||'')+'\',\''+(e.fecha_fin||'')+'\')">' +fT+'</span>';
   row+='<select style="flex:1;font-size:10px;padding:3px 6px;border-radius:5px;border:1.5px solid var(--border);background:#fff" onchange="asignarDetalle(\''+e.id+'\',this.value)">'+optionsColab+'</select>';
-  row+='<button style="width:26px;height:26px;border-radius:50%;border:1.5px solid var(--border);background:#fff;font-size:14px;display:flex;align-items:center;justify-content:center;cursor:pointer;color:var(--ink2);flex-shrink:0" onclick="openReg(\''+e.proyecto_id+'\',\''+etClave+'\',\''+e.id+'\')" title="Registrar horas">+</button>';
+  row+='<button class="bplay'+(timerEnt===e.id?' on':'')+'" onclick="tTimer(\''+e.id+'\',\''+e.nombre.replace(/'/g,"\\'")+'\')" title="'+(timerEnt===e.id?'Detener timer':'Iniciar timer')+'">'+(timerEnt===e.id?'■':'▶')+'</button>';
+  row+='<button class="bhrs" onclick="openReg(\''+e.proyecto_id+'\',\''+etClave+'\',\''+e.id+'\')" title="Registrar horas">+</button>';
   row+='</div></div>';
   return row;
 }

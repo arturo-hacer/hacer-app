@@ -610,7 +610,7 @@ async function stopTimer(){
   clearInterval(timerInt);timerInt=null;
   document.getElementById('timer-pill').classList.remove('on');
   if(timerSecs>=60){
-    const hrs=Math.max(.25,Math.round(timerSecs/900)*.25);
+    const hrs=Math.max(1/60,Math.round(timerSecs/60)/60);
     const {data:ent}=await sb.from('entregables').select('proyecto_id,etapa_clave').eq('id',timerEnt).single();
     if(ent){
       const {data:ex}=await sb.from('registros_horas').select('id,horas').eq('colaborador_id',USER.id).eq('entregable_id',timerEnt).eq('fecha',diaAct).maybeSingle();

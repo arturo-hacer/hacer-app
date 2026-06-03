@@ -1212,9 +1212,7 @@ async function guardarEditReg(){
   toast('✓ Registro actualizado');
 }
 async function eliminarEditReg(){
-  console.log('eliminando id:', editRegId);
-  const {error}=await sb.from('registros_horas').delete().eq('id',editRegId);
-  console.log('error:', error);
+  await sb.from('registros_horas').delete().eq('id',editRegId);
   closeOv('ov-er');
   updateCounter();renderSemana();
   toast('✓ Registro eliminado');

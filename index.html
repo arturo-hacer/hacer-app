@@ -282,7 +282,14 @@ textarea{resize:none;height:62px;}
     </div>
     <div class="fl"><label>Nota</label><input type="text" id="er-nota" placeholder="Opcional"></div>
     <button class="bsave" id="er-save" onclick="guardarEditReg()">Guardar</button>
-    <button onclick="eliminarEditReg()" style="width:100%;padding:12px;margin-top:8px;border:none;background:none;color:var(--rose);font-size:12px;cursor:pointer">Eliminar registro</button>
+    <div id="er-confirm" style="display:none;margin-top:8px;background:rgba(237,37,78,.06);border-radius:10px;padding:12px;text-align:center">
+      <div style="font-size:11px;color:var(--rose);margin-bottom:10px">¿Eliminar este registro?</div>
+      <div style="display:flex;gap:8px">
+        <button onclick="document.getElementById('er-confirm').style.display='none'" style="flex:1;padding:10px;border:1.5px solid var(--border);border-radius:8px;background:#fff;font-size:12px;cursor:pointer">Cancelar</button>
+        <button onclick="eliminarEditReg()" style="flex:1;padding:10px;border:none;border-radius:8px;background:var(--rose);color:#fff;font-size:12px;cursor:pointer">Eliminar</button>
+      </div>
+    </div>
+    <button onclick="document.getElementById('er-confirm').style.display='block'" style="width:100%;padding:12px;margin-top:8px;border:none;background:none;color:var(--rose);font-size:12px;cursor:pointer">Eliminar registro</button>
   </div>
 </div>
 <!-- MODAL EDITAR ENTREGABLE -->
@@ -1175,6 +1182,7 @@ async function renderSemana(){
 let editRegId=null,editRegH=0;
 function abrirEditReg(id,horas,notaEnc,entNombre,proyCode){
   editRegId=id;editRegH=horas;
+  document.getElementById('er-confirm').style.display='none';
   document.getElementById('er-ent').textContent=decodeURIComponent(notaEnc?entNombre+' · '+proyCode:entNombre+' · '+proyCode);
   document.getElementById('er-horas').textContent=hT(horas);
   document.getElementById('er-nota').value=decodeURIComponent(notaEnc||'');
@@ -1191,7 +1199,6 @@ async function guardarEditReg(){
   toast('✓ Registro actualizado');
 }
 async function eliminarEditReg(){
-  if(!confirm('¿Eliminar este registro?'))return;
   await sb.from('registros_horas').delete().eq('id',editRegId);
   closeOv('ov-er');
   updateCounter();renderSemana();

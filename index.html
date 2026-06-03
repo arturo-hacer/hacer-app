@@ -587,7 +587,7 @@ async function cambDia(d){diaAct=d;await renderReg();updateCounter();}
 async function renderMisTareas(){
   const cont=document.getElementById('mis-t');
   if(!cont)return;
-  const {data:ents}=await sb.from('entregables').select('*,proyectos(id,codigo,nombre)').eq('asignado_id',USER.id).eq('eliminado',false).order('fecha_fin',{ascending:true,nullsFirst:false});
+  const {data:ents}=await sb.from('entregables').select('*,proyectos(id,codigo,nombre)').eq('asignado_id',USER.id).eq('eliminado',false).order('fecha_unica',{ascending:true,nullsFirst:false}).order('fecha_fin',{ascending:true,nullsFirst:false});
   if(!ents||!ents.length){cont.innerHTML=`<div class="empty"><div class="empty-i">📋</div><div>No tienes entregables asignados</div></div>`;return;}
   const {data:rh}=await sb.from('registros_horas').select('*').eq('colaborador_id',USER.id).eq('fecha',diaAct);
   const rm={};(rh||[]).forEach(r=>rm[r.entregable_id]=r);
@@ -612,9 +612,12 @@ async function renderMisTareas(){
         if(!show.length)return;
         let rH='';
         show.forEach(e=>{
-          const reg=rm[e.id],pl=timerEnt===e.id,d=dH(e.fecha_fin);
+          const reg=rm[e.id],pl=timerEnt===e.id;
+          const fechaRef=e.fecha_unica||e.fecha_fin;
+          const d=dH(fechaRef);
           let fC='sin',fT='+ fecha';
-          if(e.fecha_fin){fT=fF(e.fecha_fin);fC=e.done?'ok':d<0?'vencida':d<=5?'pronto':'ok';}
+          if(e.fecha_unica){fT=(e.recurrente?'↻ ':'')+fF(e.fecha_unica);fC=e.done?'ok':d<0?'vencida':d<=5?'pronto':'ok';}
+          else if(e.fecha_fin){fT=fF(e.fecha_fin);fC=e.done?'ok':d<0?'vencida':d<=5?'pronto':'ok';}
           rH+=`<div class="erow">
             <div class="echk ${e.done?'done':pl?'play':''}" onclick="tDone('${e.id}',${e.done})">${e.done?'✓':pl?'▶':''}</div>
             <div style="flex:1;min-width:0">
@@ -1219,6 +1222,23 @@ async function eliminarEntregableDetalle(entId){
   }
 }
 
+function dpSiguienteFecha(desde, frec, dias){
+  const d=new Date(desde);
+  if(frec==='daily'){d.setDate(d.getDate()+1);return d;}
+  if(frec==='weekly'){
+    const diasArr=[...dias].sort();
+    if(!diasArr.length)return null;
+    // Buscar el siguiente día de la semana seleccionado
+    for(let i=1;i<=7;i++){
+      const nd=new Date(d);nd.setDate(nd.getDate()+i);
+      if(diasArr.includes(nd.getDay()))return nd;
+    }
+    return null;
+  }
+  if(frec==='monthly'){d.setMonth(d.getMonth()+1);return d;}
+  if(frec==='yearly'){d.setFullYear(d.getFullYear()+1);return d;}
+  return null;
+}
 async function toggleDoneDetalle(entId, cur){
   const done=cur===true||cur==='true'?false:true;
   await sb.from('entregables').update({done}).eq('id',entId);
@@ -1319,23 +1339,7 @@ function dpUpdatePreview(){
   }
 }
 
-function dpSiguienteFecha(desde, frec, dias){
-  const d=new Date(desde);
-  if(frec==='daily'){d.setDate(d.getDate()+1);return d;}
-  if(frec==='weekly'){
-    const diasArr=[...dias].sort();
-    if(!diasArr.length)return null;
-    // Buscar el siguiente día de la semana seleccionado
-    for(let i=1;i<=7;i++){
-      const nd=new Date(d);nd.setDate(nd.getDate()+i);
-      if(diasArr.includes(nd.getDay()))return nd;
-    }
-    return null;
-  }
-  if(frec==='monthly'){d.setMonth(d.getMonth()+1);return d;}
-  if(frec==='yearly'){d.setFullYear(d.getFullYear()+1);return d;}
-  return null;
-}
+
 
 function dpLimpiar(){
   document.getElementById('dpd-unica').value='';

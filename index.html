@@ -1161,8 +1161,9 @@ async function renderSemana(){
       regs.forEach(r=>{
         const entNom=r.entregables?.nombre||'Sin entregable';
         const pCod=r.proyectos?.codigo||'';
-        const notaEnc=encodeURIComponent(r.nota||'');
-        html+=`<div class="card" style="padding:10px 14px;margin-bottom:6px;display:flex;align-items:center;gap:10px;cursor:pointer" onclick="abrirEditReg('${r.id}',${r.horas},'${notaEnc}','${entNom.replace(/'/g,"\'")}','${pCod}')">`;
+        html+=`<div class="card reg-row" style="padding:10px 14px;margin-bottom:6px;display:flex;align-items:center;gap:10px;cursor:pointer"
+          data-rid="${r.id}" data-horas="${r.horas}" data-nota="${encodeURIComponent(r.nota||'')}"
+          data-ent="${encodeURIComponent(entNom)}" data-cod="${pCod}">`;
         html+=`<div style="flex:1;min-width:0">`;
         html+=`<div style="font-size:11px;color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${entNom}</div>`;
         html+=`<div style="font-size:9px;color:var(--ink3);margin-top:2px">${pCod}${r.nota?' · '+r.nota:''}</div>`;
@@ -1176,17 +1177,29 @@ async function renderSemana(){
   }
 
   cont.innerHTML=html+'</div>';
+  // Delegación de eventos para filas de registros
+  cont.querySelectorAll('.reg-row').forEach(el=>{
+    el.addEventListener('click',()=>{
+      abrirEditReg(
+        el.dataset.rid,
+        parseFloat(el.dataset.horas),
+        el.dataset.nota,
+        decodeURIComponent(el.dataset.ent),
+        el.dataset.cod
+      );
+    });
+  });
 }
 
 // ── EDITAR REGISTRO DESDE MI SEMANA ──
 let editRegId=null,editRegH=0;
 function abrirEditReg(id,horas,notaEnc,entNombre,proyCode){
-  editRegId=id;editRegH=horas;
+  editRegId=id;
+  editRegH=horas;
   document.getElementById('er-confirm').style.display='none';
-  document.getElementById('er-ent').textContent=decodeURIComponent(notaEnc?entNombre+' · '+proyCode:entNombre+' · '+proyCode);
+  document.getElementById('er-ent').textContent=entNombre+(proyCode?' · '+proyCode:'');
   document.getElementById('er-horas').textContent=hT(horas);
   document.getElementById('er-nota').value=decodeURIComponent(notaEnc||'');
-  rH=horas;
   document.getElementById('ov-er').classList.add('on');
 }
 async function guardarEditReg(){

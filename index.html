@@ -540,11 +540,11 @@ function setupApp(){
   updateCounter();
   reanudarTimer();
   const tabs=esAdmin
-    ?[{id:'registrar',l:'Registrar'},{id:'proyectos',l:'Proyectos'},{id:'semana',l:'Mi semana'},{id:'reportes',l:'Reportes'},{id:'gestion',l:'Gestión'}]
+    ?[{id:'dashboard',l:'Dashboard'},{id:'registrar',l:'Registrar'},{id:'proyectos',l:'Proyectos'},{id:'semana',l:'Mi semana'},{id:'reportes',l:'Reportes'},{id:'gestion',l:'Gestión'}]
     :[{id:'registrar',l:'Registrar'},{id:'proyectos',l:'Proyectos'},{id:'semana',l:'Mi semana'}];
   document.getElementById('tabs').innerHTML=tabs.map((t,i)=>`<button class="tab ${i===0?'on':''}" onclick="switchTab('${t.id}',this)">${t.l}</button>`).join('');
   document.getElementById('panes').innerHTML=tabs.map((t,i)=>`<div class="pane ${i===0?'on':''}" id="pane-${t.id}"><div class="ldg">Cargando...</div></div>`).join('');
-  loadTab('registrar');
+  loadTab(esAdmin?'dashboard':'registrar');
 }
 
 function switchTab(tab,btn){
@@ -554,6 +554,7 @@ function switchTab(tab,btn){
 }
 async function loadTab(tab){
   if(tab==='registrar')await renderReg();
+  if(tab==='dashboard')await renderDashboard();
   if(tab==='proyectos')await renderProy();
   if(tab==='semana')await renderSemana();
   if(tab==='reportes')renderRepUI();
@@ -792,6 +793,126 @@ async function saveReg(){
   }
   btn.disabled=false;btn.textContent='Guardar';
   closeOv('ov-reg');updateCounter();renderMisTareas();
+}
+
+// ── DASHBOARD ADMIN ──
+async function renderDashboard(){
+  const cont=document.getElementById('pane-dashboard');
+  if(!cont)return;
+  cont.innerHTML=`<div style="padding:16px"><div class="ldg">Cargando dashboard...</div></div>`;
+
+  // Obtener datos en paralelo
+  const hoyStr=diaAct;
+  const diasSem=semana();
+  const [
+    {data:ents},
+    {data:colabs},
+    {data:regs},
+    {data:proys}
+  ] = await Promise.all([
+    sb.from('entregables').select('id,nombre,done,eliminado,fecha_fin,fecha_unica,asignado_id,etapa_clave,proyecto_id,proyectos(codigo)').eq('eliminado',false).eq('done',false),
+    sb.from('colaboradores').select('*').order('nombre'),
+    sb.from('registros_horas').select('colaborador_id,horas,fecha').in('fecha',diasSem),
+    sb.from('proyectos').select('id,codigo,nombre').order('codigo')
+  ]);
+
+  let html='<div style="padding:16px">';
+
+  // ── SECCIÓN 1: Alertas ──
+  html+=`<div class="sec">Entregables atrasados</div>`;
+  const alertas=[];
+  (ents||[]).forEach(e=>{
+    const fechaRef=e.fecha_unica||e.fecha_fin;
+    if(!fechaRef)return;
+    const d=dH(fechaRef);
+    const colab=(colabs||[]).find(c=>c.id===e.asignado_id);
+    const resp=colab?colab.nombre+' '+(colab.apellido||''):'Sin asignar';
+    if(d<0) alertas.push({tipo:'vencida',ico:'🔴',nombre:e.nombre,proyecto:e.proyectos?.codigo||'',etapa:e.etapa_clave||'',resp,dias:Math.abs(d)});
+    else if(d===0) alertas.push({tipo:'hoy',ico:'🟡',nombre:e.nombre,proyecto:e.proyectos?.codigo||'',etapa:e.etapa_clave||'',resp,dias:0});
+  });
+
+  if(!alertas.length){
+    html+=`<div class="card" style="padding:12px 14px;margin-bottom:14px;display:flex;align-items:center;gap:10px">
+      <span style="font-size:18px">✅</span>
+      <div><div style="font-size:11px;color:var(--ink);font-weight:500">Sin atrasos</div>
+      <div style="font-size:10px;color:var(--ink3)">Todos los entregables van a tiempo</div></div>
+    </div>`;
+  } else {
+    alertas.sort((a,b)=>b.dias-a.dias).forEach(a=>{
+      html+=`<div class="card" style="padding:12px 14px;margin-bottom:8px;display:flex;align-items:center;gap:10px;border-left:3px solid ${a.tipo==='vencida'?'var(--rose)':'var(--amber)'}">
+        <span style="font-size:16px">${a.ico}</span>
+        <div style="flex:1;min-width:0">
+          <div style="font-size:11px;color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${a.nombre}</div>
+          <div style="font-size:9px;color:var(--ink3);margin-top:2px">${a.proyecto}${a.etapa?' · '+a.etapa:''} · ${a.resp}</div>
+        </div>
+        <span style="font-size:10px;font-weight:600;color:${a.tipo==='vencida'?'var(--rose)':'var(--amber)'};white-space:nowrap;flex-shrink:0">${a.dias>0?a.dias+'d tarde':'Hoy'}</span>
+      </div>`;
+    });
+  }
+
+  // ── SECCIÓN 2: Entregables que vencen esta semana ──
+  html+=`<div class="sec" style="margin-top:8px">Esta semana</div>`;
+  const estaSemana=(ents||[]).filter(e=>{
+    const f=e.fecha_unica||e.fecha_fin;
+    return f&&f>=hoyStr&&f<=diasSem[diasSem.length-1];
+  }).sort((a,b)=>(a.fecha_unica||a.fecha_fin||'').localeCompare(b.fecha_unica||b.fecha_fin||''));
+
+  if(!estaSemana.length){
+    html+=`<div class="card" style="padding:12px 14px;margin-bottom:14px;font-size:11px;color:var(--ink3);text-align:center">Sin entregables esta semana</div>`;
+  } else {
+    estaSemana.forEach(e=>{
+      const colab=(colabs||[]).find(c=>c.id===e.asignado_id);
+      const fechaRef=e.fecha_unica||e.fecha_fin;
+      const d=dH(fechaRef);
+      const cls=d===0?'hoy':d<=2?'pronto':'ok';
+      html+=`<div class="card" style="padding:10px 14px;margin-bottom:8px;display:flex;align-items:center;gap:10px">`;
+      if(colab) html+=`<div style="width:28px;height:28px;border-radius:50%;background:${colab.color||'var(--accent)'};display:flex;align-items:center;justify-content:center;font-size:9px;color:#fff;font-weight:600;flex-shrink:0">${(colab.nombre[0]||'')+(colab.apellido?colab.apellido[0]:'')}</div>`;
+      else html+=`<div style="width:28px;height:28px;border-radius:50%;background:var(--bg2);display:flex;align-items:center;justify-content:center;font-size:10px;color:var(--ink3);flex-shrink:0">?</div>`;
+      html+=`<div style="flex:1;min-width:0">
+        <div style="font-size:11px;color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${e.nombre}</div>
+        <div style="font-size:9px;color:var(--ink3);margin-top:2px">${e.proyectos?.codigo||''}${colab?' · '+colab.nombre:''}</div>
+      </div>
+      <span class="efecha ${cls}">${d===0?'Hoy':fF(fechaRef)}</span>`;
+      html+=`</div>`;
+    });
+  }
+
+  // ── SECCIÓN 3: Registro semanal del equipo ──
+  html+=`<div class="sec" style="margin-top:8px">Registro semanal del equipo</div>`;
+  const hrsColab={};
+  (regs||[]).forEach(r=>{if(!hrsColab[r.colaborador_id])hrsColab[r.colaborador_id]=0;hrsColab[r.colaborador_id]+=r.horas;});
+
+  // Días transcurridos esta semana incluyendo hoy
+  const diasTransc=Math.max(1,diasSem.indexOf(hoyStr)+1);
+  const metaHastaHoy=diasTransc*8;
+  const metaSemana=40;
+
+  (colabs||[]).filter(c=>c.rol!=='admin').forEach(c=>{
+    const hrs=hrsColab[c.id]||0;
+    const pct=Math.min(100,Math.round(hrs/metaSemana*100));
+    const pctMeta=Math.min(100,Math.round(metaHastaHoy/metaSemana*100));
+    const ok=hrs>=metaHastaHoy;
+    const color=ok?'var(--green)':hrs>=metaHastaHoy*.75?'var(--amber)':'var(--rose)';
+    const faltante=Math.max(0,metaHastaHoy-hrs);
+    html+=`<div class="card" style="padding:12px 14px;margin-bottom:8px">
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px">
+        <div style="width:30px;height:30px;border-radius:50%;background:${c.color||'var(--accent)'};display:flex;align-items:center;justify-content:center;font-size:10px;color:#fff;font-weight:600;flex-shrink:0">${(c.nombre[0]||'')+(c.apellido?c.apellido[0]:'')}</div>
+        <div style="flex:1"><div style="font-size:11px;color:var(--ink);font-weight:500">${c.nombre} ${c.apellido||''}</div></div>
+        <div style="text-align:right">
+          <div style="font-size:13px;font-weight:600;color:${color}">${hT(hrs)}</div>
+          <div style="font-size:9px;color:var(--ink3)">${faltante>0?'−'+hT(faltante)+' por registrar':'✓ Al día'}</div>
+        </div>
+      </div>
+      <div style="position:relative;height:5px;background:var(--bg2);border-radius:3px;overflow:hidden">
+        <div style="position:absolute;height:100%;width:${pct}%;background:${color};border-radius:3px"></div>
+        <div style="position:absolute;height:100%;width:2px;background:var(--ink3);opacity:.3;left:${pctMeta}%"></div>
+      </div>
+      <div style="font-size:9px;color:var(--ink3);margin-top:4px;text-align:right">${hT(hrs)} / ${metaSemana}h semana</div>
+    </div>`;
+  });
+
+  html+='</div>';
+  cont.innerHTML=html;
 }
 
 async function renderProy(){

@@ -265,6 +265,26 @@ textarea{resize:none;height:62px;}
   </div>
 </div>
 
+
+<!-- MODAL EDITAR REGISTRO -->
+<div class="ov" id="ov-er" onclick="closeOv('ov-er',event)" style="z-index:400">
+  <div class="sheet">
+    <div class="sh"></div>
+    <div class="stitle">Editar registro</div>
+    <div class="ssub" id="er-ent" style="font-size:10px;color:var(--ink3)"></div>
+    <div class="fl" style="margin-top:16px">
+      <label>Horas</label>
+      <div style="display:flex;align-items:center;gap:12px;justify-content:center;padding:8px 0">
+        <button onclick="editRegH=Math.max(0.25,parseFloat((editRegH-0.25).toFixed(2)));document.getElementById('er-horas').textContent=hT(editRegH)" style="width:36px;height:36px;border-radius:50%;border:1.5px solid var(--border);background:#fff;font-size:20px;color:var(--ink2);cursor:pointer;display:flex;align-items:center;justify-content:center">−</button>
+        <span id="er-horas" style="font-family:'Fraunces',serif;font-size:32px;font-weight:300;color:var(--ink);min-width:80px;text-align:center"></span>
+        <button onclick="editRegH=parseFloat((editRegH+0.25).toFixed(2));document.getElementById('er-horas').textContent=hT(editRegH)" style="width:36px;height:36px;border-radius:50%;border:1.5px solid var(--border);background:#fff;font-size:20px;color:var(--ink2);cursor:pointer;display:flex;align-items:center;justify-content:center">+</button>
+      </div>
+    </div>
+    <div class="fl"><label>Nota</label><input type="text" id="er-nota" placeholder="Opcional"></div>
+    <button class="bsave" id="er-save" onclick="guardarEditReg()">Guardar</button>
+    <button onclick="eliminarEditReg()" style="width:100%;padding:12px;margin-top:8px;border:none;background:none;color:var(--rose);font-size:12px;cursor:pointer">Eliminar registro</button>
+  </div>
+</div>
 <!-- MODAL EDITAR ENTREGABLE -->
 <div class="ov" id="ov-eed" onclick="closeOv('ov-eed',event)" style="z-index:500">
   <div class="sheet">
@@ -356,6 +376,11 @@ textarea{resize:none;height:62px;}
         <div id="pf-dist-cont"></div>
         <div style="font-size:9px;margin-top:4px" id="pf-dist-total2"></div>
       </div>
+    </div>
+    <div class="fl">
+      <label>Colaboradores con acceso</label>
+      <div id="pf-colabs" style="display:flex;flex-wrap:wrap;gap:8px;margin-top:2px"></div>
+      <div style="font-size:9px;color:var(--ink3);margin-top:6px">El admin siempre tiene acceso a todos los proyectos.</div>
     </div>
     <button class="bsave" id="pf-save" onclick="guardarProy2()">Guardar proyecto</button>
     <button class="bdanger" id="pf-del" style="display:none" onclick="eliminarProy2()">Eliminar proyecto</button>
@@ -649,7 +674,15 @@ async function saveReg(){
 async function renderProy(){
   const cont=document.getElementById('pane-proyectos');
   cont.innerHTML=`<div style="padding:16px"><div class="ldg">Cargando...</div></div>`;
-  const {data:ps}=await sb.from('proyectos').select('*').order('codigo');
+  const esAdmin=PERFIL?.rol==='admin';
+  let q=sb.from('proyectos').select('*').order('codigo');
+  if(!esAdmin){
+    const {data:acceso}=await sb.from('proyecto_colaboradores').select('proyecto_id').eq('colaborador_id',USER.id);
+    const ids=(acceso||[]).map(a=>a.proyecto_id);
+    if(!ids.length){cont.innerHTML=`<div style="padding:16px"><div class="empty"><div class="empty-i">📁</div><div>Sin proyectos asignados</div></div></div>`;return;}
+    q=q.in('id',ids);
+  }
+  const {data:ps}=await q;
   if(!ps||!ps.length){cont.innerHTML=`<div style="padding:16px"><div class="empty"><div class="empty-i">📁</div><div>Sin proyectos aún</div></div></div>`;return;}
   const {data:es}=await sb.from('entregables').select('proyecto_id,done,eliminado');
   const ep={};(es||[]).forEach(e=>{if(!ep[e.proyecto_id])ep[e.proyecto_id]={t:0,d:0};if(!e.eliminado){ep[e.proyecto_id].t++;if(e.done)ep[e.proyecto_id].d++;}});
@@ -1041,24 +1074,101 @@ async function renderSemana(){
   const cont=document.getElementById('pane-semana');
   cont.innerHTML=`<div style="padding:16px"><div class="ldg">Cargando...</div></div>`;
   const dias=semana();
-  const {data:rs}=await sb.from('registros_horas').select('horas,fecha,proyecto_id,proyectos(codigo,nombre)').eq('colaborador_id',USER.id).in('fecha',dias);
-  const tot=(rs||[]).reduce((s,r)=>s+r.horas,0);
-  const pp={};(rs||[]).forEach(r=>{const pid=r.proyecto_id;if(!pp[pid])pp[pid]={n:r.proyectos?.nombre||pid,c:r.proyectos?.codigo||'',h:0};pp[pid].h+=r.horas;});
+  // Traer últimos 7 días para el historial (5 días hábiles aprox)
+  const ultimos5=[];
+  for(let i=0;i<7&&ultimos5.length<5;i++){
+    const d=new Date();d.setDate(d.getDate()-i);
+    const ds=fechaAStr(d);
+    ultimos5.push(ds);
+  }
+  const todasFechas=[...new Set([...dias,...ultimos5])];
+  const {data:rs}=await sb.from('registros_horas')
+    .select('id,horas,fecha,nota,proyecto_id,entregable_id,proyectos(codigo,nombre),entregables(nombre)')
+    .eq('colaborador_id',USER.id)
+    .in('fecha',todasFechas)
+    .order('fecha',{ascending:false});
+
+  const rsSemana=(rs||[]).filter(r=>dias.includes(r.fecha));
+  const tot=rsSemana.reduce((s,r)=>s+r.horas,0);
+  const pp={};
+  rsSemana.forEach(r=>{const pid=r.proyecto_id;if(!pp[pid])pp[pid]={n:r.proyectos?.nombre||pid,c:r.proyectos?.codigo||'',h:0};pp[pid].h+=r.horas;});
+
   let html='<div style="padding:16px">';
+
+  // Contador semanal
   html+=`<div class="card" style="padding:14px;margin-bottom:14px">
     <div style="font-family:'Fraunces',serif;font-size:40px;font-weight:300;color:var(--ink);line-height:1">${hT(tot)}</div>
     <div style="font-size:9px;letter-spacing:.1em;text-transform:uppercase;color:var(--ink3);margin-top:4px">Esta semana</div>
     <div style="margin-top:10px;height:6px;background:var(--bg2);border-radius:3px;overflow:hidden"><div style="height:100%;width:${Math.min(100,Math.round(tot/40*100))}%;background:${tot>=40?'var(--green)':tot>=32?'var(--amber)':'var(--accent)'};border-radius:3px"></div></div>
     <div style="font-size:10px;color:var(--ink3);margin-top:4px">${tot>=40?'✓ Meta semanal alcanzada':'Faltan '+hT(Math.max(0,40-tot))+' para 40h'}</div>
   </div>`;
-  if(Object.keys(pp).length){
-    html+=`<div class="sec">Por proyecto</div>`;
-    Object.entries(pp).sort((a,b)=>b[1].h-a[1].h).forEach(([pid,d])=>{
-      const pct=Math.round(d.h/tot*100);
-      html+=`<div class="card" style="padding:12px 14px;margin-bottom:8px;display:flex;align-items:center;gap:10px"><span class="cod">${d.c}</span><div style="flex:1;min-width:0"><div style="font-size:11px;color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${d.n}</div><div style="height:4px;background:var(--bg2);border-radius:2px;overflow:hidden;margin-top:5px"><div style="height:100%;width:${pct}%;background:var(--accent);border-radius:2px"></div></div></div><span style="font-size:13px;font-weight:500;color:var(--accent);white-space:nowrap">${hT(d.h)}</span></div>`;
+
+  // Historial últimos 5 días
+  html+=`<div class="sec">Historial reciente</div>`;
+  const porFecha={};
+  (rs||[]).forEach(r=>{if(!porFecha[r.fecha])porFecha[r.fecha]=[];porFecha[r.fecha].push(r);});
+  const diasConReg=ultimos5.filter(d=>porFecha[d]?.length);
+
+  if(!diasConReg.length){
+    html+=`<div style="font-size:11px;color:var(--ink3);text-align:center;padding:20px">Sin registros recientes</div>`;
+  } else {
+    const diasSemana=['Dom','Lun','Mar','Mié','Jue','Vie','Sáb'];
+    const meses=['ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic'];
+    diasConReg.forEach(fecha=>{
+      const d=new Date(fecha+'T12:00:00');
+      const label=`${diasSemana[d.getDay()]} ${d.getDate()} ${meses[d.getMonth()]}`;
+      const regs=porFecha[fecha];
+      const totDia=regs.reduce((s,r)=>s+r.horas,0);
+      html+=`<div style="margin-bottom:10px">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
+          <span style="font-size:10px;font-weight:600;color:var(--ink2);text-transform:uppercase;letter-spacing:.05em">${label}</span>
+          <span style="font-size:10px;color:var(--ink3)">${hT(totDia)}</span>
+        </div>`;
+      regs.forEach(r=>{
+        const entNom=r.entregables?.nombre||'Sin entregable';
+        const pCod=r.proyectos?.codigo||'';
+        const notaEnc=encodeURIComponent(r.nota||'');
+        html+=`<div class="card" style="padding:10px 14px;margin-bottom:6px;display:flex;align-items:center;gap:10px;cursor:pointer" onclick="abrirEditReg('${r.id}',${r.horas},'${notaEnc}','${entNom.replace(/'/g,"\'")}','${pCod}')">`;
+        html+=`<div style="flex:1;min-width:0">`;
+        html+=`<div style="font-size:11px;color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${entNom}</div>`;
+        html+=`<div style="font-size:9px;color:var(--ink3);margin-top:2px">${pCod}${r.nota?' · '+r.nota:''}</div>`;
+        html+=`</div>`;
+        html+=`<span style="font-size:13px;font-weight:500;color:var(--accent);white-space:nowrap;flex-shrink:0">${hT(r.horas)}</span>`;
+        html+=`<span style="font-size:10px;color:var(--ink3);flex-shrink:0">✏</span>`;
+        html+=`</div>`;
+      });
+      html+=`</div>`;
     });
   }
+
   cont.innerHTML=html+'</div>';
+}
+
+// ── EDITAR REGISTRO DESDE MI SEMANA ──
+let editRegId=null,editRegH=0;
+function abrirEditReg(id,horas,notaEnc,entNombre,proyCode){
+  editRegId=id;editRegH=horas;
+  document.getElementById('er-ent').textContent=decodeURIComponent(notaEnc?entNombre+' · '+proyCode:entNombre+' · '+proyCode);
+  document.getElementById('er-horas').textContent=hT(horas);
+  document.getElementById('er-nota').value=decodeURIComponent(notaEnc||'');
+  rH=horas;
+  document.getElementById('ov-er').classList.add('on');
+}
+async function guardarEditReg(){
+  const nota=document.getElementById('er-nota').value.trim();
+  const btn=document.getElementById('er-save');btn.disabled=true;btn.textContent='Guardando...';
+  await sb.from('registros_horas').update({horas:editRegH,nota}).eq('id',editRegId);
+  btn.disabled=false;btn.textContent='Guardar';
+  closeOv('ov-er');
+  updateCounter();renderSemana();
+  toast('✓ Registro actualizado');
+}
+async function eliminarEditReg(){
+  if(!confirm('¿Eliminar este registro?'))return;
+  await sb.from('registros_horas').delete().eq('id',editRegId);
+  closeOv('ov-er');
+  updateCounter();renderSemana();
+  toast('✓ Registro eliminado');
 }
 
 function renderRepUI(){
@@ -1222,7 +1332,26 @@ async function eliminarColab2(){
 }
 
 // ── PROYECTO FORM ──
-let proyEditId2=null,etapasSel2=new Set(),tipoProy='productivo';
+let proyEditId2=null,etapasSel2=new Set(),tipoProy='productivo',colabsSel=new Set();
+
+async function renderColabsCheck(proyId){
+  colabsSel=new Set();
+  const {data:colabs}=await sb.from('colaboradores').select('id,nombre,apellido,rol').order('nombre');
+  if(proyId){
+    const {data:asig}=await sb.from('proyecto_colaboradores').select('colaborador_id').eq('proyecto_id',proyId);
+    (asig||[]).forEach(a=>colabsSel.add(a.colaborador_id));
+  }
+  const cont=document.getElementById('pf-colabs');
+  cont.innerHTML=(colabs||[]).filter(c=>c.rol!=='admin').map(c=>{
+    const sel=colabsSel.has(c.id);
+    return `<button type="button" class="rol-b2 ${sel?'on2':''}" id="pc-${c.id}" onclick="toggleColabProy('${c.id}')">${c.nombre} ${c.apellido||''}</button>`;
+  }).join('');
+}
+
+function toggleColabProy(id){
+  if(colabsSel.has(id)){colabsSel.delete(id);document.getElementById('pc-'+id).classList.remove('on2');}
+  else{colabsSel.add(id);document.getElementById('pc-'+id).classList.add('on2');}
+}
 
 function selTipoProy(tipo){
   tipoProy=tipo;
@@ -1241,13 +1370,14 @@ function selTipoProy(tipo){
   }
 }
 
-function abrirNuevoProy(){
+async function abrirNuevoProy(){
   proyEditId2=null;etapasSel2=new Set();
   document.getElementById('pf-title2').textContent='Nuevo proyecto';
   ['pf-cod','pf-nom2','pf-cli','pf-presup2','pf-gasto','pf-inicio'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
   document.getElementById('pf-del').style.display='none';
   selTipoProy('productivo');
   renderEtapasCheck2();actualizarDist2();
+  await renderColabsCheck(null);
   document.getElementById('ov-proy2').classList.add('on');
 }
 async function abrirEditProy(id){
@@ -1263,6 +1393,7 @@ async function abrirEditProy(id){
   document.getElementById('pf-del').style.display='block';
   selTipoProy(p.tipo||'productivo');
   renderEtapasCheck2();actualizarDist2();
+  await renderColabsCheck(id);
   document.getElementById('ov-proy2').classList.add('on');
 }
 function renderEtapasCheck2(){
@@ -1357,6 +1488,15 @@ async function guardarProy2(){
       }
       const inserts=Object.entries(presupEtapas).map(([k,m])=>({proyecto_id:np.id,etapa_clave:k,monto:m}));
       if(inserts.length)await sb.from('presupuesto_etapas').insert(inserts);
+    }
+  }
+  // Guardar colaboradores asignados
+  const pid=proyEditId2||(np?.id);
+  if(pid){
+    await sb.from('proyecto_colaboradores').delete().eq('proyecto_id',pid);
+    if(colabsSel.size){
+      const insColabs=[...colabsSel].map(cid=>({proyecto_id:pid,colaborador_id:cid}));
+      await sb.from('proyecto_colaboradores').insert(insColabs);
     }
   }
   closeOv('ov-proy2');btn.disabled=false;btn.textContent='Guardar';

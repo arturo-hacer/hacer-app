@@ -203,17 +203,17 @@ textarea{resize:none;height:62px;}
     <div class="fl"><label>Tiempo trabajado</label>
       <div class="stw">
         <div class="str">
-          <button class="stb" id="stm" onclick="ch(-.25)">−</button>
+          <button class="stb" id="stm" onclick="ch(-1/60)">−</button>
           <div class="std">
             <input class="sti" id="sti" type="text" value="2:00" onchange="pi(this.value)" onkeydown="if(event.key==='Enter')this.blur()" inputmode="decimal">
             <span class="stl" id="stl">2 horas</span>
           </div>
-          <button class="stb" onclick="ch(.25)">+</button>
+          <button class="stb" onclick="ch(1/60)">+</button>
         </div>
         <div class="qb">
-          <button onclick="sh2(.25)">15m</button><button onclick="sh2(.5)">30m</button>
-          <button onclick="sh2(.75)">45m</button><button onclick="sh2(1)">1h</button>
-          <button onclick="sh2(2)">2h</button><button onclick="sh2(4)">4h</button>
+          <button onclick="sh2(30/60)">30m</button><button onclick="sh2(1)">1h</button>
+          <button onclick="sh2(1.5)">1:30</button><button onclick="sh2(2)">2h</button>
+          <button onclick="sh2(3)">3h</button><button onclick="sh2(4)">4h</button>
           <button onclick="sh2(8)">8h</button>
         </div>
       </div>
@@ -278,9 +278,9 @@ textarea{resize:none;height:62px;}
     <div class="fl" style="margin-top:16px">
       <label>Horas</label>
       <div style="display:flex;align-items:center;gap:12px;justify-content:center;padding:8px 0">
-        <button onclick="editRegH=Math.max(0.25,parseFloat((editRegH-0.25).toFixed(2)));document.getElementById('er-horas').textContent=hT(editRegH)" style="width:36px;height:36px;border-radius:50%;border:1.5px solid var(--border);background:#fff;font-size:20px;color:var(--ink2);cursor:pointer;display:flex;align-items:center;justify-content:center">−</button>
+        <button onclick="editRegH=Math.max(1/60,parseFloat((editRegH-1/60).toFixed(4)));document.getElementById('er-horas').textContent=hT(editRegH)" style="width:36px;height:36px;border-radius:50%;border:1.5px solid var(--border);background:#fff;font-size:20px;color:var(--ink2);cursor:pointer;display:flex;align-items:center;justify-content:center">−</button>
         <span id="er-horas" style="font-family:'Fraunces',serif;font-size:32px;font-weight:300;color:var(--ink);min-width:80px;text-align:center"></span>
-        <button onclick="editRegH=parseFloat((editRegH+0.25).toFixed(2));document.getElementById('er-horas').textContent=hT(editRegH)" style="width:36px;height:36px;border-radius:50%;border:1.5px solid var(--border);background:#fff;font-size:20px;color:var(--ink2);cursor:pointer;display:flex;align-items:center;justify-content:center">+</button>
+        <button onclick="editRegH=parseFloat((editRegH+1/60).toFixed(4));document.getElementById('er-horas').textContent=hT(editRegH)" style="width:36px;height:36px;border-radius:50%;border:1.5px solid var(--border);background:#fff;font-size:20px;color:var(--ink2);cursor:pointer;display:flex;align-items:center;justify-content:center">+</button>
       </div>
     </div>
     <div class="fl"><label>Nota</label><input type="text" id="er-nota" placeholder="Opcional"></div>
@@ -664,10 +664,10 @@ async function rActEnts(pe=null,forceEc=null){
   (data||[]).forEach(e=>s.innerHTML+=`<option value="${e.id}">${e.nombre}</option>`);
   if(pe)s.value=pe;
 }
-function updSt(){document.getElementById('sti').value=hD(rH);document.getElementById('stl').textContent=hT(rH);document.getElementById('stm').disabled=rH<=.25;}
-function ch(d){rH=Math.max(.25,Math.min(24,Math.round((rH+d)*4)/4));updSt();}
+function updSt(){document.getElementById('sti').value=hD(rH);document.getElementById('stl').textContent=hT(rH);document.getElementById('stm').disabled=rH<=1/60;}
+function ch(d){rH=Math.max(1/60,Math.min(24,Math.round((rH+d)*60)/60));updSt();}
 function sh2(h){rH=h;updSt();}
-function pi(v){v=v.trim();let h=0;if(v.includes(':')){{const[a,b]=v.split(':');h=parseInt(a||0)+parseInt(b||0)/60;}}else if(v.includes('.'))h=parseFloat(v);else h=parseInt(v)||0;rH=Math.max(.25,Math.min(24,Math.round((h||.25)*4)/4));updSt();}
+function pi(v){v=v.trim();let h=0;if(v.includes(':')){{const[a,b]=v.split(':');h=parseInt(a||0)+parseInt(b||0)/60;}}else if(v.includes('.'))h=parseFloat(v);else h=parseInt(v)||0;rH=Math.max(1/60,Math.min(24,h||1/60));updSt();}
 async function saveReg(){
   const pid=document.getElementById('rp').value,ec=document.getElementById('re').value,eid=document.getElementById('rent').value;
   if(!pid||!ec||!eid){toast('Completa todos los campos');return;}

@@ -488,6 +488,7 @@ function setupApp(){
   if(esAdmin)document.getElementById('admin-pill').style.display='inline-block';
   document.getElementById('fab').style.display='flex';
   updateCounter();
+  reanudarTimer();
   const tabs=esAdmin
     ?[{id:'registrar',l:'Registrar'},{id:'proyectos',l:'Proyectos'},{id:'semana',l:'Mi semana'},{id:'reportes',l:'Reportes'},{id:'gestion',l:'Gestión'}]
     :[{id:'registrar',l:'Registrar'},{id:'proyectos',l:'Proyectos'},{id:'semana',l:'Mi semana'}];
@@ -599,31 +600,72 @@ async function tDone(id,cur){
   toast(done?'✓ Completado':'Desmarcado');renderMisTareas();
 }
 
+const TIMER_MAX_SECS=28800; // 8 horas
+
 function tTimer(id,nom){
   if(timerEnt===id){stopTimer();return;}
   if(timerInt)stopTimer();
   timerEnt=id;timerSecs=0;
+  const startTime=Date.now();
+  localStorage.setItem('timer',JSON.stringify({entId:id,nom,startTime}));
   document.getElementById('timer-nom').textContent=nom;
   document.getElementById('timer-pill').classList.add('on');
-  timerInt=setInterval(()=>{timerSecs++;document.getElementById('timer-txt').textContent=fS(timerSecs);},1000);
+  timerInt=setInterval(()=>{
+    timerSecs=Math.floor((Date.now()-startTime)/1000);
+    document.getElementById('timer-txt').textContent=fS(Math.min(timerSecs,TIMER_MAX_SECS));
+    if(timerSecs>=TIMER_MAX_SECS){stopTimer();toast('⏹ Timer auto-detenido (8h máximo)');}
+  },1000);
   renderMisTareas();toast('▶ Timer iniciado');
 }
-async function stopTimer(){
-  if(!timerInt)return;
-  clearInterval(timerInt);timerInt=null;
-  document.getElementById('timer-pill').classList.remove('on');
-  if(timerSecs>=60){
-    const hrs=Math.max(1/60,Math.round(timerSecs/60)/60);
+
+async function reanudarTimer(){
+  try{
+    const saved=JSON.parse(localStorage.getItem('timer')||'null');
+    if(!saved)return;
+    const secsTranscurridos=Math.floor((Date.now()-saved.startTime)/1000);
+    if(secsTranscurridos>=TIMER_MAX_SECS){
+      // Ya pasaron 8h — registrar automáticamente y limpiar
+      timerEnt=saved.entId;timerSecs=TIMER_MAX_SECS;
+      await _guardarTimer();
+      toast('⏹ Timer auto-detenido (8h máximo)');
+      return;
+    }
+    // Retomar el timer desde donde quedó
+    timerEnt=saved.entId;timerSecs=secsTranscurridos;
+    document.getElementById('timer-nom').textContent=saved.nom;
+    document.getElementById('timer-pill').classList.add('on');
+    const startTime=saved.startTime;
+    timerInt=setInterval(()=>{
+      timerSecs=Math.floor((Date.now()-startTime)/1000);
+      document.getElementById('timer-txt').textContent=fS(Math.min(timerSecs,TIMER_MAX_SECS));
+      if(timerSecs>=TIMER_MAX_SECS){stopTimer();toast('⏹ Timer auto-detenido (8h máximo)');}
+    },1000);
+    document.getElementById('timer-txt').textContent=fS(timerSecs);
+    toast(`▶ Timer retomado · ${fS(timerSecs)} transcurridos`);
+  }catch(e){localStorage.removeItem('timer');}
+}
+async function _guardarTimer(){
+  const secsEfectivos=Math.min(timerSecs,TIMER_MAX_SECS);
+  localStorage.removeItem('timer');
+  if(secsEfectivos>=60){
+    const hrs=Math.max(1/60,Math.round(secsEfectivos/60)/60);
     const {data:ent}=await sb.from('entregables').select('proyecto_id,etapa_clave').eq('id',timerEnt).single();
     if(ent){
       const {data:ex}=await sb.from('registros_horas').select('id,horas').eq('colaborador_id',USER.id).eq('entregable_id',timerEnt).eq('fecha',diaAct).maybeSingle();
-      if(ex)await sb.from('registros_horas').update({horas:ex.horas+hrs}).eq('id',ex.id);
+      if(ex)await sb.from('registros_horas').update({horas:Math.round((ex.horas+hrs)*60)/60}).eq('id',ex.id);
       else await sb.from('registros_horas').insert({colaborador_id:USER.id,entregable_id:timerEnt,proyecto_id:ent.proyecto_id,etapa_clave:ent.etapa_clave,fecha:diaAct,horas:hrs,nota:'(timer)'});
       toast(`■ ${hT(hrs)} guardadas`);
     }
   }
   timerEnt=null;timerSecs=0;
   updateCounter();renderMisTareas();
+}
+
+async function stopTimer(){
+  if(!timerInt)return;
+  clearInterval(timerInt);timerInt=null;
+  document.getElementById('timer-pill').classList.remove('on');
+  await _guardarTimer();
 }
 
 async function openReg(pid=null,ec=null,eid=null){

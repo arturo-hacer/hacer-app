@@ -684,11 +684,30 @@ async function renderProy(){
   }
   const {data:ps}=await q;
   if(!ps||!ps.length){cont.innerHTML=`<div style="padding:16px"><div class="empty"><div class="empty-i">📁</div><div>Sin proyectos aún</div></div></div>`;return;}
+
+  // Entregables para barra de avance
   const {data:es}=await sb.from('entregables').select('proyecto_id,done,eliminado');
   const ep={};(es||[]).forEach(e=>{if(!ep[e.proyecto_id])ep[e.proyecto_id]={t:0,d:0};if(!e.eliminado){ep[e.proyecto_id].t++;if(e.done)ep[e.proyecto_id].d++;}});
+
+  // Consumo presupuestal: horas × tarifa por proyecto
+  const proyIds=ps.map(p=>p.id);
+  const {data:regs}=await sb.from('registros_horas')
+    .select('proyecto_id,horas,colaboradores(tarifa)')
+    .in('proyecto_id',proyIds);
+  const consumo={};
+  (regs||[]).forEach(r=>{
+    if(!consumo[r.proyecto_id])consumo[r.proyecto_id]=0;
+    consumo[r.proyecto_id]+=(r.horas*(r.colaboradores?.tarifa||0));
+  });
+
   let html='<div style="padding:16px">';
   ps.forEach(p=>{
-    const s=ep[p.id]||{t:0,d:0},av=s.t>0?Math.round(s.d/s.t*100):0;
+    const s=ep[p.id]||{t:0,d:0};
+    const av=s.t>0?Math.round(s.d/s.t*100):0;
+    const tienePresup=p.presupuesto_total>0&&p.tipo!=='en_blanco';
+    const pctConsumido=tienePresup?Math.min(100,Math.round((consumo[p.id]||0)/p.presupuesto_total*100)):null;
+    const colorConsumido=pctConsumido>=90?'var(--rose)':pctConsumido>=70?'var(--amber)':'var(--green)';
+
     html+=`<div class="card" style="padding:14px;margin-bottom:12px">
       <div style="display:flex;align-items:flex-start;gap:10px;margin-bottom:10px">
         <span class="cod">${p.codigo}</span>
@@ -697,13 +716,21 @@ async function renderProy(){
           <div style="font-size:10px;color:var(--ink3);margin-top:2px">${p.cliente||''}</div>
         </div>
       </div>
-      <div style="display:flex;align-items:center;gap:8px">
+      <div style="display:flex;align-items:center;gap:6px;margin-bottom:6px">
         <div style="flex:1;height:5px;background:var(--bg2);border-radius:3px;overflow:hidden">
           <div style="height:100%;width:${av}%;background:var(--accent);border-radius:3px"></div>
         </div>
-        <span style="font-size:10px;color:var(--accent);font-weight:500">${av}%</span>
+        <span style="font-size:10px;color:var(--accent);font-weight:500;min-width:28px;text-align:right">${av}%</span>
+        <span style="font-size:9px;color:var(--ink3);min-width:60px">entregables</span>
       </div>
-      <div style="display:flex;justify-content:space-between;align-items:center;margin-top:6px">
+      ${tienePresup?`<div style="display:flex;align-items:center;gap:6px;margin-bottom:6px">
+        <div style="flex:1;height:5px;background:var(--bg2);border-radius:3px;overflow:hidden">
+          <div style="height:100%;width:${pctConsumido}%;background:${colorConsumido};border-radius:3px"></div>
+        </div>
+        <span style="font-size:10px;color:${colorConsumido};font-weight:500;min-width:28px;text-align:right">${pctConsumido}%</span>
+        <span style="font-size:9px;color:var(--ink3);min-width:60px">presupuesto</span>
+      </div>`:''}
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-top:4px">
         <div style="font-size:10px;color:var(--ink3)">${s.d}/${s.t} entregables</div>
         <button style="font-size:10px;color:var(--accent);background:none;border:none;cursor:pointer;letter-spacing:.04em" onclick="abrirDetalleProy('${p.id}')">Ver entregables ›</button>
       </div>

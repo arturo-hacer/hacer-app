@@ -8,6 +8,7 @@
 <title>hacer:</title>
 <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Fraunces:ital,opsz,wght@0,9..144,300;0,9..144,400;1,9..144,300&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.2/Sortable.min.js"></script>
 <style>
 :root{--bg:#f4f2ec;--bg2:#eae7de;--ink:#1c1b17;--ink2:#5c5b53;--ink3:#9c9b90;--accent:#2828b8;--acc-lt:rgba(40,40,184,.08);--rose:#ed254e;--rose-lt:rgba(237,37,78,.08);--green:#3a7a4a;--grn-lt:rgba(58,122,74,.10);--amber:#c28a10;--amb-lt:rgba(194,138,16,.10);--lav:#8a8ae5;--border:rgba(28,27,23,.10);--r:12px;}
 *{box-sizing:border-box;margin:0;padding:0;}
@@ -134,6 +135,8 @@ textarea{resize:none;height:62px;}
 .etapa-check-btn.on{border-color:var(--accent);background:var(--acc-lt);color:var(--accent);}
 .det-tab{flex-shrink:0;padding:8px 12px;font-size:10px;letter-spacing:.07em;text-transform:uppercase;color:var(--ink3);background:none;border:none;border-bottom:2px solid transparent;cursor:pointer;white-space:nowrap;}
 .det-tab.on{color:var(--accent);border-bottom-color:var(--accent);}
+.sortable-ghost{opacity:.4;background:var(--acc-lt)!important;}
+.drag-handle:active{cursor:grabbing;}
 .bdanger{width:100%;padding:11px;background:none;color:var(--rose);border:1.5px solid var(--rose);border-radius:9px;font-size:11px;letter-spacing:.08em;text-transform:uppercase;margin-top:8px;cursor:pointer;}
 </style>
 </head>
@@ -787,7 +790,7 @@ async function renderGanttDetalle(){
     .select('*')
     .eq('proyecto_id',proyDetalleId)
     .eq('eliminado',false)
-    .order('etapa_clave').order('grupo').order('created_at');
+    .order('etapa_clave').order('grupo').order('orden').order('created_at');
 
   const conFecha=(ents||[]).filter(e=>e.fecha_inicio&&e.fecha_fin);
   if(!conFecha.length){
@@ -909,6 +912,7 @@ function _filaEnt(e,colabs,esAdmin){
   row+='<div style="'+checkStyle+'" onclick="toggleDoneDetalle(\''+e.id+'\','+e.done+')">'+(e.done?'✓':'')+'</div>';
   row+='<span style="flex:1;font-size:11px;color:var(--ink);'+(e.done?'text-decoration:line-through;opacity:.5':'')+'">' +e.nombre+'</span>';
   if(esAdmin){
+    row+='<div class="drag-handle" style="font-size:14px;color:var(--ink3);cursor:grab;padding:2px 6px;user-select:none" title="Arrastrar">⠿</div>';
     row+='<button style="font-size:12px;color:var(--ink3);background:none;border:none;cursor:pointer;padding:2px 6px" data-edit-id="'+e.id+'" title="Editar nombre">✏</button>';
     row+='<button style="font-size:16px;color:var(--ink3);background:none;border:none;cursor:pointer;padding:2px 4px" onclick="eliminarEntregableDetalle(\''+e.id+'\')" title="Eliminar">×</button>';
   }
@@ -938,6 +942,7 @@ async function renderEntregablesDetalle(){
       abrirEditarEntregable(entId,nombre);
     });
   });
+  initSortables();
 }
 
 async function _renderEntBlanco(cont,colabs,esAdmin){
@@ -946,7 +951,7 @@ async function _renderEntBlanco(cont,colabs,esAdmin){
     .eq('proyecto_id',proyDetalleId)
     .eq('eliminado',false)
     .eq('etapa_clave','_')
-    .order('grupo').order('created_at');
+    .order('grupo').order('orden').order('created_at');
   const porGrupo={};
   (ents||[]).forEach(e=>{ const g=e.grupo||'General'; if(!porGrupo[g])porGrupo[g]=[]; porGrupo[g].push(e); });
   let html='';
@@ -955,7 +960,9 @@ async function _renderEntBlanco(cont,colabs,esAdmin){
     const pend=porGrupo[grupo].filter(e=>!e.done);
     const comp=porGrupo[grupo].filter(e=>e.done);
     html+=`<div style="padding:5px 16px 3px;font-size:9px;color:var(--ink3);background:var(--bg2);border-bottom:1px dashed var(--border);letter-spacing:.05em">${grupo}</div>`;
-    pend.forEach(e=>{ html+=_filaEnt(e,colabs,esAdmin); });
+    html+=`<div class="sortable-group" data-proyecto="${proyDetalleId}">`;
+    pend.forEach(e=>{ html+=`<div data-id="${e.id}">`+_filaEnt(e,colabs,esAdmin)+'</div>'; });
+    html+='</div>';
     if(comp.length){
       html+=`<div style="padding:6px 16px;font-size:9px;color:var(--ink3);cursor:pointer;display:flex;align-items:center;gap:6px;background:var(--bg)" onclick="const s=this.nextElementSibling;s.style.display=s.style.display==='none'?'block':'none'">▼ Completadas <span class="ccount">${comp.length}</span></div><div style="display:none">`;
       comp.forEach(e=>{ html+=_filaEnt(e,colabs,esAdmin); });
@@ -973,7 +980,7 @@ async function _renderEntProductivo(cont,colabs,esAdmin){
     .select('*,colaboradores(nombre,apellido,color)')
     .eq('proyecto_id',proyDetalleId)
     .eq('eliminado',false)
-    .order('etapa_clave').order('grupo').order('created_at');
+    .order('etapa_clave').order('grupo').order('orden').order('created_at');
   const porEtapa={};
   (ents||[]).forEach(e=>{
     if(!porEtapa[e.etapa_clave])porEtapa[e.etapa_clave]={};
@@ -986,7 +993,9 @@ async function _renderEntProductivo(cont,colabs,esAdmin){
     html+=`<div style="padding:8px 16px;background:var(--bg2);font-size:9px;letter-spacing:.1em;text-transform:uppercase;color:var(--ink2);display:flex;align-items:center;gap:8px;position:sticky;top:0;z-index:2"><span class="ec">${et.k}</span>${et.n}</div>`;
     Object.entries(porEtapa[et.k]).forEach(([grupo,es])=>{
       html+=`<div style="padding:5px 16px 3px 16px;font-size:9px;color:var(--ink3);border-bottom:1px dashed var(--border)">${grupo}</div>`;
-      es.forEach(e=>{ html+=_filaEnt(e,colabs,esAdmin); });
+      html+=`<div class="sortable-group" data-proyecto="${proyDetalleId}" data-etapa="${et.k}" data-grupo="${grupo}">`;
+      es.forEach(e=>{ html+=`<div data-id="${e.id}">`+_filaEnt(e,colabs,esAdmin)+'</div>'; });
+      html+='</div>';
       if(esAdmin) html+=`<button onclick="abrirNuevoEntDetalle('${et.k}','${grupo}')" style="display:flex;align-items:center;gap:6px;padding:8px 16px;font-size:10px;color:var(--accent);background:none;border:none;border-top:1px dashed var(--border);width:100%;cursor:pointer">+ Agregar entregable</button>`;
     });
     if(esAdmin) html+=`<button onclick="abrirNuevoEntDetalle('${et.k}','')" style="display:flex;align-items:center;gap:6px;padding:8px 16px;font-size:10px;color:var(--ink3);background:var(--bg);border:none;border-top:1px dashed var(--border);width:100%;cursor:pointer">+ Agregar en grupo nuevo</button>`;
@@ -1004,6 +1013,26 @@ async function _renderEntProductivo(cont,colabs,esAdmin){
 }
 
 
+
+// ── SORTABLE — reordenar entregables ──
+function initSortables(){
+  const esAdmin=PERFIL?.rol==='admin';
+  if(!esAdmin)return;
+  document.querySelectorAll('.sortable-group').forEach(el=>{
+    Sortable.create(el,{
+      animation:150,
+      handle:'.drag-handle',
+      ghostClass:'sortable-ghost',
+      onEnd: async function(evt){
+        const items=[...evt.to.children];
+        const updates=items.map((el,i)=>({id:el.dataset.id, orden:i}));
+        for(const u of updates){
+          await sb.from('entregables').update({orden:u.orden}).eq('id',u.id);
+        }
+      }
+    });
+  });
+}
 
 // Agregar tarea en proyecto en blanco
 let nuevoEntEtapa=null, nuevoEntGrupo=null;

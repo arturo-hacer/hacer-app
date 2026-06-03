@@ -200,6 +200,9 @@ textarea{resize:none;height:62px;}
       <select id="re" onchange="rActEnts()"><option value="">— etapa —</option></select></div>
     <div class="fl"><label>Entregable</label>
       <select id="rent"><option value="">— entregable —</option></select></div>
+    <div id="reg-previo" style="display:none;margin:0 0 10px;padding:8px 12px;background:var(--acc-lt);border-radius:8px;font-size:10px;color:var(--accent)">
+      Ya llevas <strong id="reg-previo-val"></strong> registradas hoy en esta tarea — se sumarán al nuevo tiempo.
+    </div>
     <div class="fl"><label>Tiempo trabajado</label>
       <div class="stw">
         <div class="str">
@@ -627,12 +630,21 @@ async function openReg(pid=null,ec=null,eid=null){
   rH=2;updSt();
   document.getElementById('rnota').value='';
   document.getElementById('reg-fecha').textContent=fF(diaAct)||diaAct;
+  document.getElementById('reg-previo').style.display='none';
   const {data:proys}=await sb.from('proyectos').select('id,codigo,nombre').order('codigo');
   const s=document.getElementById('rp');
   s.innerHTML='<option value="">— proyecto —</option>';
   (proys||[]).forEach(p=>s.innerHTML+=`<option value="${p.id}">${p.codigo} · ${p.nombre}</option>`);
   if(pid){s.value=pid;await rActEtapas(ec,eid);}
   else{document.getElementById('re').innerHTML='<option value="">— etapa —</option>';document.getElementById('rent').innerHTML='<option value="">— entregable —</option>';}
+  // Mostrar horas previas si hay registro hoy para este entregable
+  if(eid){
+    const {data:ex}=await sb.from('registros_horas').select('horas').eq('colaborador_id',USER.id).eq('entregable_id',eid).eq('fecha',diaAct).maybeSingle();
+    if(ex?.horas){
+      document.getElementById('reg-previo').style.display='block';
+      document.getElementById('reg-previo-val').textContent=hT(ex.horas);
+    }
+  }
   document.getElementById('ov-reg').classList.add('on');
 }
 async function rActEtapas(pe=null,pent=null){
@@ -673,12 +685,18 @@ async function saveReg(){
   if(!pid||!ec||!eid){toast('Completa todos los campos');return;}
   const btn=document.getElementById('rsave');btn.disabled=true;btn.textContent='Guardando...';
   const etapaClave=ec==='_'?'_':ec;
-  const {data:ex}=await sb.from('registros_horas').select('id').eq('colaborador_id',USER.id).eq('entregable_id',eid).eq('fecha',diaAct).maybeSingle();
-  if(ex)await sb.from('registros_horas').update({horas:rH,nota:document.getElementById('rnota').value}).eq('id',ex.id);
-  else await sb.from('registros_horas').insert({colaborador_id:USER.id,entregable_id:eid,proyecto_id:pid,etapa_clave:etapaClave,fecha:diaAct,horas:rH,nota:document.getElementById('rnota').value});
+  const {data:ex}=await sb.from('registros_horas').select('id,horas').eq('colaborador_id',USER.id).eq('entregable_id',eid).eq('fecha',diaAct).maybeSingle();
+  const nota=document.getElementById('rnota').value;
+  if(ex){
+    const total=Math.round((ex.horas+rH)*60)/60;
+    await sb.from('registros_horas').update({horas:total,nota}).eq('id',ex.id);
+    toast(`✓ ${hT(rH)} agregadas · Total hoy: ${hT(total)}`);
+  } else {
+    await sb.from('registros_horas').insert({colaborador_id:USER.id,entregable_id:eid,proyecto_id:pid,etapa_clave:etapaClave,fecha:diaAct,horas:rH,nota});
+    toast(`✓ ${hT(rH)} guardadas`);
+  }
   btn.disabled=false;btn.textContent='Guardar';
   closeOv('ov-reg');updateCounter();renderMisTareas();
-  toast(`✓ ${hT(rH)} guardadas`);
 }
 
 async function renderProy(){

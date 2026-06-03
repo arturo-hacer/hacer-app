@@ -1319,7 +1319,7 @@ async function loadGProys(){
 // ── COLABORADOR FORM ──
 let colabEditId=null,colSel='#2828b8',rolSel2='colaborador';
 const COLS=['#2828b8','#ed254e','#3a7a4a','#c28a10','#7b6fa0','#2a7a8a','#8a5a2a'];
-const ETAPAS_C=[{k:'DE',n:'Definición'},{k:'SD',n:'Diseño Esquemático'},{k:'DD',n:'Desarrollo de Diseño'},{k:'CD',n:'Documentos Constructivos'},{k:'PC',n:'Planos Comerciales'}];
+const ETAPAS_C=[{k:'PC',n:'Procesos'},{k:'DE',n:'Definición'},{k:'SD',n:'Diseño Esquemático'},{k:'DD',n:'Desarrollo de Diseño'},{k:'CD',n:'Documentos Constructivos'}];
 
 function abrirNuevoColab(){
   colabEditId=null;rolSel2='colaborador';colSel=COLS[0];
@@ -1445,11 +1445,19 @@ async function abrirEditProy(id){
 }
 function renderEtapasCheck2(){
   const c=document.getElementById('pf-etapas2');c.innerHTML='';
+  // PC siempre incluido
+  etapasSel2.add('PC');
   ETAPAS_C.forEach(et=>{
     const b=document.createElement('button');b.type='button';
+    const esPC=et.k==='PC';
     b.className='etapa-check-btn'+(etapasSel2.has(et.k)?' on':'');
     b.textContent=`${et.k} · ${et.n}`;
-    b.onclick=()=>{etapasSel2.has(et.k)?etapasSel2.delete(et.k):etapasSel2.add(et.k);b.classList.toggle('on');actualizarDist2();};
+    if(esPC){
+      b.title='Siempre incluido';
+      b.style.opacity='0.7';b.style.cursor='default';
+    } else {
+      b.onclick=()=>{etapasSel2.has(et.k)?etapasSel2.delete(et.k):etapasSel2.add(et.k);b.classList.toggle('on');actualizarDist2();};
+    }
     c.appendChild(b);
   });
 }

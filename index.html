@@ -274,6 +274,27 @@ textarea{resize:none;height:62px;}
 .det-modal-header{padding:20px 22px 0;flex-shrink:0;}
 .det-modal-body{flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;}
 
+/* ── SELECCIÓN MÚLTIPLE ── */
+.ent-table tbody tr.sel-row{background:var(--acc-lt)!important;outline:1px solid rgba(40,40,184,.2);}
+.sel-bar{
+  position:sticky;top:0;z-index:10;
+  display:none;align-items:center;gap:12px;
+  padding:10px 18px;
+  background:var(--accent);color:#fff;
+  border-radius:0;
+  font-size:11px;
+}
+.sel-bar.on{display:flex;}
+.sel-bar-count{font-weight:600;letter-spacing:.04em;}
+.sel-bar-btn{
+  padding:5px 14px;border-radius:6px;border:1.5px solid rgba(255,255,255,.4);
+  background:none;color:#fff;font-size:10px;font-family:'DM Mono',monospace;
+  cursor:pointer;letter-spacing:.06em;transition:background .15s;
+}
+.sel-bar-btn:hover{background:rgba(255,255,255,.15);}
+.sel-bar-clr{margin-left:auto;background:none;border:none;color:rgba(255,255,255,.6);font-size:20px;cursor:pointer;line-height:1;padding:0;}
+.sel-bar-clr:hover{color:#fff;}
+
 /* ── DATE PICKER ── */
 #ov-dpd{align-items:center;}
 #ov-dpd .modal{max-width:360px;}
@@ -346,7 +367,7 @@ textarea{resize:none;height:62px;}
 ═══════════════════════════════════════════ -->
 
 <!-- REGISTRAR HORAS -->
-<div class="ov" id="ov-reg" onclick="closeOv('ov-reg',event)">
+<div class="ov" id="ov-reg" onclick="closeOv('ov-reg',event)" style="z-index:450">
   <div class="modal">
     <div class="stitle">Registrar horas</div>
     <div class="fl" style="margin-bottom:12px"><label>Fecha</label><input type="date" id="reg-fecha-input" style="font-size:12px;padding:8px 10px"></div>
@@ -382,9 +403,9 @@ textarea{resize:none;height:62px;}
 </div>
 
 <!-- DETALLE PROYECTO -->
-<div class="ov" id="ov-det-proy" onclick="if(event.target.id==='ov-det-proy')document.getElementById('ov-det-proy').classList.remove('on')" style="z-index:350">
+<div class="ov" id="ov-det-proy" onclick="if(event.target.id==='ov-det-proy'){limpiarSeleccion();document.getElementById('ov-det-proy').classList.remove('on');}" style="z-index:350">
   <div class="modal modal-xl" style="position:relative">
-    <button class="modal-close" onclick="document.getElementById('ov-det-proy').classList.remove('on')">×</button>
+    <button class="modal-close" onclick="limpiarSeleccion();document.getElementById('ov-det-proy').classList.remove('on')">×</button>
     <div class="det-modal-header">
       <div style="font-family:'Fraunces',serif;font-size:20px;font-weight:300;margin-bottom:2px" id="det-proy-title"></div>
       <div style="font-size:10px;color:var(--ink3);margin-bottom:0" id="det-proy-sub"></div>
@@ -394,7 +415,15 @@ textarea{resize:none;height:62px;}
         <button class="det-tab" id="det-tab-horas" onclick="switchDetProy('horas',this)" style="display:none">Horas × persona</button>
       </div>
     </div>
-    <div class="det-modal-body" id="det-proy-body"></div>
+    <div class="sel-bar" id="sel-bar">
+        <span class="sel-bar-count" id="sel-count">0 seleccionadas</span>
+        <button class="sel-bar-btn" onclick="editarFechasSeleccion()">📅 Fechas</button>
+        <button class="sel-bar-btn" onclick="asignarSeleccion()">👤 Asignar</button>
+        <button class="sel-bar-btn" onclick="moverSeleccion()">↗ Mover</button>
+        <button class="sel-bar-btn" onclick="eliminarSeleccion()" style="border-color:rgba(237,37,78,.5);color:#ffb3c0">× Eliminar</button>
+        <button class="sel-bar-clr" onclick="limpiarSeleccion()" title="Cancelar selección">×</button>
+      </div>
+      <div class="det-modal-body" id="det-proy-body"></div>
   </div>
 </div>
 
@@ -599,6 +628,7 @@ const SURL='https://yqggaamyiblqenjwcggw.supabase.co';
 const SKEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InlxZ2dhYW15aWJscWVuandjZ2d3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODAzNDM3NTAsImV4cCI6MjA5NTkxOTc1MH0._ZpHlZz5sIfeUKuS9zMw7U3Jv3PPzNWRtJbG9QTkUdw';
 const sb=supabase.createClient(SURL,SKEY);
 let USER=null,PERFIL=null,diaAct=hoy(),rH=2,timerInt=null,timerSecs=0,timerEnt=null,showDone={};
+let seleccionadas=new Set(),ultimaFilaSel=null;
 const COLS=['#2828b8','#ed254e','#3a7a4a','#c28a10','#7b6fa0','#2a7a8a','#8a5a2a'];
 const ETAPAS_C=[{k:'PC',n:'Procesos'},{k:'DE',n:'Definición'},{k:'SD',n:'Diseño Esquemático'},{k:'DD',n:'Desarrollo de Diseño'},{k:'CD',n:'Documentos Constructivos'}];
 const DN=['Dom','Lun','Mar','Mié','Jue','Vie','Sáb'];
@@ -1052,7 +1082,33 @@ async function guardarNuevaTareaRapida(){
 
 function tEt(h){h.nextElementSibling.classList.toggle('open');h.querySelector('.echev').classList.toggle('open');}
 function tSD(pid){showDone[pid]=!showDone[pid];renderMisTareas();}
-async function tDone(id,cur){const done=cur===true||cur==='true'?false:true;await sb.from('entregables').update({done}).eq('id',id);toast(done?'✓ Completado':'Desmarcado');renderMisTareas();}
+async function tDone(id,cur){
+  const done=cur===true||cur==='true'?false:true;
+  await sb.from('entregables').update({done}).eq('id',id);
+  if(done){
+    // Misma lógica de recurrencia que toggleDoneDetalle
+    const {data:e}=await sb.from('entregables').select('*').eq('id',id).single();
+    if(e?.recurrente&&e?.frecuencia){
+      const baseDate=e.fecha_unica?new Date(e.fecha_unica+'T12:00:00'):new Date();
+      const dias=new Set(e.dias_semana||[]);
+      const siguiente=dpSiguienteFecha(baseDate,e.frecuencia,dias);
+      if(siguiente){
+        const sigStr=fechaAStr(siguiente);
+        const {data:exist}=await sb.from('entregables').select('id').eq('proyecto_id',e.proyecto_id).eq('nombre',e.nombre).eq('fecha_unica',sigStr).eq('done',false).maybeSingle();
+        if(!exist){
+          await sb.from('entregables').insert({
+            proyecto_id:e.proyecto_id,etapa_clave:e.etapa_clave,grupo:e.grupo,
+            nombre:e.nombre,done:false,eliminado:false,recurrente:true,
+            frecuencia:e.frecuencia,dias_semana:e.dias_semana,
+            fecha_unica:sigStr,asignado_id:e.asignado_id,orden:e.orden
+          });
+          toast(`✓ Completado · Próxima: ${fF(sigStr)}`);
+        } else { toast('✓ Completado'); }
+      } else { toast('✓ Completado'); }
+    } else { toast('✓ Completado'); }
+  } else { toast('Desmarcado'); }
+  renderMisTareas();
+}
 
 // ── TIMER ──
 function tTimer(id,nom){
@@ -1455,13 +1511,22 @@ function _filaTabla(e, colabs, esAdmin){
   if(esAdmin){
     nombreCell = `<div style="display:flex;align-items:center;gap:7px">
       <div style="${chkStyle}" onclick="toggleDoneDetalle('${e.id}',${e.done})">${e.done?'✓':''}</div>
-      <span class="ent-nombre" data-edit-id="${e.id}" style="flex:1;cursor:pointer;${e.done?'text-decoration:line-through;opacity:.5':''}" title="Click para editar">${e.nombre}</span>
+      <span class="ent-nombre" data-edit-id="${e.id}"
+        style="flex:1;cursor:pointer;user-select:none;${e.done?'text-decoration:line-through;opacity:.5':''}"
+        title="Cmd/Ctrl+click para seleccionar · Click para editar nombre"
+        onclick="if(event.metaKey||event.ctrlKey){event.preventDefault();event.stopPropagation();seleccionarFila(event,'${e.id}',this.closest('tr'));}">
+        ${e.nombre}
+      </span>
       <div class="drag-handle" style="font-size:13px;color:var(--ink3);cursor:grab;user-select:none;opacity:.5" title="Arrastrar">⠿</div>
     </div>`;
   } else {
     nombreCell = `<div style="display:flex;align-items:center;gap:7px">
       <div style="${chkStyle}" onclick="toggleDoneDetalle('${e.id}',${e.done})">${e.done?'✓':''}</div>
-      <span style="${e.done?'text-decoration:line-through;opacity:.5':''}">${e.nombre}</span>
+      <span style="user-select:none;cursor:pointer;${e.done?'text-decoration:line-through;opacity:.5':''}"
+        title="Cmd/Ctrl+click para seleccionar"
+        onclick="if(event.metaKey||event.ctrlKey){event.preventDefault();event.stopPropagation();seleccionarFila(event,'${e.id}',this.closest('tr'));}">
+        ${e.nombre}
+      </span>
     </div>`;
   }
 
@@ -1473,7 +1538,7 @@ function _filaTabla(e, colabs, esAdmin){
   </div>`;
 
   const trClass = e.done?'done-row':'';
-  return `<tr class="${trClass}" data-id="${e.id}">
+  return `<tr class="${trClass} ent-fila-sel" data-id="${e.id}">
     <td class="col-nombre">${nombreCell}</td>
     <td class="col-resp">${respCell}</td>
     <td class="col-fecha"><span class="efecha ${fIniClass||'sin'}" onclick="abrirDPDetalle('${e.id}','${e.fecha_inicio||''}','${e.fecha_fin||''}')" style="cursor:pointer">${fIni}</span></td>
@@ -1498,18 +1563,51 @@ async function renderEntregablesDetalle(){
   const {data:colabs}=await sb.from('colaboradores').select('id,nombre,apellido,color').order('nombre');
   if(proyDetalleTipo==='en_blanco')await _renderEntBlanco(cont,colabs,esAdmin);
   else await _renderEntProductivo(cont,colabs,esAdmin);
-  cont.querySelectorAll('.ent-nombre').forEach(span=>{
-    span.addEventListener('click',()=>{
-      const entId=span.dataset.editId;const nombreActual=span.textContent.trim();
-      const input=document.createElement('input');input.value=nombreActual;
-      input.style.cssText='flex:1;font-size:11px;padding:2px 6px;border:1.5px solid var(--accent);border-radius:5px;outline:none;width:100%;';
-      span.replaceWith(input);input.focus();input.select();
-      const guardar=async()=>{const nuevo=input.value.trim();if(nuevo&&nuevo!==nombreActual){await sb.from('entregables').update({nombre:nuevo}).eq('id',entId);}await renderDetProyBody();};
-      input.addEventListener('blur',guardar);
-      input.addEventListener('keydown',e=>{if(e.key==='Enter')input.blur();if(e.key==='Escape'){input.value=nombreActual;input.blur();}});
-    });
-  });
+  // Edición de nombre: delegado en el contenedor para sobrevivir re-renders parciales
+  cont.addEventListener('click', function _nombreClick(ev){
+    if(ev.metaKey||ev.ctrlKey) return;
+    const span=ev.target.closest('.ent-nombre');
+    if(!span) return;
+    activarEdicionNombre(span);
+  },{capture:false});
+
   initSortables();
+}
+
+function activarEdicionNombre(span){
+  const entId=span.dataset.editId;
+  const nombreActual=span.textContent.trim();
+  const input=document.createElement('input');
+  input.value=nombreActual;
+  input.style.cssText='flex:1;font-size:11px;padding:2px 6px;border:1.5px solid var(--accent);border-radius:5px;outline:none;width:100%;min-width:0;';
+  span.replaceWith(input);
+  input.focus();input.select();
+
+  let guardado=false;
+  const guardar=async()=>{
+    if(guardado)return; guardado=true;
+    const nuevo=input.value.trim()||nombreActual;
+    // Restaurar span en el DOM sin reload
+    const newSpan=document.createElement('span');
+    newSpan.className='ent-nombre';
+    newSpan.dataset.editId=entId;
+    newSpan.style.cssText='flex:1;cursor:pointer;';
+    newSpan.title='Cmd/Ctrl+click para seleccionar · Click para editar nombre';
+    // Preservar el onclick de selección
+    newSpan.setAttribute('onclick',`if(event.metaKey||event.ctrlKey){event.preventDefault();event.stopPropagation();seleccionarFila(event,'${entId}',this.closest('tr'));}`);
+    newSpan.textContent=nuevo;
+    input.replaceWith(newSpan);
+    if(nuevo!==nombreActual){
+      await sb.from('entregables').update({nombre:nuevo}).eq('id',entId);
+      toast('✓ Nombre actualizado');
+    }
+  };
+  input.addEventListener('blur',guardar);
+  input.addEventListener('keydown',ev=>{
+    if(ev.key==='Enter'){ev.preventDefault();input.blur();}
+    if(ev.key==='Escape'){input.value=nombreActual;input.blur();}
+  });
+
 }
 
 async function _renderEntBlanco(cont,colabs,esAdmin){
@@ -1569,8 +1667,11 @@ async function _renderEntProductivo(cont,colabs,esAdmin){
       pend.forEach(e=>{ html+=_filaTabla(e,colabs,esAdmin); });
       html+=`</tbody><tbody>`;
       if(comp.length){
-        html+=`<tr style="background:var(--bg)"><td colspan="5" style="padding:6px 16px;font-size:9px;color:var(--ink3);cursor:pointer" onclick="const s=this.closest('tr').nextElementSibling;s.style.display=s.style.display===''?'none':''">▼ Completadas <span class="ccount">${comp.length}</span></td></tr>`;
+        const compId2='comp-'+Math.random().toString(36).slice(2);
+        html+=`<tr style="background:var(--bg)"><td colspan="5" style="padding:6px 16px;font-size:9px;color:var(--ink3);cursor:pointer" onclick="const s=document.getElementById('${compId2}');s.style.display=s.style.display==='none'?'':'none'">▼ Completadas <span class="ccount">${comp.length}</span></td></tr>`;
+        html+=`</tbody><tbody id="${compId2}" style="display:none">`;
         comp.forEach(e=>{ html+=_filaTabla(e,colabs,esAdmin); });
+        html+=`</tbody><tbody>`;
       }
     });
     if(esAdmin)html+=`<tr><td colspan="5" style="padding:0"><button onclick="abrirNuevoEntDetalle('${et.k}','')" style="display:flex;align-items:center;gap:6px;padding:8px 16px;font-size:10px;color:var(--accent);background:none;border:none;border-top:1px dashed var(--border);width:100%;cursor:pointer">+ Agregar entregable</button></td></tr>`;
@@ -1728,18 +1829,176 @@ async function abrirDPDetalle(entId,inicio,fin){
   document.getElementById('ov-dpd').classList.add('on');
 }
 async function guardarFechasDetalle(){
+  // Determinar IDs a actualizar — selección múltiple o individual
+  const ids = seleccionadas.size>0 ? [...seleccionadas] : [dpDetalleEntId];
+  const n = ids.length;
+
   if(dpMode==='rango'){
     const ini=document.getElementById('dpd-inicio').value,fin=document.getElementById('dpd-fin').value;
     if(ini&&fin&&fin<ini){toast('La entrega debe ser después del inicio');return;}
-    await sb.from('entregables').update({fecha_inicio:ini||null,fecha_fin:fin||null,fecha_unica:null,recurrente:false,frecuencia:null,dias_semana:null}).eq('id',dpDetalleEntId);
+    for(const id of ids){
+      await sb.from('entregables').update({fecha_inicio:ini||null,fecha_fin:fin||null,fecha_unica:null,recurrente:false,frecuencia:null,dias_semana:null}).eq('id',id);
+    }
   } else {
     const fecha=document.getElementById('dpd-unica').value||null;
     const frec=document.getElementById('dpd-frecuencia').value||null;
     const dias=frec==='weekly'&&dpDiasSel.size?[...dpDiasSel]:null;
-    await sb.from('entregables').update({fecha_unica:fecha,fecha_inicio:null,fecha_fin:null,recurrente:!!frec,frecuencia:frec,dias_semana:dias}).eq('id',dpDetalleEntId);
+    for(const id of ids){
+      await sb.from('entregables').update({fecha_unica:fecha,fecha_inicio:null,fecha_fin:null,recurrente:!!frec,frecuencia:frec,dias_semana:dias}).eq('id',id);
+    }
   }
-  document.getElementById('ov-dpd').classList.remove('on');await renderDetProyBody();toast('✓ Fechas guardadas');
+  limpiarSeleccion();
+  document.getElementById('ov-dpd').classList.remove('on');
+  await renderDetProyBody();
+  toast(n>1?`✓ Fechas aplicadas a ${n} tareas`:'✓ Fechas guardadas');
 }
+// ── SELECCIÓN MÚLTIPLE ──
+function seleccionarFila(evt, entId, tr){
+  // Cmd/Ctrl+click: toggle selección en esta fila
+  if(seleccionadas.has(entId)){
+    seleccionadas.delete(entId);
+    tr.classList.remove('sel-row');
+  } else {
+    seleccionadas.add(entId);
+    tr.classList.add('sel-row');
+  }
+  actualizarSelBar();
+}
+
+function actualizarSelBar(){
+  const bar=document.getElementById('sel-bar');
+  const cnt=document.getElementById('sel-count');
+  if(!bar)return;
+  if(seleccionadas.size>0){
+    bar.classList.add('on');
+    cnt.textContent=`${seleccionadas.size} tarea${seleccionadas.size!==1?'s':''} seleccionada${seleccionadas.size!==1?'s':''}`;
+  } else {
+    bar.classList.remove('on');
+  }
+}
+
+function limpiarSeleccion(){
+  seleccionadas.clear();ultimaFilaSel=null;
+  document.querySelectorAll('tr.sel-row').forEach(r=>r.classList.remove('sel-row'));
+  actualizarSelBar();
+}
+
+function editarFechasSeleccion(){
+  if(!seleccionadas.size)return;
+  // Abrir date picker en modo rango, sin entId específico
+  dpDetalleEntId=null;
+  dpDiasSel=new Set();dpLimpiar();
+  dpSetMode('rango');
+  document.getElementById('ov-dpd').classList.add('on');
+}
+
+// ══════════════════════════════════════════════════
+// ACCIONES EN LOTE (selección múltiple)
+// ══════════════════════════════════════════════════
+
+async function asignarSeleccion(){
+  if(!seleccionadas.size)return;
+  const {data:colabs}=await sb.from('colaboradores').select('id,nombre,apellido,color').order('nombre');
+  // Modal inline sencillo
+  const ovId='ov-bulk-asignar';
+  let ov=document.getElementById(ovId);
+  if(!ov){
+    ov=document.createElement('div');ov.className='ov';ov.id=ovId;ov.style.zIndex='600';
+    ov.onclick=e=>{if(e.target===ov)ov.classList.remove('on');};
+    ov.innerHTML=`<div class="modal" style="max-width:360px;position:relative">
+      <button class="modal-close" onclick="document.getElementById('${ovId}').classList.remove('on')">×</button>
+      <div class="stitle">Asignar responsable</div>
+      <div class="ssub" id="bulk-asignar-sub"></div>
+      <div class="fl"><label>Responsable</label>
+        <select id="bulk-colab-sel"><option value="">Sin asignar</option></select>
+      </div>
+      <button class="bsave" onclick="confirmarAsignarSeleccion()">Asignar</button>
+    </div>`;
+    document.body.appendChild(ov);
+  }
+  document.getElementById('bulk-asignar-sub').textContent=`${seleccionadas.size} tarea${seleccionadas.size!==1?'s':''} seleccionada${seleccionadas.size!==1?'s':''}`;
+  const sel=document.getElementById('bulk-colab-sel');
+  sel.innerHTML='<option value="">Sin asignar</option>'+(colabs||[]).map(c=>`<option value="${c.id}">${c.nombre} ${c.apellido||''}</option>`).join('');
+  ov.classList.add('on');
+}
+
+async function confirmarAsignarSeleccion(){
+  const colabId=document.getElementById('bulk-colab-sel').value;
+  const ids=[...seleccionadas];
+  for(const id of ids) await sb.from('entregables').update({asignado_id:colabId||null}).eq('id',id);
+  document.getElementById('ov-bulk-asignar').classList.remove('on');
+  limpiarSeleccion();
+  await renderDetProyBody();
+  toast(`✓ Responsable asignado a ${ids.length} tarea${ids.length!==1?'s':''}`);
+}
+
+async function moverSeleccion(){
+  if(!seleccionadas.size)return;
+  // Traer etapas y grupos del proyecto actual
+  const {data:ents}=await sb.from('entregables').select('etapa_clave,grupo').eq('proyecto_id',proyDetalleId).eq('eliminado',false);
+  const etapas=[...new Set((ents||[]).map(e=>e.etapa_clave).filter(Boolean))].sort();
+  const grupos=[...new Set((ents||[]).map(e=>e.grupo).filter(Boolean))].sort();
+
+  const ovId='ov-bulk-mover';
+  let ov=document.getElementById(ovId);
+  if(!ov){
+    ov=document.createElement('div');ov.className='ov';ov.id=ovId;ov.style.zIndex='600';
+    ov.onclick=e=>{if(e.target===ov)ov.classList.remove('on');};
+    ov.innerHTML=`<div class="modal" style="max-width:360px;position:relative">
+      <button class="modal-close" onclick="document.getElementById('${ovId}').classList.remove('on')">×</button>
+      <div class="stitle">Mover tareas</div>
+      <div class="ssub" id="bulk-mover-sub"></div>
+      <div class="fl"><label>Nueva etapa <span style="color:var(--ink3)">(dejar vacío para no cambiar)</span></label>
+        <select id="bulk-etapa-sel"><option value="">— sin cambio —</option></select>
+      </div>
+      <div class="fl"><label>Nuevo grupo <span style="color:var(--ink3)">(dejar vacío para no cambiar)</span></label>
+        <select id="bulk-grupo-sel"><option value="">— sin cambio —</option></select>
+      </div>
+      <button class="bsave" onclick="confirmarMoverSeleccion()">Mover</button>
+    </div>`;
+    document.body.appendChild(ov);
+  }
+  document.getElementById('bulk-mover-sub').textContent=`${seleccionadas.size} tarea${seleccionadas.size!==1?'s':''} seleccionada${seleccionadas.size!==1?'s':''}`;
+  const ETAPAS_N={DE:'Definición',SD:'Diseño Esquemático',DD:'Desarrollo de Diseño',CD:'Documentos Constructivos',PC:'Procesos'};
+  const eSel=document.getElementById('bulk-etapa-sel');
+  eSel.innerHTML='<option value="">— sin cambio —</option>'+etapas.map(k=>`<option value="${k}">${k} · ${ETAPAS_N[k]||k}</option>`).join('');
+  const gSel=document.getElementById('bulk-grupo-sel');
+  gSel.innerHTML='<option value="">— sin cambio —</option>'+grupos.map(g=>`<option value="${g}">${g}</option>`).join('')
+    +'<option value="__nuevo__">+ Nuevo grupo...</option>';
+  ov.classList.add('on');
+}
+
+async function confirmarMoverSeleccion(){
+  const nuevaEtapa=document.getElementById('bulk-etapa-sel').value;
+  let nuevoGrupo=document.getElementById('bulk-grupo-sel').value;
+  if(nuevoGrupo==='__nuevo__'){
+    nuevoGrupo=prompt('Nombre del nuevo grupo:')?.trim()||'';
+    if(!nuevoGrupo) return;
+  }
+  if(!nuevaEtapa&&!nuevoGrupo){toast('Selecciona al menos etapa o grupo');return;}
+  const ids=[...seleccionadas];
+  const upd={};
+  if(nuevaEtapa) upd.etapa_clave=nuevaEtapa;
+  if(nuevoGrupo) upd.grupo=nuevoGrupo;
+  for(const id of ids) await sb.from('entregables').update(upd).eq('id',id);
+  document.getElementById('ov-bulk-mover').classList.remove('on');
+  limpiarSeleccion();
+  await renderDetProyBody();
+  toast(`✓ ${ids.length} tarea${ids.length!==1?'s':''} movida${ids.length!==1?'s':''}`);
+}
+
+async function eliminarSeleccion(){
+  if(!seleccionadas.size)return;
+  const ids=[...seleccionadas];
+  const n=ids.length;
+  if(!confirm(`¿Eliminar ${n} tarea${n!==1?'s':''}? Esta acción no se puede deshacer.`))return;
+  for(const id of ids) await sb.from('entregables').update({eliminado:true}).eq('id',id);
+  limpiarSeleccion();
+  await renderDetProyBody();
+  toast(`✓ ${n} tarea${n!==1?'s':''} eliminada${n!==1?'s':''}`);
+}
+
+
 async function asignarDetalle(entId,colabId){await sb.from('entregables').update({asignado_id:colabId||null}).eq('id',entId);toast('✓ Responsable actualizado');}
 async function toggleDoneDetalle(entId,cur){
   const done=cur===true||cur==='true'?false:true;

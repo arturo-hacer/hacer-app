@@ -496,12 +496,18 @@ textarea{resize:none;height:62px;}
     <button class="modal-close" onclick="closeOv('ov-er')">×</button>
     <div class="stitle">Editar registro</div>
     <div class="ssub" id="er-ent" style="font-size:10px;color:var(--ink3)"></div>
-    <div class="fl" style="margin-top:16px">
-      <label>Horas</label>
-      <div style="display:flex;align-items:center;gap:12px;justify-content:center;padding:8px 0">
-        <button onclick="editRegH=Math.max(1/60,parseFloat((editRegH-1/60).toFixed(4)));document.getElementById('er-horas').textContent=hT(editRegH)" style="width:36px;height:36px;border-radius:50%;border:1.5px solid var(--border);background:#fff;font-size:20px;color:var(--ink2);cursor:pointer;display:flex;align-items:center;justify-content:center">−</button>
-        <span id="er-horas" style="font-family:'Fraunces',serif;font-size:32px;font-weight:300;color:var(--ink);min-width:80px;text-align:center"></span>
-        <button onclick="editRegH=parseFloat((editRegH+1/60).toFixed(4));document.getElementById('er-horas').textContent=hT(editRegH)" style="width:36px;height:36px;border-radius:50%;border:1.5px solid var(--border);background:#fff;font-size:20px;color:var(--ink2);cursor:pointer;display:flex;align-items:center;justify-content:center">+</button>
+    <div style="display:flex;gap:10px;margin-top:16px">
+      <div class="fl" style="flex:1">
+        <label>Tiempo (H:MM)</label>
+        <input type="text" id="er-horas-txt" placeholder="2:30"
+          style="font-family:'Fraunces',serif;font-size:28px;font-weight:300;text-align:center;padding:10px;"
+          onblur="erParsearHoras(this.value)"
+          onkeydown="if(event.key==='Enter')this.blur()">
+        <div id="er-horas-preview" style="font-size:10px;color:var(--ink3);text-align:center;margin-top:4px"></div>
+      </div>
+      <div class="fl" style="flex:1">
+        <label>Fecha</label>
+        <input type="date" id="er-fecha" style="font-size:13px;padding:10px;">
       </div>
     </div>
     <div class="fl"><label>Nota</label><input type="text" id="er-nota" placeholder="Opcional"></div>
@@ -2088,26 +2094,60 @@ async function renderSemana(){
     <div class="semana-right">${rightHtml}</div>
   </div>`;
   cont.querySelectorAll('.reg-row').forEach(el=>{
-    el.addEventListener('click',()=>{abrirEditReg(el.dataset.rid,parseFloat(el.dataset.horas),el.dataset.nota,decodeURIComponent(el.dataset.ent),el.dataset.cod);});
+    el.addEventListener('click',()=>{abrirEditReg(el.dataset.rid,parseFloat(el.dataset.horas),el.dataset.nota,decodeURIComponent(el.dataset.ent),el.dataset.cod,el.dataset.fecha);});
   });
 }
 
 // ── EDITAR REGISTRO ──
 let editRegId=null,editRegH=0;
-function abrirEditReg(id,horas,notaEnc,entNombre,proyCode){
+
+function erParsearHoras(val){
+  // Acepta: "2:30", "2.5", "2,5", "2h30", "2h", "90m", "90", "2"
+  val=(val||'').trim().replace(',','.');
+  let h=0;
+  if(/^\d+:\d+$/.test(val)){
+    const[a,b]=val.split(':');h=parseInt(a)+parseInt(b)/60;
+  } else if(/^\d+h\d+m?$/i.test(val)){
+    const m=val.match(/(\d+)h(\d+)/i);h=parseInt(m[1])+parseInt(m[2])/60;
+  } else if(/^\d+h$/i.test(val)){
+    h=parseInt(val);
+  } else if(/^\d+m$/i.test(val)){
+    h=parseInt(val)/60;
+  } else {
+    h=parseFloat(val)||0;
+  }
+  editRegH=Math.max(1/60,Math.min(24,Math.round(h*60)/60));
+  document.getElementById('er-horas-txt').value=hD(editRegH);
+  document.getElementById('er-horas-preview').textContent=hT(editRegH);
+}
+
+function abrirEditReg(id,horas,notaEnc,entNombre,proyCode,fecha){
   editRegId=id;editRegH=horas;
   document.getElementById('er-confirm').style.display='none';
   document.getElementById('er-ent').textContent=entNombre+(proyCode?' · '+proyCode:'');
-  document.getElementById('er-horas').textContent=hT(horas);
+  document.getElementById('er-horas-txt').value=hD(horas);
+  document.getElementById('er-horas-preview').textContent=hT(horas);
+  document.getElementById('er-fecha').value=fecha||hoy();
   document.getElementById('er-nota').value=decodeURIComponent(notaEnc||'');
   document.getElementById('ov-er').classList.add('on');
+  // Focus en el input de horas para edición inmediata
+  setTimeout(()=>{
+    const inp=document.getElementById('er-horas-txt');
+    inp.focus();inp.select();
+  },120);
 }
+
 async function guardarEditReg(){
+  // Parsear por si no hubo blur
+  erParsearHoras(document.getElementById('er-horas-txt').value);
   const nota=document.getElementById('er-nota').value.trim();
+  const fecha=document.getElementById('er-fecha').value||hoy();
   const btn=document.getElementById('er-save');btn.disabled=true;btn.textContent='Guardando...';
-  await sb.from('registros_horas').update({horas:editRegH,nota}).eq('id',editRegId);
-  btn.disabled=false;btn.textContent='Guardar';closeOv('ov-er');updateCounter();renderSemana();toast('✓ Registro actualizado');
+  await sb.from('registros_horas').update({horas:editRegH,nota,fecha}).eq('id',editRegId);
+  btn.disabled=false;btn.textContent='Guardar';
+  closeOv('ov-er');updateCounter();renderSemana();toast('✓ Registro actualizado');
 }
+
 async function eliminarEditReg(){
   await sb.from('registros_horas').delete().eq('id',editRegId);
   closeOv('ov-er');updateCounter();renderSemana();toast('✓ Registro eliminado');
@@ -2320,11 +2360,23 @@ async function guardarProy2(){
       if(tpls?.length){
         const ordenEtapas=['DE','SD','DD','CD','PC'];
         tpls.sort((a,b)=>{const ia=ordenEtapas.indexOf(a.etapa_clave),ib=ordenEtapas.indexOf(b.etapa_clave);if(ia!==ib)return ia-ib;return (a.orden||0)-(b.orden||0);});
-        let fechaCursor=fechaInicio?new Date(fechaInicio+' 00:00'):null;
+        // Calcular fechas por etapa secuencialmente
+        const dursEtapa=getDurEtapas();
+        const ORDEN_ET=['DE','SD','DD','CD']; // PC sin fechas
+        const fechasEtapa={};
+        let cursor=fechaInicio?new Date(fechaInicio+' 00:00'):null;
+        ORDEN_ET.forEach(k=>{
+          const sem=parseFloat(dursEtapa[k])||0;
+          if(!cursor||!sem){fechasEtapa[k]={ini:null,fin:null};return;}
+          const ini=fechaAStr(new Date(cursor));
+          const finD=new Date(cursor);finD.setDate(finD.getDate()+Math.round(sem*7));
+          const fin=fechaAStr(finD);
+          fechasEtapa[k]={ini,fin};
+          cursor=finD;
+        });
         const ents=tpls.map(t=>{
-          let fIni=null,fFin=null;
-          if(fechaCursor){fIni=fechaAStr(fechaCursor);const dur=t.duracion_semanas||1;const fFinDate=new Date(fechaCursor);fFinDate.setDate(fFinDate.getDate()+Math.round(dur*7));fFin=fechaAStr(fFinDate);fechaCursor=new Date(fFinDate);}
-          return {proyecto_id:np.id,etapa_clave:t.etapa_clave,grupo:t.grupo,nombre:t.nombre,done:false,eliminado:false,fecha_inicio:fIni,fecha_fin:fFin};
+          const ef=fechasEtapa[t.etapa_clave]||{ini:null,fin:null};
+          return {proyecto_id:np.id,etapa_clave:t.etapa_clave,grupo:t.grupo,nombre:t.nombre,done:false,eliminado:false,fecha_inicio:ef.ini,fecha_fin:ef.fin};
         });
         await sb.from('entregables').insert(ents);
       }
@@ -2341,34 +2393,101 @@ async function eliminarProy2(){
 
 // ── TEMPLATES ──
 let tplEtapaSel=null;
+// duraciones_etapa: objeto guardado en localStorage { DE: 8, SD: 6, DD: 10, CD: 4 }
+function getDurEtapas(){try{return JSON.parse(localStorage.getItem('dur_etapas')||'{}')}catch{return {};}}
+function setDurEtapa(k,v){const d=getDurEtapas();d[k]=v;localStorage.setItem('dur_etapas',JSON.stringify(d));}
+
 async function loadGTemplates(){
   const cont=document.getElementById('g-tpls');if(!cont)return;
   const {data:tpls}=await sb.from('templates').select('*').order('orden');
-  if(!tpls||!tpls.length){cont.innerHTML=`<div class="empty"><div class="empty-i">📋</div><div>Sin templates</div></div>`;return;}
-  const porEtapa={};tpls.forEach(t=>{if(!porEtapa[t.etapa_clave])porEtapa[t.etapa_clave]=[];porEtapa[t.etapa_clave].push(t);});
-  let html=`<div style="background:var(--acc-lt);border-radius:8px;padding:10px 12px;margin-bottom:12px;font-size:10px;color:var(--ink2)">📅 Asigna duración en semanas a cada entregable. Al crear un proyecto nuevo, las fechas se calcularán en secuencia.</div>`;
-  ETAPAS_C.forEach(et=>{
-    const ents=porEtapa[et.k]||[];
-    let rowsHTML=ents.map(e=>`<div style="display:flex;align-items:center;gap:8px;padding:8px 14px;border-bottom:1px solid var(--border)">
-      <div style="flex:1;min-width:0"><div style="font-size:11px;color:var(--ink)">${e.nombre}</div><div style="font-size:9px;color:var(--ink3);margin-top:1px">${e.grupo}</div></div>
-      <div style="display:flex;align-items:center;gap:4px;flex-shrink:0">
-        <input type="number" value="${e.duracion_semanas||1}" min="0.5" max="52" step="0.5" style="width:48px;padding:4px 6px;font-size:11px;text-align:center;border:1.5px solid var(--border);border-radius:5px;background:#fff" onchange="actualizarDuracion('${e.id}',this.value)" title="Semanas">
+  const porEtapa={};(tpls||[]).forEach(t=>{if(!porEtapa[t.etapa_clave])porEtapa[t.etapa_clave]=[];porEtapa[t.etapa_clave].push(t);});
+  const durs=getDurEtapas();
+  const ETAPAS_TPL=ETAPAS_C.filter(e=>e.k!=='PC'); // PC sin fechas
+
+  // Preview de fechas secuenciales
+  function previewFechas(){
+    const d2=getDurEtapas();
+    const inicioEl=document.getElementById('tpl-fecha-inicio');
+    if(!inicioEl||!inicioEl.value) return;
+    let cursor=new Date(inicioEl.value+' 00:00');
+    ETAPAS_TPL.forEach(et=>{
+      const sem=parseFloat(d2[et.k])||0;
+      const ini=document.getElementById('tpl-prev-ini-'+et.k);
+      const fin=document.getElementById('tpl-prev-fin-'+et.k);
+      if(!ini||!fin) return;
+      if(!sem){ini.textContent='—';fin.textContent='—';return;}
+      const iniDate=new Date(cursor);
+      const finDate=new Date(cursor);finDate.setDate(finDate.getDate()+Math.round(sem*7));
+      ini.textContent=fF(fechaAStr(iniDate));
+      fin.textContent=fF(fechaAStr(finDate));
+      cursor=finDate;
+    });
+  }
+
+  let html=`<div style="background:var(--acc-lt);border-radius:8px;padding:12px 14px;margin-bottom:14px">
+    <div style="font-size:10px;font-weight:600;color:var(--accent);margin-bottom:8px;letter-spacing:.05em">DURACIÓN POR ETAPA</div>
+    <div style="font-size:10px;color:var(--ink2);margin-bottom:10px">Las etapas son secuenciales (DE → SD → DD → CD). Todas las tareas de una etapa comparten sus fechas. Procesos no tiene fechas.</div>
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px;padding-bottom:12px;border-bottom:1px solid var(--border)">
+      <span style="font-size:10px;color:var(--ink2);flex-shrink:0">Fecha de inicio del proyecto:</span>
+      <input type="date" id="tpl-fecha-inicio" style="font-size:11px;padding:5px 8px;border:1.5px solid var(--border);border-radius:7px;background:#fff" oninput="previewFechasTPL()">
+    </div>
+    <table style="width:100%;border-collapse:collapse">
+      <thead><tr>
+        <th style="font-size:9px;letter-spacing:.1em;text-transform:uppercase;color:var(--ink3);text-align:left;padding:4px 8px 6px">Etapa</th>
+        <th style="font-size:9px;letter-spacing:.1em;text-transform:uppercase;color:var(--ink3);text-align:center;padding:4px 8px 6px">Semanas</th>
+        <th style="font-size:9px;letter-spacing:.1em;text-transform:uppercase;color:var(--ink3);text-align:left;padding:4px 8px 6px">Inicio aprox.</th>
+        <th style="font-size:9px;letter-spacing:.1em;text-transform:uppercase;color:var(--ink3);text-align:left;padding:4px 8px 6px">Término aprox.</th>
+      </tr></thead>
+      <tbody>`;
+
+  ETAPAS_TPL.forEach(et=>{
+    const sem=durs[et.k]||'';
+    html+=`<tr style="border-top:1px solid var(--border)">
+      <td style="padding:8px;"><span class="ec">${et.k}</span> <span style="font-size:10px;color:var(--ink2)">${et.n}</span></td>
+      <td style="padding:8px;text-align:center">
+        <input type="number" id="tpl-dur-${et.k}" value="${sem}" min="0" max="104" step="0.5" placeholder="—"
+          style="width:56px;padding:5px 6px;font-size:12px;text-align:center;border:1.5px solid var(--border);border-radius:7px;background:#fff"
+          oninput="setDurEtapa('${et.k}',parseFloat(this.value)||0);previewFechasTPL()" title="Semanas que dura esta etapa">
         <span style="font-size:9px;color:var(--ink3)">sem</span>
+      </td>
+      <td style="padding:8px;font-size:10px;color:var(--green)" id="tpl-prev-ini-${et.k}">—</td>
+      <td style="padding:8px;font-size:10px;color:var(--green)" id="tpl-prev-fin-${et.k}">—</td>
+    </tr>`;
+  });
+
+  html+=`</tbody></table>
+  <div style="font-size:9px;color:var(--ink3);margin-top:8px">* Las fechas son orientativas. Se calculan en secuencia al crear un proyecto nuevo con fecha de inicio.</div>
+  </div>`;
+
+  // Tareas por etapa (sin control de duración individual)
+  const ETAPAS_ALL=ETAPAS_C; // PC sí aparece pero sin fechas
+  ETAPAS_ALL.forEach(et=>{
+    const ents=porEtapa[et.k]||[];
+    const esPC=et.k==='PC';
+    let rowsHTML=ents.map(e=>`<div style="display:flex;align-items:center;gap:8px;padding:8px 14px;border-bottom:1px solid var(--border)">
+      <div style="flex:1;min-width:0">
+        <div style="font-size:11px;color:var(--ink)">${e.nombre}</div>
+        <div style="font-size:9px;color:var(--ink3);margin-top:1px">${e.grupo}</div>
       </div>
-      <button style="font-size:12px;color:var(--ink3);background:none;border:none;cursor:pointer;padding:2px 4px" onclick="abrirEditarTemplate('${e.id}','${e.nombre}','${e.grupo}')">✏</button>
+      <button style="font-size:12px;color:var(--ink3);background:none;border:none;cursor:pointer;padding:2px 6px" onclick="abrirEditarTemplate('${e.id}','${e.nombre}','${e.grupo}')">✏</button>
       <button style="width:22px;height:22px;border-radius:4px;border:none;background:none;font-size:14px;color:var(--ink3);cursor:pointer" onclick="eliminarTemplate('${e.id}')">×</button>
     </div>`).join('');
+
     html+=`<div class="card" style="margin-bottom:10px">
       <div style="padding:9px 14px;background:var(--bg2);display:flex;align-items:center;gap:8px;border-bottom:1px solid var(--border)">
-        <span class="ec">${et.k}</span><span style="font-size:11px;color:var(--ink2);flex:1">${et.n}</span>
+        <span class="ec">${et.k}</span>
+        <span style="font-size:11px;color:var(--ink2);flex:1">${et.n}</span>
+        ${esPC?'<span style="font-size:9px;color:var(--ink3)">Sin fechas</span>':''}
         <button class="btn-nuevo" style="padding:4px 10px;font-size:9px" onclick="abrirNuevoTemplate('${et.k}')">+ Agregar</button>
       </div>
       ${rowsHTML||`<div style="padding:10px 14px;font-size:10px;color:var(--ink3)">Sin entregables — agrega el primero</div>`}
     </div>`;
   });
+
   cont.innerHTML=html;
+  // Exponer previewFechasTPL al scope global
+  window.previewFechasTPL=previewFechas;
 }
-async function actualizarDuracion(tplId,valor){const dur=Math.max(0.5,parseFloat(valor)||1);await sb.from('templates').update({duracion_semanas:dur}).eq('id',tplId);toast('✓ Duración actualizada');}
 let editTplId=null;
 function abrirEditarTemplate(tplId,nombre,grupo){editTplId=tplId;document.getElementById('etpl-nom').value=nombre;document.getElementById('etpl-grupo').value=grupo;document.getElementById('ov-etpl').classList.add('on');}
 async function guardarEditarTemplate(){

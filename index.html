@@ -3,27 +3,36 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<meta name="theme-color" content="#1c1b17">
-<meta name="apple-mobile-web-app-capable" content="yes">
 <title>hacer:</title>
 <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><text x='1' y='26' font-family='Arial,Helvetica,sans-serif' font-size='26' font-weight='700' fill='%231c1b17'>h:</text></svg>">
 <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Fraunces:ital,opsz,wght@0,9..144,300;0,9..144,400;1,9..144,300&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.2/Sortable.min.js"></script>
 <style>
-:root{--bg:#f4f2ec;--bg2:#eae7de;--ink:#1c1b17;--ink2:#5c5b53;--ink3:#9c9b90;--accent:#2828b8;--acc-lt:rgba(40,40,184,.08);--rose:#ed254e;--rose-lt:rgba(237,37,78,.08);--green:#3a7a4a;--grn-lt:rgba(58,122,74,.10);--amber:#c28a10;--amb-lt:rgba(194,138,16,.10);--lav:#8a8ae5;--border:rgba(28,27,23,.10);--r:12px;}
+:root{
+  --bg:#f4f2ec;--bg2:#eae7de;--ink:#1c1b17;--ink2:#5c5b53;--ink3:#9c9b90;
+  --accent:#2828b8;--acc-lt:rgba(40,40,184,.08);--rose:#ed254e;--rose-lt:rgba(237,37,78,.08);
+  --green:#3a7a4a;--grn-lt:rgba(58,122,74,.10);--amber:#c28a10;--amb-lt:rgba(194,138,16,.10);
+  --lav:#8a8ae5;--border:rgba(28,27,23,.10);--r:10px;
+  --sidebar:220px;
+}
 *{box-sizing:border-box;margin:0;padding:0;}
-body{font-family:'DM Mono',monospace;background:var(--bg);color:var(--ink);min-height:100vh;max-width:430px;margin:0 auto;}
+body{font-family:'DM Mono',monospace;background:var(--bg);color:var(--ink);min-height:100vh;display:flex;}
 button{font-family:'DM Mono',monospace;cursor:pointer;}
+
+/* ── PANTALLA CARGA ── */
 #pantalla-carga{position:fixed;inset:0;background:var(--ink);display:flex;flex-direction:column;align-items:center;justify-content:center;z-index:1000;transition:opacity .4s;}
 #pantalla-carga.oculta{opacity:0;pointer-events:none;}
-.carga-logo{font-size:32px;font-weight:700;color:#8a8a8a;letter-spacing:-.01em;margin-bottom:24px;}
+.carga-logo{font-size:36px;font-weight:700;color:#8a8a8a;letter-spacing:-.01em;margin-bottom:24px;}
 .spinner{width:24px;height:24px;border:2px solid rgba(255,255,255,.15);border-top-color:var(--lav);border-radius:50%;animation:spin .8s linear infinite;}
 @keyframes spin{to{transform:rotate(360deg);}}
-#pantalla-login{min-height:100vh;display:none;flex-direction:column;align-items:center;justify-content:center;padding:32px 24px;}
-.login-logo{font-size:36px;font-weight:700;color:var(--ink);letter-spacing:-.02em;margin-bottom:8px;}
+@keyframes blink{0%,100%{opacity:1;}50%{opacity:.4;}}
+
+/* ── LOGIN ── */
+#pantalla-login{display:none;flex-direction:column;align-items:center;justify-content:center;min-height:100vh;width:100%;padding:40px;}
+.login-logo{font-size:40px;font-weight:700;color:var(--ink);letter-spacing:-.02em;margin-bottom:6px;}
 .login-sub{font-size:11px;color:var(--ink3);letter-spacing:.08em;text-transform:uppercase;margin-bottom:48px;}
-.login-card{width:100%;background:#fff;border-radius:16px;border:1.5px solid var(--border);padding:24px;}
+.login-card{width:360px;background:#fff;border-radius:16px;border:1.5px solid var(--border);padding:28px;}
 .lbl{font-size:9px;letter-spacing:.12em;text-transform:uppercase;color:var(--ink3);margin-bottom:5px;display:block;}
 .inp{width:100%;font-family:'DM Mono',monospace;font-size:13px;color:var(--ink);background:var(--bg);border:1.5px solid var(--border);border-radius:8px;padding:11px 12px;outline:none;transition:border-color .15s;margin-bottom:12px;}
 .inp:focus{border-color:var(--accent);background:#fff;}
@@ -31,38 +40,73 @@ button{font-family:'DM Mono',monospace;cursor:pointer;}
 .login-btn:hover{background:#1e1e9a;}
 .login-btn:disabled{opacity:.5;}
 .login-err{font-size:11px;color:var(--rose);text-align:center;margin-top:10px;min-height:16px;}
-#app{display:none;}
-.hdr{background:var(--ink);padding:18px 18px 0;position:sticky;top:0;z-index:90;}
-.hdr-top{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:10px;}
-.logo{font-weight:700;font-size:18px;color:#8a8a8a;letter-spacing:-.01em;}
-.pill{font-size:9px;letter-spacing:.12em;text-transform:uppercase;background:rgba(138,138,229,.15);color:var(--lav);border:1px solid rgba(138,138,229,.3);padding:3px 8px;border-radius:20px;margin-top:4px;display:none;}
-.hdr-r{display:flex;flex-direction:column;align-items:flex-end;}
-.hdr-nombre{font-size:11px;color:var(--ink3);cursor:pointer;letter-spacing:.04em;}
-.hdr-nombre:hover{color:var(--rose);}
-.counter-val{font-family:'Fraunces',serif;font-size:42px;font-weight:400;line-height:1;color:#fff;transition:color .3s;}
-.counter-val.ok{color:#7bc09e;}
-.counter-lbl{font-size:9px;letter-spacing:.1em;text-transform:uppercase;color:var(--lav);text-align:right;}
-.tabs{display:flex;background:var(--ink);padding:0 2px;overflow-x:auto;scrollbar-width:none;}
-.tabs::-webkit-scrollbar{display:none;}
-.tab{flex-shrink:0;padding:9px 12px 8px;font-size:10px;letter-spacing:.07em;text-transform:uppercase;color:var(--ink3);background:none;border:none;border-bottom:2px solid transparent;transition:all .18s;white-space:nowrap;}
-.tab.on{color:var(--lav);border-bottom-color:var(--accent);}
-.pane{padding:16px;display:none;}
+
+/* ── APP LAYOUT ── */
+#app{display:none;flex:1;min-height:100vh;}
+.app-inner{display:flex;min-height:100vh;}
+
+/* ── SIDEBAR ── */
+.sidebar{width:var(--sidebar);background:var(--ink);display:flex;flex-direction:column;position:fixed;top:0;left:0;bottom:0;z-index:80;overflow:hidden;}
+.sb-logo-wrap{padding:20px 18px 16px;}
+.sb-logo{font-weight:700;font-size:20px;color:#8a8a8a;letter-spacing:-.01em;line-height:1;}
+.sb-pill{font-size:8px;letter-spacing:.12em;text-transform:uppercase;background:rgba(138,138,229,.15);color:var(--lav);border:1px solid rgba(138,138,229,.3);padding:2px 7px;border-radius:20px;margin-top:6px;display:inline-block;}
+.sb-counter-block{padding:12px 18px 16px;border-bottom:1px solid rgba(255,255,255,.06);}
+.sb-counter-val{font-family:'Fraunces',serif;font-size:46px;font-weight:400;line-height:1;color:#fff;transition:color .3s;}
+.sb-counter-val.ok{color:#7bc09e;}
+.sb-counter-lbl{font-size:9px;letter-spacing:.1em;text-transform:uppercase;color:var(--lav);margin-top:2px;}
+.sb-nav{flex:1;padding:10px 8px;overflow-y:auto;}
+.sb-nav-item{display:flex;align-items:center;gap:10px;padding:9px 12px;border-radius:8px;font-size:11px;letter-spacing:.04em;color:rgba(255,255,255,.45);cursor:pointer;transition:all .15s;border:none;background:none;width:100%;text-align:left;margin-bottom:2px;}
+.sb-nav-item:hover{color:rgba(255,255,255,.8);background:rgba(255,255,255,.06);}
+.sb-nav-item.on{color:#fff;background:rgba(255,255,255,.10);}
+.sb-nav-item .nav-ico{font-size:14px;width:18px;text-align:center;flex-shrink:0;}
+.sb-footer{padding:14px 18px;border-top:1px solid rgba(255,255,255,.06);}
+.sb-user{font-size:10px;color:rgba(255,255,255,.4);cursor:pointer;letter-spacing:.04em;transition:color .15s;}
+.sb-user:hover{color:var(--rose);}
+
+/* ── TIMER PILL ── */
+.timer-bar{background:var(--accent);padding:7px 14px;display:none;align-items:center;gap:10px;flex-shrink:0;}
+.timer-bar.on{display:flex;}
+.tdot{width:7px;height:7px;border-radius:50%;background:#fff;animation:blink 1s infinite;}
+.timer-bar-txt{font-size:11px;color:#fff;font-weight:500;}
+.timer-bar-nom{font-size:10px;color:rgba(255,255,255,.75);flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.timer-bar-stop{background:none;border:1.5px solid rgba(255,255,255,.4);color:#fff;font-size:10px;width:26px;height:26px;border-radius:50%;display:flex;align-items:center;justify-content:center;flex-shrink:0;}
+.timer-bar-stop:hover{background:rgba(255,255,255,.15);}
+
+/* ── MAIN CONTENT ── */
+.main{margin-left:var(--sidebar);flex:1;display:flex;flex-direction:column;min-height:100vh;min-width:0;}
+.main-header{background:var(--bg);border-bottom:1px solid var(--border);padding:0 28px;display:flex;align-items:center;gap:16px;flex-shrink:0;min-height:52px;}
+.main-title{font-family:'Fraunces',serif;font-size:16px;font-weight:300;color:var(--ink);flex:1;}
+.main-body{flex:1;overflow-y:auto;min-height:0;}
+
+/* ── PANES ── */
+.pane{display:none;height:100%;}
 .pane.on{display:block;}
+
+/* ── CARDS / SHARED ── */
+.card{background:#fff;border-radius:var(--r);border:1.5px solid var(--border);margin-bottom:10px;overflow:hidden;}
+.empty{text-align:center;padding:48px 20px;color:var(--ink3);}
+.empty-i{font-size:28px;margin-bottom:10px;opacity:.4;}
 .sec{font-size:9px;letter-spacing:.14em;text-transform:uppercase;color:var(--ink3);margin-bottom:10px;}
-.card{background:#fff;border-radius:var(--r);border:1.5px solid var(--border);margin-bottom:12px;overflow:hidden;}
-.empty{text-align:center;padding:36px 20px;color:var(--ink3);}
-.empty-i{font-size:26px;margin-bottom:8px;opacity:.4;}
-.day-strip{display:flex;gap:5px;overflow-x:auto;padding-bottom:4px;margin-bottom:16px;scrollbar-width:none;}
-.day-strip::-webkit-scrollbar{display:none;}
-.day-btn{flex-shrink:0;display:flex;flex-direction:column;align-items:center;padding:7px 11px;border-radius:8px;border:1.5px solid var(--border);background:#fff;cursor:pointer;transition:all .15s;}
+.cod{font-size:9px;letter-spacing:.1em;text-transform:uppercase;color:var(--accent);background:var(--acc-lt);padding:3px 6px;border-radius:4px;white-space:nowrap;flex-shrink:0;}
+.ec{font-size:9px;letter-spacing:.1em;color:var(--accent);background:var(--acc-lt);padding:2px 5px;border-radius:3px;flex-shrink:0;width:28px;text-align:center;}
+.ldg{text-align:center;padding:32px;color:var(--ink3);font-size:11px;}
+.btn-nuevo{font-size:10px;letter-spacing:.06em;padding:6px 12px;border-radius:6px;border:1.5px solid var(--accent);color:var(--accent);background:none;transition:all .15s;cursor:pointer;}
+.btn-nuevo:hover{background:var(--accent);color:#fff;}
+
+/* ── REGISTRAR ── */
+.reg-layout{display:grid;grid-template-columns:260px 1fr;height:100%;min-height:0;}
+.reg-left{border-right:1px solid var(--border);padding:20px;overflow-y:auto;background:var(--bg);}
+.reg-right{padding:20px;overflow-y:auto;}
+.day-strip{display:flex;gap:8px;margin-bottom:18px;}
+.day-btn{display:flex;flex-direction:column;align-items:center;padding:7px 10px;border-radius:8px;border:1.5px solid var(--border);background:#fff;cursor:pointer;transition:all .15s;}
 .day-btn.sel{border-color:var(--accent);background:var(--accent);color:#fff;}
 .day-btn.has:not(.sel){border-color:var(--green);}
 .day-dn{font-size:9px;letter-spacing:.08em;text-transform:uppercase;opacity:.65;margin-bottom:1px;}
-.day-num{font-size:15px;font-weight:500;}
+.day-num{font-size:14px;font-weight:500;}
 .day-dot{width:4px;height:4px;border-radius:50%;background:var(--green);margin-top:2px;opacity:0;}
 .day-btn.has .day-dot{opacity:1;}
-.cod{font-size:9px;letter-spacing:.1em;text-transform:uppercase;color:var(--accent);background:var(--acc-lt);padding:3px 6px;border-radius:4px;white-space:nowrap;flex-shrink:0;}
-.ec{font-size:9px;letter-spacing:.1em;color:var(--accent);background:var(--acc-lt);padding:2px 5px;border-radius:3px;flex-shrink:0;width:28px;text-align:center;}
+
+/* ── TAREAS ── */
 .g-hdr{padding:6px 14px 4px 22px;font-size:10px;color:var(--ink3);border-bottom:1px dashed var(--border);}
 .erow{display:flex;align-items:center;gap:8px;padding:9px 14px 9px 22px;border-bottom:1px solid var(--border);transition:background .1s;}
 .erow:last-child{border-bottom:none;}
@@ -77,18 +121,14 @@ button{font-family:'DM Mono',monospace;cursor:pointer;}
 .efecha.pronto{background:var(--amb-lt);color:var(--amber);}
 .efecha.vencida{background:var(--rose-lt);color:var(--rose);}
 .efecha.sin{background:var(--bg2);color:var(--ink3);}
-.bplay{width:28px;height:28px;border-radius:50%;border:1.5px solid var(--border);background:#fff;font-size:11px;display:flex;align-items:center;justify-content:center;transition:all .15s;color:var(--ink2);}
+.bplay{width:26px;height:26px;border-radius:50%;border:1.5px solid var(--border);background:#fff;font-size:10px;display:flex;align-items:center;justify-content:center;transition:all .15s;color:var(--ink2);}
 .bplay:hover,.bplay.on{border-color:var(--accent);color:var(--accent);}
 .bplay.on{background:var(--accent);color:#fff;}
-.bhrs{width:28px;height:28px;border-radius:50%;border:1.5px solid var(--border);background:#fff;font-size:16px;display:flex;align-items:center;justify-content:center;color:var(--ink2);}
+.bhrs{width:26px;height:26px;border-radius:50%;border:1.5px solid var(--border);background:#fff;font-size:15px;display:flex;align-items:center;justify-content:center;color:var(--ink2);}
 .bhrs:hover{border-color:var(--accent);color:var(--accent);}
-@keyframes blink{0%,100%{opacity:1;}50%{opacity:.4;}}
-.timer-pill{position:fixed;top:10px;left:50%;transform:translateX(-50%);background:var(--accent);color:#fff;border-radius:40px;padding:6px 16px;font-size:12px;display:none;align-items:center;gap:8px;z-index:500;box-shadow:0 4px 16px rgba(40,40,184,.4);}
-.timer-pill.on{display:flex;}
-.tdot{width:7px;height:7px;border-radius:50%;background:#fff;animation:blink 1s infinite;}
 .etapa-g{border-bottom:1px solid var(--border);}
 .etapa-g:last-child{border-bottom:none;}
-.etapa-h{display:flex;align-items:center;gap:8px;padding:9px 14px;cursor:pointer;background:var(--bg);user-select:none;}
+.etapa-h{display:flex;align-items:center;gap:8px;padding:8px 14px;cursor:pointer;background:var(--bg);user-select:none;}
 .etapa-h:hover{background:var(--bg2);}
 .etapa-b{display:none;}
 .etapa-b.open{display:block;}
@@ -96,21 +136,111 @@ button{font-family:'DM Mono',monospace;cursor:pointer;}
 .echev.open{transform:rotate(90deg);}
 .ctog{display:flex;align-items:center;gap:6px;padding:7px 14px;font-size:10px;color:var(--ink3);cursor:pointer;border-top:1px dashed var(--border);background:var(--bg);}
 .ccount{background:var(--grn-lt);color:var(--green);padding:1px 6px;border-radius:3px;font-size:9px;}
-.ov{position:fixed;inset:0;background:rgba(28,27,23,.55);z-index:300;display:flex;align-items:flex-end;opacity:0;pointer-events:none;transition:opacity .2s;}
+.sortable-ghost{opacity:.4;background:var(--acc-lt)!important;}
+.drag-handle:active{cursor:grabbing;}
+
+/* ── PROYECTOS LAYOUT ── */
+.proy-layout{display:grid;grid-template-columns:1fr 420px;height:100%;min-height:0;}
+.proy-list{padding:20px;overflow-y:auto;border-right:1px solid var(--border);}
+.proy-detail{overflow-y:auto;background:var(--bg);position:relative;}
+.proy-detail-empty{display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;color:var(--ink3);gap:10px;}
+.proy-detail-empty .empty-i{font-size:32px;opacity:.3;}
+
+/* ── PROJECT CARD HOVER ── */
+.proy-card{
+  background:#fff;border-radius:var(--r);border:1.5px solid var(--border);
+  padding:14px;margin-bottom:10px;cursor:pointer;
+  transition:border-color .18s, box-shadow .18s, transform .14s;
+}
+.proy-card:hover{
+  border-color:var(--accent);
+  box-shadow:0 4px 20px rgba(40,40,184,.10);
+  transform:translateY(-1px);
+}
+.proy-card:active{transform:translateY(0);box-shadow:none;}
+
+/* ── TABLA DE ENTREGABLES ── */
+.ent-table{width:100%;border-collapse:collapse;}
+.ent-table th{
+  font-size:9px;letter-spacing:.12em;text-transform:uppercase;color:var(--ink3);
+  padding:8px 12px;text-align:left;border-bottom:1.5px solid var(--border);
+  background:var(--bg);font-weight:400;position:sticky;top:0;z-index:2;
+}
+.ent-table th:first-child{padding-left:16px;}
+.ent-table th:last-child{padding-right:16px;text-align:center;}
+.ent-table td{
+  padding:9px 12px;border-bottom:1px solid var(--border);vertical-align:middle;
+  font-size:11px;color:var(--ink);
+}
+.ent-table td:first-child{padding-left:16px;}
+.ent-table td:last-child{padding-right:16px;}
+.ent-table tr:last-child td{border-bottom:none;}
+.ent-table tbody tr{background:#fff;transition:background .1s;}
+.ent-table tbody tr:hover{background:var(--bg);}
+.ent-table tbody tr.done-row{background:rgba(58,122,74,.02);}
+.ent-table tbody tr.done-row td{opacity:.55;}
+
+.et-section-hdr{
+  display:flex;align-items:center;gap:8px;padding:7px 16px;
+  background:var(--bg2);border-bottom:1px solid var(--border);
+}
+.et-grupo-hdr{
+  padding:5px 16px 4px;background:var(--bg);
+  border-bottom:1px dashed var(--border);
+  font-size:9px;color:var(--ink3);letter-spacing:.06em;
+}
+.col-nombre{min-width:160px;}
+.col-resp{width:150px;}
+.col-fecha{width:100px;white-space:nowrap;}
+.col-acc{width:80px;text-align:center;}
+
+/* Avatar inline */
+.av{width:22px;height:22px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;font-size:8px;font-weight:600;color:#fff;flex-shrink:0;vertical-align:middle;margin-right:5px;}
+.det-header{padding:18px 20px 0;position:sticky;top:0;background:var(--bg);z-index:5;}
+.det-tabs{display:flex;gap:2px;border-bottom:1px solid var(--border);overflow-x:auto;scrollbar-width:none;margin-top:12px;}
+.det-tab{flex-shrink:0;padding:8px 12px;font-size:10px;letter-spacing:.07em;text-transform:uppercase;color:var(--ink3);background:none;border:none;border-bottom:2px solid transparent;cursor:pointer;white-space:nowrap;}
+.det-tab.on{color:var(--accent);border-bottom-color:var(--accent);}
+.det-body{overflow-y:auto;}
+
+/* ── SEMANA ── */
+.semana-layout{display:grid;grid-template-columns:1fr 1fr;gap:0;height:100%;min-height:0;}
+.semana-left,.semana-right{padding:20px;overflow-y:auto;}
+.semana-left{border-right:1px solid var(--border);}
+
+/* ── DASHBOARD ── */
+.dashboard-layout{padding:24px;max-width:1100px;}
+.dash-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:20px;}
+.dash-col{display:flex;flex-direction:column;gap:10px;}
+
+/* ── REPORTES ── */
+.rep-layout{padding:24px;max-width:800px;}
+
+/* ── GESTION ── */
+.gestion-layout{display:grid;grid-template-columns:1fr 1fr;gap:24px;padding:24px;max-width:1100px;}
+.gestion-col{}
+
+/* ── MODALES (centered dialogs, not bottom sheets) ── */
+.ov{position:fixed;inset:0;background:rgba(28,27,23,.5);z-index:300;display:flex;align-items:center;justify-content:center;opacity:0;pointer-events:none;transition:opacity .2s;padding:20px;}
 .ov.on{opacity:1;pointer-events:all;}
-.sheet{background:var(--bg);border-radius:20px 20px 0 0;width:100%;padding:22px 18px 44px;transform:translateY(100%);transition:transform .28s cubic-bezier(.22,.68,0,1.15);max-height:92vh;overflow-y:auto;}
-.ov.on .sheet{transform:translateY(0);}
-.sh{width:34px;height:4px;border-radius:2px;background:var(--border);margin:0 auto 18px;}
-.stitle{font-family:'Fraunces',serif;font-size:19px;font-weight:300;font-style:italic;margin-bottom:4px;}
+.modal{background:var(--bg);border-radius:14px;width:100%;max-width:460px;max-height:90vh;overflow-y:auto;padding:26px;transform:translateY(8px) scale(.98);transition:transform .25s cubic-bezier(.22,.68,0,1.15);box-shadow:0 20px 60px rgba(0,0,0,.18);}
+.ov.on .modal{transform:translateY(0) scale(1);}
+.modal-wide{max-width:600px;}
+.modal-xl{max-width:760px;}
+.stitle{font-family:'Fraunces',serif;font-size:20px;font-weight:300;font-style:italic;margin-bottom:4px;}
 .ssub{font-size:10px;color:var(--ink3);margin-bottom:20px;}
 .fl{margin-bottom:14px;}
 .fl label{font-size:9px;letter-spacing:.12em;text-transform:uppercase;color:var(--ink3);margin-bottom:5px;display:block;}
 select,textarea,input[type=text],input[type=number],input[type=email],input[type=date]{width:100%;font-family:'DM Mono',monospace;font-size:12px;color:var(--ink);background:#fff;border:1.5px solid var(--border);border-radius:8px;padding:9px 11px;outline:none;appearance:none;transition:border-color .15s;}
 select:focus,textarea:focus,input:focus{border-color:var(--accent);}
 textarea{resize:none;height:62px;}
-.bsave{width:100%;padding:13px;background:var(--accent);color:#fff;border:none;border-radius:9px;font-size:11px;letter-spacing:.08em;text-transform:uppercase;margin-top:20px;}
+.bsave{width:100%;padding:13px;background:var(--accent);color:#fff;border:none;border-radius:9px;font-size:11px;letter-spacing:.08em;text-transform:uppercase;margin-top:18px;cursor:pointer;}
 .bsave:hover{background:#1e1e9a;}
 .bsave:disabled{opacity:.5;}
+.bdanger{width:100%;padding:11px;background:none;color:var(--rose);border:1.5px solid var(--rose);border-radius:9px;font-size:11px;letter-spacing:.08em;text-transform:uppercase;margin-top:8px;cursor:pointer;}
+.modal-close{position:absolute;top:16px;right:16px;width:28px;height:28px;border-radius:50%;background:var(--bg2);border:none;font-size:16px;color:var(--ink2);cursor:pointer;display:flex;align-items:center;justify-content:center;}
+.modal-close:hover{background:var(--border);}
+
+/* Selector de horas */
 .stw{background:#fff;border:1.5px solid var(--border);border-radius:8px;overflow:hidden;}
 .str{display:flex;align-items:center;}
 .stb{width:44px;height:48px;background:none;border:none;font-size:22px;color:var(--ink2);display:flex;align-items:center;justify-content:center;flex-shrink:0;}
@@ -123,22 +253,33 @@ textarea{resize:none;height:62px;}
 .qb button{flex:1;padding:7px 0;font-size:10px;color:var(--ink3);background:none;border:none;border-right:1px solid var(--border);cursor:pointer;}
 .qb button:last-child{border-right:none;}
 .qb button:hover{background:var(--acc-lt);color:var(--accent);}
-.toast{position:fixed;bottom:90px;left:50%;transform:translateX(-50%) translateY(10px);background:var(--ink);color:var(--bg);padding:9px 18px;border-radius:40px;font-size:11px;opacity:0;transition:all .22s;pointer-events:none;white-space:nowrap;z-index:700;}
-.toast.on{opacity:1;transform:translateX(-50%) translateY(0);}
-.fab{position:fixed;bottom:24px;right:18px;width:50px;height:50px;border-radius:50%;background:var(--accent);color:#fff;border:none;font-size:22px;display:flex;align-items:center;justify-content:center;box-shadow:0 4px 18px rgba(40,40,184,.35);z-index:200;transition:transform .15s;}
-.fab:hover{transform:scale(1.06);}
-.ldg{text-align:center;padding:24px;color:var(--ink3);font-size:11px;}
-.btn-nuevo{font-size:10px;letter-spacing:.06em;padding:6px 12px;border-radius:6px;border:1.5px solid var(--accent);color:var(--accent);background:none;transition:all .15s;cursor:pointer;}
-.btn-nuevo:hover{background:var(--accent);color:#fff;}
+
+/* Rol buttons */
 .rol-b2{flex:1;padding:9px;border-radius:7px;border:1.5px solid var(--border);background:#fff;font-size:11px;color:var(--ink2);text-align:center;transition:all .15s;cursor:pointer;}
 .rol-b2.on2{border-color:var(--accent);background:var(--acc-lt);color:var(--accent);}
 .etapa-check-btn{padding:6px 12px;border-radius:6px;border:1.5px solid var(--border);background:#fff;font-size:10px;color:var(--ink2);transition:all .15s;cursor:pointer;}
 .etapa-check-btn.on{border-color:var(--accent);background:var(--acc-lt);color:var(--accent);}
-.det-tab{flex-shrink:0;padding:8px 12px;font-size:10px;letter-spacing:.07em;text-transform:uppercase;color:var(--ink3);background:none;border:none;border-bottom:2px solid transparent;cursor:pointer;white-space:nowrap;}
-.det-tab.on{color:var(--accent);border-bottom-color:var(--accent);}
-.sortable-ghost{opacity:.4;background:var(--acc-lt)!important;}
-.drag-handle:active{cursor:grabbing;}
-.bdanger{width:100%;padding:11px;background:none;color:var(--rose);border:1.5px solid var(--rose);border-radius:9px;font-size:11px;letter-spacing:.08em;text-transform:uppercase;margin-top:8px;cursor:pointer;}
+
+/* Toast */
+.toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%) translateY(10px);background:var(--ink);color:var(--bg);padding:9px 20px;border-radius:40px;font-size:11px;opacity:0;transition:all .22s;pointer-events:none;white-space:nowrap;z-index:700;}
+.toast.on{opacity:1;transform:translateX(-50%) translateY(0);}
+
+/* FAB */
+.fab{position:fixed;bottom:24px;right:24px;width:48px;height:48px;border-radius:50%;background:var(--accent);color:#fff;border:none;font-size:22px;display:none;align-items:center;justify-content:center;box-shadow:0 4px 18px rgba(40,40,184,.35);z-index:200;transition:transform .15s;}
+.fab:hover{transform:scale(1.06);}
+
+/* ── DETAIL PROYECTO MODAL ── */
+#ov-det-proy{align-items:center;padding:20px;}
+#ov-det-proy .modal-xl{max-height:88vh;display:flex;flex-direction:column;padding:0;overflow:hidden;}
+.det-modal-header{padding:20px 22px 0;flex-shrink:0;}
+.det-modal-body{flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;}
+
+/* ── DATE PICKER ── */
+#ov-dpd{align-items:center;}
+#ov-dpd .modal{max-width:360px;}
+
+/* ── REG PREVIO ── */
+#reg-previo{display:none;margin:0 0 10px;padding:8px 12px;background:var(--acc-lt);border-radius:8px;font-size:10px;color:var(--accent);}
 </style>
 </head>
 <body>
@@ -162,48 +303,60 @@ textarea{resize:none;height:62px;}
 </div>
 
 <div id="app">
-  <div class="timer-pill" id="timer-pill">
-    <span class="tdot"></span>
-    <span id="timer-txt">00:00</span>
-    <span id="timer-nom" style="max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:10px;opacity:.8"></span>
-    <button style="background:none;border:none;color:#fff;font-size:13px;cursor:pointer;padding:0 0 0 4px" onclick="stopTimer()">■</button>
-  </div>
+  <div class="app-inner">
 
-  <div class="hdr">
-    <div class="hdr-top">
-      <div>
-        <div class="logo">hacer:</div>
-        <div class="pill" id="admin-pill">admin</div>
+    <!-- SIDEBAR -->
+    <aside class="sidebar">
+      <div class="sb-logo-wrap">
+        <div class="sb-logo">hacer:</div>
+        <div class="sb-pill" id="admin-pill" style="display:none">admin</div>
       </div>
-      <div class="hdr-r">
-        <span class="hdr-nombre" id="hdr-nom" onclick="logout()" title="Cerrar sesión">—</span>
-        <div>
-          <span class="counter-val" id="cv">0</span>
-          <div class="counter-lbl">h hoy</div>
-        </div>
+      <div class="sb-counter-block">
+        <div class="sb-counter-val" id="cv">0</div>
+        <div class="sb-counter-lbl">h hoy</div>
+      </div>
+      <nav class="sb-nav" id="sb-nav"></nav>
+      <div class="timer-bar" id="timer-pill">
+        <span class="tdot"></span>
+        <span class="timer-bar-txt" id="timer-txt">00:00</span>
+        <span class="timer-bar-nom" id="timer-nom"></span>
+        <button class="timer-bar-stop" onclick="stopTimer()">■</button>
+      </div>
+      <div class="sb-footer">
+        <div class="sb-user" id="hdr-nom" onclick="logout()" title="Cerrar sesión">—</div>
+      </div>
+    </aside>
+
+    <!-- MAIN -->
+    <div class="main">
+      <div class="main-header">
+        <div class="main-title" id="main-title">—</div>
+        <button class="btn-nuevo" id="fab" style="display:none" onclick="openReg()">+ Registrar horas</button>
+      </div>
+      <div class="main-body" id="main-body">
+        <div id="panes"></div>
       </div>
     </div>
-    <div class="tabs" id="tabs"></div>
-  </div>
 
-  <div id="panes"></div>
-  <button class="fab" id="fab" style="display:none" onclick="openReg()">+</button>
+  </div>
 </div>
 
-<div class="ov" id="ov-reg" onclick="closeOv('ov-reg',event)" style="z-index:400">
-  <div class="sheet">
-    <div class="sh"></div>
+<!-- ═══════════════════════════════════════════
+     MODALES
+═══════════════════════════════════════════ -->
+
+<!-- REGISTRAR HORAS -->
+<div class="ov" id="ov-reg" onclick="closeOv('ov-reg',event)">
+  <div class="modal">
     <div class="stitle">Registrar horas</div>
-    <div class="ssub" id="reg-fecha"></div>
+    <div class="fl" style="margin-bottom:12px"><label>Fecha</label><input type="date" id="reg-fecha-input" style="font-size:12px;padding:8px 10px"></div>
     <div class="fl"><label>Proyecto</label>
       <select id="rp" onchange="rActEtapas()"><option value="">— proyecto —</option></select></div>
     <div class="fl"><label>Etapa</label>
       <select id="re" onchange="rActEnts()"><option value="">— etapa —</option></select></div>
     <div class="fl"><label>Entregable</label>
       <select id="rent"><option value="">— entregable —</option></select></div>
-    <div id="reg-previo" style="display:none;margin:0 0 10px;padding:8px 12px;background:var(--acc-lt);border-radius:8px;font-size:10px;color:var(--accent)">
-      Ya llevas <strong id="reg-previo-val"></strong> registradas hoy en esta tarea — se sumarán al nuevo tiempo.
-    </div>
+    <div id="reg-previo">Ya llevas <strong id="reg-previo-val"></strong> registradas hoy — se sumarán.</div>
     <div class="fl"><label>Tiempo trabajado</label>
       <div class="stw">
         <div class="str">
@@ -228,46 +381,40 @@ textarea{resize:none;height:62px;}
   </div>
 </div>
 
-<!-- MODAL DETALLE PROYECTO -->
-<div class="ov" id="ov-det-proy" style="align-items:stretch;z-index:350">
-  <div style="background:var(--bg);flex:1;margin-top:50px;border-radius:20px 20px 0 0;display:flex;flex-direction:column;overflow:hidden">
-    <div style="padding:18px 18px 0;flex-shrink:0;background:var(--bg)">
-      <button onclick="document.getElementById('ov-det-proy').classList.remove('on')" style="width:30px;height:30px;border-radius:50%;background:var(--bg2);border:none;font-size:18px;color:var(--ink2);display:flex;align-items:center;justify-content:center;margin-bottom:10px;cursor:pointer">×</button>
-      <div style="font-family:'Fraunces',serif;font-size:18px;font-weight:300;margin-bottom:2px" id="det-proy-title"></div>
-      <div style="font-size:10px;color:var(--ink3);margin-bottom:12px" id="det-proy-sub"></div>
-      <div style="display:flex;gap:2px;border-bottom:1px solid var(--border);overflow-x:auto;scrollbar-width:none">
+<!-- DETALLE PROYECTO -->
+<div class="ov" id="ov-det-proy" onclick="if(event.target.id==='ov-det-proy')document.getElementById('ov-det-proy').classList.remove('on')" style="z-index:350">
+  <div class="modal modal-xl" style="position:relative">
+    <button class="modal-close" onclick="document.getElementById('ov-det-proy').classList.remove('on')">×</button>
+    <div class="det-modal-header">
+      <div style="font-family:'Fraunces',serif;font-size:20px;font-weight:300;margin-bottom:2px" id="det-proy-title"></div>
+      <div style="font-size:10px;color:var(--ink3);margin-bottom:0" id="det-proy-sub"></div>
+      <div class="det-tabs">
         <button class="det-tab on" onclick="switchDetProy('entregables',this)">Entregables</button>
         <button class="det-tab" id="det-tab-gantt" onclick="switchDetProy('gantt',this)">Gantt</button>
         <button class="det-tab" id="det-tab-horas" onclick="switchDetProy('horas',this)" style="display:none">Horas × persona</button>
       </div>
     </div>
-    <div style="flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch" id="det-proy-body"></div>
+    <div class="det-modal-body" id="det-proy-body"></div>
   </div>
 </div>
 
-<!-- DATE PICKER DETALLE -->
-<div class="ov" id="ov-dpd" onclick="if(event.target.id==='ov-dpd')document.getElementById('ov-dpd').classList.remove('on')" style="align-items:flex-end;justify-content:center;z-index:500">
-  <div style="background:#fff;border-radius:14px 14px 0 0;padding:20px;width:100%;max-width:380px;box-shadow:0 -4px 32px rgba(0,0,0,.12)">
-    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">
-      <div style="font-family:'Fraunces',serif;font-size:14px;font-weight:300;font-style:italic;color:var(--ink)" id="dpd-title">Fecha del entregable</div>
-      <button onclick="document.getElementById('ov-dpd').classList.remove('on')" style="background:none;border:none;font-size:18px;color:var(--ink3);cursor:pointer">×</button>
+<!-- DATE PICKER -->
+<div class="ov" id="ov-dpd" onclick="if(event.target.id==='ov-dpd')document.getElementById('ov-dpd').classList.remove('on')" style="z-index:500">
+  <div class="modal" style="position:relative;max-width:340px">
+    <button class="modal-close" onclick="document.getElementById('ov-dpd').classList.remove('on')">×</button>
+    <div class="stitle" id="dpd-title" style="font-size:16px">Fecha del entregable</div>
+    <div style="margin:14px 0 14px">
+      <div style="display:flex;gap:2px;background:var(--bg2);border-radius:8px;padding:3px" id="dpd-tabs">
+        <button id="dpd-tab-unica" onclick="dpSetMode('unica')" style="flex:1;padding:6px;border-radius:6px;border:none;font-size:10px;cursor:pointer;background:var(--accent);color:#fff">Fecha única</button>
+        <button id="dpd-tab-rango" onclick="dpSetMode('rango')" style="flex:1;padding:6px;border-radius:6px;border:none;font-size:10px;cursor:pointer;background:none;color:var(--ink2)">Inicio · Fin</button>
+      </div>
     </div>
-
-    <!-- Tabs: fecha única vs inicio/fin -->
-    <div style="display:flex;gap:2px;background:var(--bg2);border-radius:8px;padding:3px;margin-bottom:14px" id="dpd-tabs">
-      <button id="dpd-tab-unica" onclick="dpSetMode('unica')" style="flex:1;padding:6px;border-radius:6px;border:none;font-size:10px;cursor:pointer;background:var(--accent);color:#fff">Fecha única</button>
-      <button id="dpd-tab-rango" onclick="dpSetMode('rango')" style="flex:1;padding:6px;border-radius:6px;border:none;font-size:10px;cursor:pointer;background:none;color:var(--ink2)">Inicio · Fin</button>
-    </div>
-
-    <!-- Fecha única -->
     <div id="dpd-sec-unica">
       <div style="font-size:9px;letter-spacing:.1em;text-transform:uppercase;color:var(--ink3);margin-bottom:6px">Fecha</div>
       <input type="date" id="dpd-unica" style="width:100%;padding:8px 10px;border:1.5px solid var(--border);border-radius:8px;font-size:12px">
-
-      <!-- Recurrencia -->
       <div style="display:flex;align-items:center;justify-content:space-between;margin-top:14px;padding-top:14px;border-top:1px solid var(--border)">
         <span style="font-size:11px;color:var(--ink2)">Repetir</span>
-        <select id="dpd-frecuencia" onchange="dpFrecChange()" style="font-size:11px;padding:5px 8px;border:1.5px solid var(--border);border-radius:7px;background:#fff;color:var(--ink)">
+        <select id="dpd-frecuencia" onchange="dpFrecChange()" style="font-size:11px;padding:5px 8px;border:1.5px solid var(--border);border-radius:7px;background:#fff;color:var(--ink);width:auto">
           <option value="">No se repite</option>
           <option value="daily">Diario</option>
           <option value="weekly">Semanal</option>
@@ -275,8 +422,6 @@ textarea{resize:none;height:62px;}
           <option value="yearly">Anual</option>
         </select>
       </div>
-
-      <!-- Días de la semana (solo weekly) -->
       <div id="dpd-dias-semana" style="display:none;margin-top:12px">
         <div style="font-size:9px;letter-spacing:.1em;text-transform:uppercase;color:var(--ink3);margin-bottom:8px">En estos días</div>
         <div style="display:flex;gap:4px;justify-content:space-between">
@@ -289,19 +434,14 @@ textarea{resize:none;height:62px;}
           <button id="dpd-dia-6" onclick="dpToggleDia(6)" style="width:34px;height:34px;border-radius:50%;border:1.5px solid var(--border);background:#fff;font-size:10px;font-weight:500;cursor:pointer;color:var(--ink2)">S</button>
         </div>
       </div>
-
-      <!-- Preview fechas futuras -->
       <div id="dpd-preview" style="display:none;margin-top:12px;font-size:10px;color:var(--ink3)"></div>
     </div>
-
-    <!-- Rango inicio/fin -->
     <div id="dpd-sec-rango" style="display:none">
       <div style="display:flex;flex-direction:column;gap:10px">
         <div><div style="font-size:9px;letter-spacing:.1em;text-transform:uppercase;color:var(--ink3);margin-bottom:4px">Inicio</div><input type="date" id="dpd-inicio" style="width:100%;padding:8px 10px;border:1.5px solid var(--border);border-radius:8px;font-size:12px"></div>
         <div><div style="font-size:9px;letter-spacing:.1em;text-transform:uppercase;color:var(--ink3);margin-bottom:4px">Entrega</div><input type="date" id="dpd-fin" style="width:100%;padding:8px 10px;border:1.5px solid var(--border);border-radius:8px;font-size:12px"></div>
       </div>
     </div>
-
     <div style="display:flex;gap:8px;margin-top:16px">
       <button onclick="dpLimpiar()" style="padding:10px 14px;border-radius:7px;border:1.5px solid var(--border);background:none;font-size:11px;color:var(--ink3);cursor:pointer">Limpiar</button>
       <button onclick="guardarFechasDetalle()" style="flex:1;padding:10px;border-radius:7px;border:none;background:var(--accent);color:#fff;font-size:11px;cursor:pointer">Guardar</button>
@@ -309,10 +449,10 @@ textarea{resize:none;height:62px;}
   </div>
 </div>
 
-<!-- MODAL NUEVO ENTREGABLE EN PROYECTO -->
+<!-- NUEVO ENTREGABLE -->
 <div class="ov" id="ov-ned" onclick="closeOv('ov-ned',event)" style="z-index:500">
-  <div class="sheet">
-    <div class="sh"></div>
+  <div class="modal" style="position:relative">
+    <button class="modal-close" onclick="closeOv('ov-ned')">×</button>
     <div class="stitle">Nuevo entregable</div>
     <div class="ssub" id="ned-etapa"></div>
     <div class="fl"><label>Nombre *</label><input type="text" id="ned-nom" placeholder="Planta de conjunto"></div>
@@ -321,11 +461,10 @@ textarea{resize:none;height:62px;}
   </div>
 </div>
 
-
-<!-- MODAL EDITAR REGISTRO -->
+<!-- EDITAR REGISTRO -->
 <div class="ov" id="ov-er" onclick="closeOv('ov-er',event)" style="z-index:400">
-  <div class="sheet">
-    <div class="sh"></div>
+  <div class="modal" style="position:relative">
+    <button class="modal-close" onclick="closeOv('ov-er')">×</button>
     <div class="stitle">Editar registro</div>
     <div class="ssub" id="er-ent" style="font-size:10px;color:var(--ink3)"></div>
     <div class="fl" style="margin-top:16px">
@@ -348,20 +487,21 @@ textarea{resize:none;height:62px;}
     <button onclick="document.getElementById('er-confirm').style.display='block'" style="width:100%;padding:12px;margin-top:8px;border:none;background:none;color:var(--rose);font-size:12px;cursor:pointer">Eliminar registro</button>
   </div>
 </div>
-<!-- MODAL EDITAR ENTREGABLE -->
+
+<!-- EDITAR ENTREGABLE -->
 <div class="ov" id="ov-eed" onclick="closeOv('ov-eed',event)" style="z-index:500">
-  <div class="sheet">
-    <div class="sh"></div>
+  <div class="modal" style="position:relative">
+    <button class="modal-close" onclick="closeOv('ov-eed')">×</button>
     <div class="stitle">Editar entregable</div>
     <div class="fl"><label>Nombre *</label><input type="text" id="eed-nom" placeholder="Nombre del entregable"></div>
     <button class="bsave" id="eed-save" onclick="guardarEditarEntregable()">Guardar</button>
   </div>
 </div>
 
-<!-- MODAL EDITAR TEMPLATE -->
+<!-- EDITAR TEMPLATE -->
 <div class="ov" id="ov-etpl" onclick="closeOv('ov-etpl',event)" style="z-index:500">
-  <div class="sheet">
-    <div class="sh"></div>
+  <div class="modal" style="position:relative">
+    <button class="modal-close" onclick="closeOv('ov-etpl')">×</button>
     <div class="stitle">Editar entregable template</div>
     <div class="fl"><label>Nombre *</label><input type="text" id="etpl-nom" placeholder="Nombre del entregable"></div>
     <div class="fl"><label>Grupo / categoría</label><input type="text" id="etpl-grupo" placeholder="Proyecto Arquitectónico"></div>
@@ -369,10 +509,10 @@ textarea{resize:none;height:62px;}
   </div>
 </div>
 
-<!-- MODAL TEMPLATE -->
+<!-- NUEVO TEMPLATE -->
 <div class="ov" id="ov-tpl" onclick="closeOv('ov-tpl',event)">
-  <div class="sheet">
-    <div class="sh"></div>
+  <div class="modal" style="position:relative">
+    <button class="modal-close" onclick="closeOv('ov-tpl')">×</button>
     <div class="stitle">Nuevo entregable template</div>
     <div class="ssub" id="tf-ctx"></div>
     <div class="fl"><label>Nombre del entregable *</label><input type="text" id="tf-nom" placeholder="Planta de conjunto"></div>
@@ -381,10 +521,10 @@ textarea{resize:none;height:62px;}
   </div>
 </div>
 
-<!-- MODAL COLABORADOR -->
+<!-- COLABORADOR -->
 <div class="ov" id="ov-colab2" onclick="closeOv('ov-colab2',event)">
-  <div class="sheet">
-    <div class="sh"></div>
+  <div class="modal" style="position:relative">
+    <button class="modal-close" onclick="closeOv('ov-colab2')">×</button>
     <div class="stitle" id="cf-title2">Nuevo colaborador</div>
     <div class="ssub">La tarifa es confidencial — solo el admin la ve</div>
     <div style="display:flex;gap:10px">
@@ -405,10 +545,10 @@ textarea{resize:none;height:62px;}
   </div>
 </div>
 
-<!-- MODAL PROYECTO -->
+<!-- PROYECTO -->
 <div class="ov" id="ov-proy2" onclick="closeOv('ov-proy2',event)">
-  <div class="sheet">
-    <div class="sh"></div>
+  <div class="modal modal-wide" style="position:relative">
+    <button class="modal-close" onclick="closeOv('ov-proy2')">×</button>
     <div class="stitle" id="pf-title2">Nuevo proyecto</div>
     <div class="ssub">Los campos * son obligatorios</div>
     <div style="display:flex;gap:10px">
@@ -425,14 +565,13 @@ textarea{resize:none;height:62px;}
     </div>
     <div id="pf-section-etapas">
       <div class="fl"><label>Etapas activas *</label><div style="display:flex;flex-wrap:wrap;gap:8px" id="pf-etapas2"></div></div>
-      <div class="fl"><label>Presupuesto total ($) *</label><input type="number" id="pf-presup2" placeholder="250000" oninput="actualizarDist2()"></div>
+      <div style="display:flex;gap:10px">
+        <div class="fl" style="flex:1"><label>Presupuesto total ($) *</label><input type="number" id="pf-presup2" placeholder="250000" oninput="actualizarDist2()"></div>
+        <div class="fl" style="flex:1"><label>Gasto previo ($)</label><input type="number" id="pf-gasto" placeholder="0"></div>
+      </div>
       <div class="fl"><label>Fecha de inicio del proyecto</label>
         <input type="date" id="pf-inicio">
-        <div style="font-size:9px;color:var(--ink3);margin-top:4px">Se usará para calcular fechas automáticamente en secuencia</div>
-      </div>
-      <div class="fl"><label>Gasto previo a esta app ($)</label>
-        <input type="number" id="pf-gasto" placeholder="0">
-        <div style="font-size:9px;color:var(--ink3);margin-top:4px">Para proyectos con consumo anterior</div>
+        <div style="font-size:9px;color:var(--ink3);margin-top:4px">Para calcular fechas automáticamente</div>
       </div>
       <div class="fl" id="pf-dist2" style="display:none">
         <label>Distribución por etapa</label>
@@ -452,55 +591,44 @@ textarea{resize:none;height:62px;}
 
 <div class="toast" id="toast"></div>
 
+<!-- ═══════════════════════════════════════════
+     SCRIPT — mismo JS, layout adaptado
+═══════════════════════════════════════════ -->
 <script>
 const SURL='https://yqggaamyiblqenjwcggw.supabase.co';
 const SKEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InlxZ2dhYW15aWJscWVuandjZ2d3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODAzNDM3NTAsImV4cCI6MjA5NTkxOTc1MH0._ZpHlZz5sIfeUKuS9zMw7U3Jv3PPzNWRtJbG9QTkUdw';
 const sb=supabase.createClient(SURL,SKEY);
-
 let USER=null,PERFIL=null,diaAct=hoy(),rH=2,timerInt=null,timerSecs=0,timerEnt=null,showDone={};
+const COLS=['#2828b8','#ed254e','#3a7a4a','#c28a10','#7b6fa0','#2a7a8a','#8a5a2a'];
+const ETAPAS_C=[{k:'PC',n:'Procesos'},{k:'DE',n:'Definición'},{k:'SD',n:'Diseño Esquemático'},{k:'DD',n:'Desarrollo de Diseño'},{k:'CD',n:'Documentos Constructivos'}];
+const DN=['Dom','Lun','Mar','Mié','Jue','Vie','Sáb'];
+const TIMER_MAX_SECS=28800;
 
+// ── HELPERS ──
 function hace(n){const d=new Date();d.setDate(d.getDate()-n);const y=d.getFullYear(),m=String(d.getMonth()+1).padStart(2,'0'),dd=String(d.getDate()).padStart(2,'0');return `${y}-${m}-${dd}`;}
 function fF(iso){if(!iso)return null;const[y,m,d]=iso.split('-');const M=['ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic'];return `${parseInt(d)} ${M[parseInt(m)-1]}`;}
 function dH(iso){if(!iso)return null;return Math.round((new Date(iso+' 00:00')-new Date(hoy()+' 00:00'))/864e5);}
 function fS(s){return `${String(Math.floor(s/60)).padStart(2,'0')}:${String(s%60).padStart(2,'0')}`;}
 function hD(h){const hh=Math.floor(h),mm=Math.round((h-hh)*60);return `${hh}:${String(mm).padStart(2,'0')}`;}
 function hT(h){const hh=Math.floor(h),mm=Math.round((h-hh)*60);if(hh===0)return `${mm}min`;if(mm===0)return `${hh}h`;return `${hh}h ${mm}m`;}
-const DN=['Dom','Lun','Mar','Mié','Jue','Vie','Sáb'];
+function ini(a,b){return((a||'')[0]+(b||'')[0]).toUpperCase();}
+function fechaAStr(d){const y=d.getFullYear(),m=String(d.getMonth()+1).padStart(2,'0'),dd=String(d.getDate()).padStart(2,'0');return `${y}-${m}-${dd}`;}
 function semana(){
-  const dias=[];
-  const h=new Date();
-  // usar fecha local, no UTC
+  const dias=[];const h=new Date();
   const hLocal=new Date(h.getFullYear(),h.getMonth(),h.getDate());
-  const dow=hLocal.getDay(); // 0=dom,1=lun...6=sab
-  const diff=dow===0?-6:1-dow;
-  const lun=new Date(hLocal);
-  lun.setDate(hLocal.getDate()+diff);
-  for(let i=0;i<7;i++){
-    const d=new Date(lun);
-    d.setDate(lun.getDate()+i);
-    // formatear como YYYY-MM-DD en hora local
-    const y=d.getFullYear();
-    const m=String(d.getMonth()+1).padStart(2,'0');
-    const dd=String(d.getDate()).padStart(2,'0');
-    dias.push(`${y}-${m}-${dd}`);
-  }
+  const dow=hLocal.getDay();const diff=dow===0?-6:1-dow;
+  const lun=new Date(hLocal);lun.setDate(hLocal.getDate()+diff);
+  for(let i=0;i<5;i++){const d=new Date(lun);d.setDate(lun.getDate()+i);const y=d.getFullYear(),m=String(d.getMonth()+1).padStart(2,'0'),dd=String(d.getDate()).padStart(2,'0');dias.push(`${y}-${m}-${dd}`);}
   return dias;
 }
-function hoy(){
-  const h=new Date();
-  const y=h.getFullYear();
-  const m=String(h.getMonth()+1).padStart(2,'0');
-  const d=String(h.getDate()).padStart(2,'0');
-  return `${y}-${m}-${d}`;
-}
-function ini(a,b){return((a||'')[0]+(b||'')[0]).toUpperCase();}
+function hoy(){const h=new Date();return `${h.getFullYear()}-${String(h.getMonth()+1).padStart(2,'0')}-${String(h.getDate()).padStart(2,'0')}`;}
 
+// ── INIT / AUTH ──
 async function init(){
   const {data:{session}}=await sb.auth.getSession();
   if(session){USER=session.user;await loadPerfil();showApp();}
   else showLogin();
 }
-
 function showLogin(){
   document.getElementById('pantalla-carga').classList.add('oculta');
   document.getElementById('pantalla-login').style.display='flex';
@@ -532,24 +660,40 @@ async function logout(){
   await sb.auth.signOut();location.reload();
 }
 
+// ── APP SETUP ──
 function setupApp(){
   const esAdmin=PERFIL?.rol==='admin';
   document.getElementById('hdr-nom').textContent=PERFIL?.nombre||USER.email;
   if(esAdmin)document.getElementById('admin-pill').style.display='inline-block';
   document.getElementById('fab').style.display='flex';
-  updateCounter();
-  reanudarTimer();
+  updateCounter();reanudarTimer();
+
   const tabs=esAdmin
-    ?[{id:'dashboard',l:'Dashboard'},{id:'registrar',l:'Registrar'},{id:'proyectos',l:'Proyectos'},{id:'semana',l:'Mi semana'},{id:'reportes',l:'Reportes'},{id:'gestion',l:'Gestión'}]
-    :[{id:'registrar',l:'Registrar'},{id:'proyectos',l:'Proyectos'},{id:'semana',l:'Mi semana'}];
-  document.getElementById('tabs').innerHTML=tabs.map((t,i)=>`<button class="tab ${i===0?'on':''}" onclick="switchTab('${t.id}',this)">${t.l}</button>`).join('');
+    ?[{id:'dashboard',l:'Dashboard',ico:'◉'},{id:'registrar',l:'Mis tareas',ico:'☑'},{id:'proyectos',l:'Proyectos',ico:'▤'},{id:'semana',l:'Mi semana',ico:'◷'},{id:'reportes',l:'Reportes',ico:'↗'},{id:'gestion',l:'Gestión',ico:'⚙'}]
+    :[{id:'registrar',l:'Mis tareas',ico:'☑'},{id:'proyectos',l:'Proyectos',ico:'▤'},{id:'semana',l:'Mi semana',ico:'◷'}];
+
+  document.getElementById('sb-nav').innerHTML=tabs.map((t,i)=>`
+    <button class="sb-nav-item ${i===0?'on':''}" onclick="switchTab('${t.id}',this)" id="nav-${t.id}">
+      <span class="nav-ico">${t.ico}</span>${t.l}
+    </button>`).join('');
+
   document.getElementById('panes').innerHTML=tabs.map((t,i)=>`<div class="pane ${i===0?'on':''}" id="pane-${t.id}"><div class="ldg">Cargando...</div></div>`).join('');
   loadTab(esAdmin?'dashboard':'registrar');
+  updateMainTitle(esAdmin?'dashboard':'registrar');
+}
+
+function updateMainTitle(tab){
+  const titles={dashboard:'Dashboard',registrar:'Mis tareas',proyectos:'Proyectos',semana:'Mi semana',reportes:'Reportes',gestion:'Gestión'};
+  document.getElementById('main-title').textContent=titles[tab]||tab;
 }
 
 function switchTab(tab,btn){
-  document.querySelectorAll('.tab').forEach(t=>t.classList.remove('on'));btn.classList.add('on');
+  document.querySelectorAll('.sb-nav-item').forEach(t=>t.classList.remove('on'));btn.classList.add('on');
   document.querySelectorAll('.pane').forEach(p=>p.classList.remove('on'));document.getElementById('pane-'+tab).classList.add('on');
+  updateMainTitle(tab);
+  // Show/hide fab based on tab
+  const fabEl=document.getElementById('fab');
+  fabEl.style.display=(tab==='registrar'||tab==='proyectos'||tab==='semana')?'flex':'none';
   loadTab(tab);
 }
 async function loadTab(tab){
@@ -561,6 +705,7 @@ async function loadTab(tab){
   if(tab==='gestion')await renderGestion();
 }
 
+// ── COUNTER ──
 async function updateCounter(){
   const {data}=await sb.from('registros_horas').select('horas').eq('colaborador_id',USER.id).eq('fecha',diaAct);
   const tot=(data||[]).reduce((s,r)=>s+r.horas,0);
@@ -570,92 +715,346 @@ async function updateCounter(){
   el.classList.toggle('ok',tot>=8);
 }
 
+// ── REGISTRAR ──
 async function renderReg(){
   const cont=document.getElementById('pane-registrar');
-  const dias=semana();
-  const {data:rc}=await sb.from('registros_horas').select('fecha').eq('colaborador_id',USER.id).in('fecha',dias);
-  const withH=new Set((rc||[]).map(r=>r.fecha));
-  let html=`<div class="day-strip">`;
-  dias.forEach(d=>{
-    const dt=new Date(d+'T12:00:00'),sel=d===diaAct,has=withH.has(d)&&!sel;
-    html+=`<button class="day-btn ${sel?'sel':''} ${has?'has':''}" onclick="cambDia('${d}')"><span class="day-dn">${DN[dt.getDay()]}</span><span class="day-num">${dt.getDate()}</span><span class="day-dot"></span></button>`;
-  });
-  html+=`</div><div class="sec">Mis tareas</div><div id="mis-t"><div class="ldg">Cargando...</div></div>`;
-  cont.innerHTML=html;
+  cont.innerHTML=`<div style="padding:20px"><div id="mis-t"><div class="ldg">Cargando...</div></div></div>`;
   await renderMisTareas();
 }
-async function cambDia(d){diaAct=d;await renderReg();updateCounter();}
 
 async function renderMisTareas(){
-  const cont=document.getElementById('mis-t');
-  if(!cont)return;
-  const {data:ents}=await sb.from('entregables').select('*,proyectos(id,codigo,nombre)').eq('asignado_id',USER.id).eq('eliminado',false).order('fecha_unica',{ascending:true,nullsFirst:false}).order('fecha_fin',{ascending:true,nullsFirst:false});
-  if(!ents||!ents.length){cont.innerHTML=`<div class="empty"><div class="empty-i">📋</div><div>No tienes entregables asignados</div></div>`;return;}
-  const {data:rh}=await sb.from('registros_horas').select('*').eq('colaborador_id',USER.id).eq('fecha',diaAct);
-  const rm={};(rh||[]).forEach(r=>rm[r.entregable_id]=r);
-  const pp={};
+  const cont=document.getElementById('mis-t');if(!cont)return;
+
+  const {data:ents}=await sb.from('entregables')
+    .select('*,proyectos(id,codigo,nombre),colaboradores(id,nombre,apellido,color)')
+    .eq('asignado_id',USER.id)
+    .eq('eliminado',false)
+    .order('fecha_unica',{ascending:true,nullsFirst:false})
+    .order('fecha_fin',{ascending:true,nullsFirst:false});
+
+  // También traer todos los colaboradores para el selector de responsable
+  const {data:colabs}=await sb.from('colaboradores').select('id,nombre,apellido,color').order('nombre');
+
+  if(!ents||!ents.length){
+    cont.innerHTML=`<div class="empty"><div class="empty-i">📋</div><div>No tienes entregables asignados</div></div>`;
+    return;
+  }
+
+  const hoyStr=hoy();
+  const finSemana=semana()[4];
+
+  const retrasadas=[], estaSemana=[], proximas=[];
   ents.forEach(e=>{
-    const pid=e.proyecto_id;
-    if(!pp[pid])pp[pid]={p:e.proyectos,ets:{}};
-    if(!pp[pid].ets[e.etapa_clave])pp[pid].ets[e.etapa_clave]={gs:{}};
-    if(!pp[pid].ets[e.etapa_clave].gs[e.grupo])pp[pid].ets[e.etapa_clave].gs[e.grupo]=[];
-    pp[pid].ets[e.etapa_clave].gs[e.grupo].push(e);
+    if(e.done)return;
+    const fechaRef=e.fecha_unica||e.fecha_fin;
+    if(!fechaRef){ proximas.push(e); return; }
+    if(fechaRef < hoyStr)          retrasadas.push(e);
+    else if(fechaRef <= finSemana) estaSemana.push(e);
+    else                           proximas.push(e);
   });
-  let html='';
-  Object.entries(pp).forEach(([pid,{p,ets}])=>{
-    const sd=showDone[pid]||false;
-    let etH='',cc=0;
-    Object.entries(ets).forEach(([clave,{gs}])=>{
-      let gH='';
-      Object.entries(gs).forEach(([gn,es])=>{
-        const pend=es.filter(e=>!e.done),comp=es.filter(e=>e.done);
-        cc+=comp.length;
-        const show=[...pend,...(sd?comp:[])];
-        if(!show.length)return;
-        let rH='';
-        show.forEach(e=>{
-          const reg=rm[e.id],pl=timerEnt===e.id;
-          const fechaRef=e.fecha_unica||e.fecha_fin;
-          const d=dH(fechaRef);
-          let fC='sin',fT='+ fecha';
-          if(e.fecha_unica){fT=(e.recurrente?'↻ ':'')+fF(e.fecha_unica);fC=e.done?'ok':d<0?'vencida':d<=5?'pronto':'ok';}
-          else if(e.fecha_fin){fT=fF(e.fecha_fin);fC=e.done?'ok':d<0?'vencida':d<=5?'pronto':'ok';}
-          rH+=`<div class="erow">
-            <div class="echk ${e.done?'done':pl?'play':''}" onclick="tDone('${e.id}',${e.done})">${e.done?'✓':pl?'▶':''}</div>
-            <div style="flex:1;min-width:0">
-              <div class="enombre" style="${e.done?'text-decoration:line-through;opacity:.5':''}">${e.nombre}</div>
-              <div style="display:flex;gap:6px;margin-top:3px;flex-wrap:wrap;align-items:center">
-                ${reg?`<span class="ehrs">${hT(reg.horas)} hoy</span>`:''}
-                <span class="efecha ${fC}">${fT}</span>
-              </div>
-            </div>
-            <div style="display:flex;gap:4px;align-items:center;flex-shrink:0">
-              <button class="bplay ${pl?'on':''}" onclick="tTimer('${e.id}','${e.nombre.replace(/'/g,"\\'")}')">${pl?'■':'▶'}</button>
-              <button class="bhrs" onclick="openReg('${pid}','${clave}','${e.id}')">+</button>
-            </div>
-          </div>`;
-        });
-        gH+=`<div class="g-hdr">${gn}</div>${rH}`;
-      });
-      if(!gH)return;
-      etH+=`<div class="etapa-g"><div class="etapa-h" onclick="tEt(this)"><span class="ec">${clave}</span><span style="font-size:11px;color:var(--ink2);flex:1">${clave}</span><span class="echev open">›</span></div><div class="etapa-b open">${gH}</div></div>`;
-    });
-    const ct=cc>0?`<div class="ctog" onclick="tSD('${pid}')">${sd?'▲ Ocultar':'▼ Mostrar'} completadas <span class="ccount">${cc}</span></div>`:'';
-    html+=`<div class="card" style="margin-bottom:12px"><div style="padding:12px 14px 10px;display:flex;align-items:flex-start;gap:10px;border-bottom:1px solid var(--border)"><span class="cod">${p.codigo}</span><div style="font-family:'Fraunces',serif;font-size:14px;font-weight:300;color:var(--ink)">${p.nombre}</div></div>${etH}${ct}</div>`;
+
+
+  // Columnas — sin Grupo, alineadas entre todas las secciones
+  const COLS_DEF=`<colgroup>
+    <col style="width:36px">
+    <col>
+    <col style="width:60px">
+    <col style="width:180px">
+    <col style="width:100px">
+    <col style="width:100px">
+    <col style="width:140px">
+    <col style="width:84px">
+  </colgroup>`;
+
+  const thead=`<thead><tr>
+    <th style="padding-left:14px"></th>
+    <th>Tarea</th>
+    <th>Etapa</th>
+    <th>Proyecto</th>
+    <th>Inicio</th>
+    <th>Terminación</th>
+    <th>Responsable</th>
+    <th style="text-align:center">—</th>
+  </tr></thead>`;
+
+  const optsColab=(sel)=>'<option value="">Sin asignar</option>'+(colabs||[]).map(c=>`<option value="${c.id}" ${sel===c.id?'selected':''}>${c.nombre} ${c.apellido||''}</option>`).join('');
+
+  function filaT(e){
+    const pid=e.proyecto_id, clave=e.etapa_clave||'_';
+    const pl=timerEnt===e.id;
+
+    // Fechas — editables al click
+    let fIni='+ fecha', fFin='+ fecha', fFinC='sin', fIniC='sin';
+    if(e.fecha_inicio){fIni=fF(e.fecha_inicio);fIniC='';}
+    const fechaRef=e.fecha_unica||e.fecha_fin;
+    if(fechaRef){
+      const d2=dH(fechaRef);
+      fFin=(e.recurrente?'↻ ':'')+fF(fechaRef);
+      fFinC=d2<0?'vencida':d2<=5?'pronto':'ok';
+    }
+
+    // Check circle — igual que en proyectos
+    const chkBg=e.done?'var(--green)':'transparent';
+    const chkBorder=e.done?'var(--green)':'var(--border)';
+
+    // Responsable select — actualización optimista (sin reload)
+    const respCell=`<select class="resp-sel"
+      style="font-size:10px;padding:3px 6px;border-radius:5px;border:1.5px solid var(--border);background:#fff;width:100%"
+      onchange="asignarMiTarea('${e.id}',this.value,this)">${optsColab(e.asignado_id)}</select>`;
+
+    // Play / stop
+    const playBtn=pl
+      ? `<button class="bplay on" onclick="stopTimer()" title="Detener timer" style="display:flex;flex-shrink:0;font-size:10px">■</button>`
+      : `<button class="bplay" onclick="tTimer('${e.id}','${e.nombre.replace(/'/g,"\'")}');" style="display:flex;flex-shrink:0">▶</button>`;
+
+    // × eliminar — gris, mismo tamaño que los otros botones
+    const delBtn=`<button onclick="eliminarTarea('${e.id}')" title="Eliminar" style="background:none;border:none;cursor:pointer;font-size:18px;font-weight:300;color:var(--ink3);padding:0 2px;line-height:1;opacity:.6">×</button>`;
+
+    return `<tr data-id="${e.id}" style="background:#fff;transition:background .1s" onmouseover="this.style.background='var(--bg)'" onmouseout="this.style.background='#fff'">
+      <td style="padding-left:14px;vertical-align:middle">
+        <div style="width:17px;height:17px;border-radius:50%;border:1.5px solid ${chkBorder};background:${chkBg};display:flex;align-items:center;justify-content:center;font-size:9px;color:#fff;cursor:pointer;flex-shrink:0"
+          onclick="tDone('${e.id}',${e.done})">${e.done?'✓':''}</div>
+      </td>
+      <td style="vertical-align:middle">
+        <span style="font-size:11px;color:var(--ink);cursor:pointer;border-bottom:1px dashed transparent;transition:border-color .15s;${e.done?'text-decoration:line-through;opacity:.5':''}"
+          onmouseover="this.style.borderBottomColor='var(--ink3)'"
+          onmouseout="this.style.borderBottomColor='transparent'"
+          onclick="editarNombreInline(this,'${e.id}','${e.nombre.replace(/'/g,"\\'")}')">
+          ${e.nombre}
+        </span>
+      </td>
+      <td style="vertical-align:middle">
+        <span class="ec" style="font-size:9px">${clave==='_'?'—':clave}</span>
+      </td>
+      <td style="vertical-align:middle">
+        <div style="display:flex;align-items:center;gap:5px;min-width:0">
+          <span class="cod" style="font-size:8px;padding:2px 4px;flex-shrink:0">${e.proyectos?.codigo||''}</span>
+          <span style="font-size:10px;color:var(--ink2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${e.proyectos?.nombre||''}</span>
+        </div>
+      </td>
+      <td style="vertical-align:middle">
+        <span class="efecha ${fIniC||'sin'}" style="cursor:pointer"
+          onclick="abrirDPDetalle('${e.id}','${e.fecha_inicio||''}','${e.fecha_fin||''}')">
+          ${fIni}
+        </span>
+      </td>
+      <td style="vertical-align:middle">
+        <span class="efecha ${fFinC}" style="cursor:pointer"
+          onclick="abrirDPDetalle('${e.id}','${e.fecha_inicio||''}','${e.fecha_fin||''}')">
+          ${fFin}
+        </span>
+      </td>
+      <td style="vertical-align:middle">${respCell}</td>
+      <td style="vertical-align:middle">
+        <div style="display:flex;gap:4px;justify-content:center;align-items:center">
+          ${playBtn}
+          <button class="bhrs" onclick="openReg('${pid}','${clave}','${e.id}')" title="Registrar horas" style="display:flex;flex-shrink:0">+</button>
+          ${delBtn}
+        </div>
+      </td>
+    </tr>`;
+  }
+
+  function seccion(titulo, items, color, ico){
+    if(!items.length)return '';
+    return `<tbody>
+      <tr>
+        <td colspan="8" style="padding:14px 16px 6px;background:var(--bg)">
+          <div style="display:flex;align-items:center;gap:8px;border-bottom:2px solid ${color};padding-bottom:5px">
+            <span style="font-size:12px">${ico}</span>
+            <span style="font-size:10px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:${color}">${titulo}</span>
+            <span style="font-size:10px;color:var(--ink3)">${items.length} tarea${items.length!==1?'s':''}</span>
+          </div>
+        </td>
+      </tr>
+    </tbody>
+    <tbody>${items.map(filaT).join('')}</tbody>`;
+  }
+
+  const tbodys =
+    seccion('Retrasadas',  retrasadas,  'var(--rose)',  '🔴') +
+    seccion('Esta semana', estaSemana,  'var(--amber)', '🟡') +
+    seccion('Próximas',    proximas,    'var(--ink3)',  '⚪');
+
+  if(!tbodys){
+    cont.innerHTML=`<div class="empty"><div class="empty-i">✅</div><div>Todo al día — sin tareas pendientes</div></div>`;
+    return;
+  }
+
+  cont.innerHTML=`<table class="ent-table" style="table-layout:fixed;width:100%">
+    ${COLS_DEF}${thead}${tbodys}
+  </table>
+  <button onclick="abrirNuevaTareaRapida()" style="display:flex;align-items:center;gap:8px;padding:11px 18px;font-size:11px;color:var(--accent);background:var(--acc-lt);border:none;border-top:1.5px dashed rgba(40,40,184,.2);width:100%;cursor:pointer">+ Nueva tarea</button>`;
+}
+
+
+
+// ── EDITAR NOMBRE INLINE (mis tareas) ──
+function editarNombreInline(span, entId, nombreActual){
+  const input=document.createElement('input');
+  input.value=nombreActual;
+  input.style.cssText='font-size:11px;padding:2px 6px;border:1.5px solid var(--accent);border-radius:5px;outline:none;width:100%;';
+  span.replaceWith(input);input.focus();input.select();
+  const guardar=async()=>{
+    const nuevo=input.value.trim();
+    if(nuevo&&nuevo!==nombreActual){
+      // Actualización optimista: reemplazar input con el nuevo span de inmediato
+      const newSpan=document.createElement('span');
+      newSpan.textContent=nuevo;
+      newSpan.style.cssText='font-size:11px;color:var(--ink);cursor:pointer;border-bottom:1px dashed transparent;transition:border-color .15s';
+      newSpan.onmouseover=()=>newSpan.style.borderBottomColor='var(--ink3)';
+      newSpan.onmouseout=()=>newSpan.style.borderBottomColor='transparent';
+      newSpan.onclick=()=>editarNombreInline(newSpan,entId,nuevo);
+      input.replaceWith(newSpan);
+      await sb.from('entregables').update({nombre:nuevo}).eq('id',entId);
+      toast('✓ Nombre actualizado');
+    } else {
+      await renderMisTareas();
+    }
+  };
+  input.addEventListener('blur',guardar);
+  input.addEventListener('keydown',ev=>{if(ev.key==='Enter')input.blur();if(ev.key==='Escape'){input.value=nombreActual;guardar();}});
+}
+
+// ── ASIGNAR RESPONSABLE — optimista, sin reload ──
+async function asignarMiTarea(entId, colabId, selectEl){
+  // Guardar visualmente de inmediato, sin esperar
+  selectEl.style.borderColor='var(--green)';
+  setTimeout(()=>selectEl.style.borderColor='',800);
+  await sb.from('entregables').update({asignado_id:colabId||null}).eq('id',entId);
+  toast('✓ Responsable actualizado');
+}
+
+// ── ELIMINAR TAREA ──
+eliminarTarea._p={};
+async function eliminarTarea(entId){
+  if(eliminarTarea._p[entId]){
+    clearTimeout(eliminarTarea._p[entId]);delete eliminarTarea._p[entId];
+    // Optimista: quitar fila inmediatamente
+    const row=document.querySelector(`tr[data-id="${entId}"]`);
+    if(row){row.style.opacity='0';row.style.transition='opacity .2s';setTimeout(()=>row.remove(),200);}
+    await sb.from('entregables').update({eliminado:true}).eq('id',entId);
+    toast('Tarea eliminada');
+  } else {
+    eliminarTarea._p[entId]=setTimeout(()=>delete eliminarTarea._p[entId],3000);
+    toast('Toca × de nuevo para confirmar');
+  }
+}
+
+
+// ── NUEVA TAREA RÁPIDA (mis tareas) ──
+async function abrirNuevaTareaRapida(){
+  const {data:proys}=await sb.from('proyectos').select('id,codigo,nombre,tipo,etapas_activas').order('codigo');
+  if(!proys||!proys.length){toast('No hay proyectos disponibles');return;}
+
+  // Construir modal propio (no reutilizar ov-ned para evitar conflictos)
+  const ovId='ov-nueva-tarea';
+  let ov=document.getElementById(ovId);
+  if(!ov){
+    ov=document.createElement('div');ov.className='ov';ov.id=ovId;ov.style.zIndex='600';
+    ov.onclick=e=>{if(e.target===ov)ov.classList.remove('on');};
+    ov.innerHTML=`<div class="modal" style="position:relative;max-width:440px">
+      <button class="modal-close" onclick="document.getElementById('${ovId}').classList.remove('on')">×</button>
+      <div class="stitle">Nueva tarea</div>
+      <div class="ssub">La tarea quedará asignada a ti por default</div>
+      <div class="fl"><label>Proyecto *</label>
+        <select id="nt-proy" onchange="ntCambiarProy(this.value)"><option value="">— proyecto —</option></select>
+      </div>
+      <div class="fl" id="nt-etapa-wrap" style="display:none"><label>Etapa *</label>
+        <select id="nt-etapa" onchange="ntCambiarEtapa(this.value)"><option value="">— etapa —</option></select>
+      </div>
+      <div class="fl" id="nt-grupo-wrap" style="display:none"><label>Grupo / categoría *</label>
+        <select id="nt-grupo"><option value="">— grupo —</option></select>
+      </div>
+      <div class="fl"><label>Nombre de la tarea *</label>
+        <input type="text" id="nt-nom" placeholder="Planta de conjunto">
+      </div>
+      <button class="bsave" id="nt-save" onclick="guardarNuevaTareaRapida()">Agregar tarea</button>
+    </div>`;
+    document.body.appendChild(ov);
+  }
+
+  // Poblar proyectos
+  const sel=document.getElementById('nt-proy');
+  sel.innerHTML='<option value="">— proyecto —</option>'+proys.map(p=>`<option value="${p.id}" data-tipo="${p.tipo}" data-etapas="${JSON.stringify(p.etapas_activas||[]).replace(/"/g,"&quot;")}">${p.codigo} · ${p.nombre}</option>`).join('');
+
+  // Reset
+  document.getElementById('nt-nom').value='';
+  document.getElementById('nt-etapa-wrap').style.display='none';
+  document.getElementById('nt-grupo-wrap').style.display='none';
+  document.getElementById('nt-etapa').innerHTML='<option value="">— etapa —</option>';
+  document.getElementById('nt-grupo').innerHTML='<option value="">— grupo —</option>';
+
+  ov.classList.add('on');
+}
+
+async function ntCambiarProy(proyId){
+  document.getElementById('nt-etapa-wrap').style.display='none';
+  document.getElementById('nt-grupo-wrap').style.display='none';
+  if(!proyId)return;
+
+  const opt=document.querySelector(`#nt-proy option[value="${proyId}"]`);
+  const tipo=opt?.dataset.tipo;
+  const etapas=JSON.parse(opt?.dataset.etapas||'[]');
+
+  const etSel=document.getElementById('nt-etapa');
+  const ETAPAS_N={DE:'Definición',SD:'Diseño Esquemático',DD:'Desarrollo de Diseño',CD:'Documentos Constructivos',PC:'Procesos'};
+
+  if(tipo==='en_blanco'){
+    // Proyecto en blanco: solo un nivel, traer grupos existentes
+    etSel.innerHTML='<option value="_">Tareas del proyecto</option>';
+    document.getElementById('nt-etapa-wrap').style.display='block';
+    await ntCambiarEtapa('_',proyId);
+  } else {
+    etSel.innerHTML='<option value="">— etapa —</option>'+etapas.map(k=>`<option value="${k}">${k} · ${ETAPAS_N[k]||k}</option>`).join('');
+    document.getElementById('nt-etapa-wrap').style.display='block';
+  }
+}
+
+async function ntCambiarEtapa(clave, proyIdOverride){
+  document.getElementById('nt-grupo-wrap').style.display='none';
+  const proyId=proyIdOverride||document.getElementById('nt-proy').value;
+  if(!clave||!proyId)return;
+
+  // Traer grupos existentes en ese proyecto+etapa
+  let q=sb.from('entregables').select('grupo').eq('proyecto_id',proyId).eq('eliminado',false);
+  if(clave==='_') q=q.eq('etapa_clave','_'); else q=q.eq('etapa_clave',clave);
+  const {data:ents}=await q;
+  const grupos=[...new Set((ents||[]).map(e=>e.grupo).filter(Boolean))].sort();
+
+  const gSel=document.getElementById('nt-grupo');
+  gSel.innerHTML='<option value="">— grupo —</option>'+grupos.map(g=>`<option value="${g}">${g}</option>`).join('');
+  if(grupos.length){
+    document.getElementById('nt-grupo-wrap').style.display='block';
+  }
+}
+
+async function guardarNuevaTareaRapida(){
+  const nombre=document.getElementById('nt-nom').value.trim();
+  const proyId=document.getElementById('nt-proy').value;
+  const clave=document.getElementById('nt-etapa').value;
+  const grupo=document.getElementById('nt-grupo').value||'General';
+
+  if(!nombre){toast('Escribe el nombre de la tarea');return;}
+  if(!proyId){toast('Selecciona un proyecto');return;}
+  if(!clave){toast('Selecciona una etapa');return;}
+
+  const btn=document.getElementById('nt-save');btn.disabled=true;btn.textContent='Guardando...';
+  await sb.from('entregables').insert({
+    proyecto_id:proyId, etapa_clave:clave, grupo, nombre,
+    done:false, eliminado:false, asignado_id:USER.id
   });
-  cont.innerHTML=html||`<div class="empty"><div class="empty-i">✅</div><div>Todo al día</div></div>`;
+  btn.disabled=false;btn.textContent='Agregar tarea';
+  document.getElementById('ov-nueva-tarea').classList.remove('on');
+  await renderMisTareas();
+  toast('✓ Tarea agregada');
 }
 
 function tEt(h){h.nextElementSibling.classList.toggle('open');h.querySelector('.echev').classList.toggle('open');}
 function tSD(pid){showDone[pid]=!showDone[pid];renderMisTareas();}
-async function tDone(id,cur){
-  const done=cur===true||cur==='true'?false:true;
-  await sb.from('entregables').update({done}).eq('id',id);
-  toast(done?'✓ Completado':'Desmarcado');renderMisTareas();
-}
+async function tDone(id,cur){const done=cur===true||cur==='true'?false:true;await sb.from('entregables').update({done}).eq('id',id);toast(done?'✓ Completado':'Desmarcado');renderMisTareas();}
 
-const TIMER_MAX_SECS=28800; // 8 horas
-
+// ── TIMER ──
 function tTimer(id,nom){
   if(timerEnt===id){stopTimer();return;}
   if(timerInt)stopTimer();
@@ -671,29 +1070,16 @@ function tTimer(id,nom){
   },1000);
   renderMisTareas();toast('▶ Timer iniciado');
 }
-
 async function reanudarTimer(){
   try{
-    const saved=JSON.parse(localStorage.getItem('timer')||'null');
-    if(!saved)return;
+    const saved=JSON.parse(localStorage.getItem('timer')||'null');if(!saved)return;
     const secsTranscurridos=Math.floor((Date.now()-saved.startTime)/1000);
-    if(secsTranscurridos>=TIMER_MAX_SECS){
-      // Ya pasaron 8h — registrar automáticamente y limpiar
-      timerEnt=saved.entId;timerSecs=TIMER_MAX_SECS;
-      await _guardarTimer();
-      toast('⏹ Timer auto-detenido (8h máximo)');
-      return;
-    }
-    // Retomar el timer desde donde quedó
+    if(secsTranscurridos>=TIMER_MAX_SECS){timerEnt=saved.entId;timerSecs=TIMER_MAX_SECS;await _guardarTimer();toast('⏹ Timer auto-detenido (8h máximo)');return;}
     timerEnt=saved.entId;timerSecs=secsTranscurridos;
     document.getElementById('timer-nom').textContent=saved.nom;
     document.getElementById('timer-pill').classList.add('on');
     const startTime=saved.startTime;
-    timerInt=setInterval(()=>{
-      timerSecs=Math.floor((Date.now()-startTime)/1000);
-      document.getElementById('timer-txt').textContent=fS(Math.min(timerSecs,TIMER_MAX_SECS));
-      if(timerSecs>=TIMER_MAX_SECS){stopTimer();toast('⏹ Timer auto-detenido (8h máximo)');}
-    },1000);
+    timerInt=setInterval(()=>{timerSecs=Math.floor((Date.now()-startTime)/1000);document.getElementById('timer-txt').textContent=fS(Math.min(timerSecs,TIMER_MAX_SECS));if(timerSecs>=TIMER_MAX_SECS){stopTimer();toast('⏹ Timer auto-detenido (8h máximo)');}},1000);
     document.getElementById('timer-txt').textContent=fS(timerSecs);
     toast(`▶ Timer retomado · ${fS(timerSecs)} transcurridos`);
   }catch(e){localStorage.removeItem('timer');}
@@ -711,21 +1097,18 @@ async function _guardarTimer(){
       toast(`■ ${hT(hrs)} guardadas`);
     }
   }
-  timerEnt=null;timerSecs=0;
-  updateCounter();renderMisTareas();
+  timerEnt=null;timerSecs=0;updateCounter();renderMisTareas();
 }
-
 async function stopTimer(){
-  if(!timerInt)return;
-  clearInterval(timerInt);timerInt=null;
-  document.getElementById('timer-pill').classList.remove('on');
-  await _guardarTimer();
+  if(!timerInt)return;clearInterval(timerInt);timerInt=null;
+  document.getElementById('timer-pill').classList.remove('on');await _guardarTimer();
 }
 
+// ── REGISTRAR HORAS MODAL ──
 async function openReg(pid=null,ec=null,eid=null){
   rH=2;updSt();
   document.getElementById('rnota').value='';
-  document.getElementById('reg-fecha').textContent=fF(diaAct)||diaAct;
+  document.getElementById('reg-fecha-input').value=diaAct;
   document.getElementById('reg-previo').style.display='none';
   const {data:proys}=await sb.from('proyectos').select('id,codigo,nombre').order('codigo');
   const s=document.getElementById('rp');
@@ -733,43 +1116,29 @@ async function openReg(pid=null,ec=null,eid=null){
   (proys||[]).forEach(p=>s.innerHTML+=`<option value="${p.id}">${p.codigo} · ${p.nombre}</option>`);
   if(pid){s.value=pid;await rActEtapas(ec,eid);}
   else{document.getElementById('re').innerHTML='<option value="">— etapa —</option>';document.getElementById('rent').innerHTML='<option value="">— entregable —</option>';}
-  // Mostrar horas previas si hay registro hoy para este entregable
   if(eid){
-    const {data:ex}=await sb.from('registros_horas').select('horas').eq('colaborador_id',USER.id).eq('entregable_id',eid).eq('fecha',diaAct).maybeSingle();
-    if(ex?.horas){
-      document.getElementById('reg-previo').style.display='block';
-      document.getElementById('reg-previo-val').textContent=hT(ex.horas);
-    }
+    const {data:ex}=await sb.from('registros_horas').select('horas').eq('colaborador_id',USER.id).eq('entregable_id',eid).eq('fecha',document.getElementById('reg-fecha-input')?.value||diaAct).maybeSingle();
+    if(ex?.horas){document.getElementById('reg-previo').style.display='block';document.getElementById('reg-previo-val').textContent=hT(ex.horas);}
   }
   document.getElementById('ov-reg').classList.add('on');
 }
 async function rActEtapas(pe=null,pent=null){
-  const pid=document.getElementById('rp').value;
-  const s=document.getElementById('re');
-  s.innerHTML='<option value="">— etapa —</option>';
-  document.getElementById('rent').innerHTML='<option value="">— entregable —</option>';
+  const pid=document.getElementById('rp').value;const s=document.getElementById('re');
+  s.innerHTML='<option value="">— etapa —</option>';document.getElementById('rent').innerHTML='<option value="">— entregable —</option>';
   if(!pid)return;
   const {data:proy}=await sb.from('proyectos').select('tipo').eq('id',pid).single();
-  if(proy?.tipo==='en_blanco'){
-    s.innerHTML='<option value="_">Tareas del proyecto</option>';
-    s.value='_';
-    await rActEnts(pent,'_');
-    return;
-  }
+  if(proy?.tipo==='en_blanco'){s.innerHTML='<option value="_">Tareas del proyecto</option>';s.value='_';await rActEnts(pent,'_');return;}
   const {data}=await sb.from('entregables').select('etapa_clave').eq('proyecto_id',pid).eq('eliminado',false);
   [...new Set((data||[]).map(e=>e.etapa_clave).filter(Boolean))].forEach(c=>s.innerHTML+=`<option value="${c}">${c}</option>`);
   if(pe){s.value=pe;await rActEnts(pent);}
 }
 async function rActEnts(pe=null,forceEc=null){
   const pid=document.getElementById('rp').value,ec=forceEc||document.getElementById('re').value;
-  const s=document.getElementById('rent');
-  s.innerHTML='<option value="">— entregable —</option>';
+  const s=document.getElementById('rent');s.innerHTML='<option value="">— entregable —</option>';
   if(!pid||!ec)return;
   let q=sb.from('entregables').select('id,nombre').eq('proyecto_id',pid).eq('eliminado',false);
-  if(ec==='_') q=q.eq('etapa_clave','_');
-  else q=q.eq('etapa_clave',ec);
-  const {data}=await q;
-  (data||[]).forEach(e=>s.innerHTML+=`<option value="${e.id}">${e.nombre}</option>`);
+  if(ec==='_')q=q.eq('etapa_clave','_');else q=q.eq('etapa_clave',ec);
+  const {data}=await q;(data||[]).forEach(e=>s.innerHTML+=`<option value="${e.id}">${e.nombre}</option>`);
   if(pe)s.value=pe;
 }
 function updSt(){document.getElementById('sti').value=hD(rH);document.getElementById('stl').textContent=hT(rH);document.getElementById('stm').disabled=rH<=1/60;}
@@ -781,223 +1150,176 @@ async function saveReg(){
   if(!pid||!ec||!eid){toast('Completa todos los campos');return;}
   const btn=document.getElementById('rsave');btn.disabled=true;btn.textContent='Guardando...';
   const etapaClave=ec==='_'?'_':ec;
-  const {data:ex}=await sb.from('registros_horas').select('id,horas').eq('colaborador_id',USER.id).eq('entregable_id',eid).eq('fecha',diaAct).maybeSingle();
+  const fechaReg=document.getElementById('reg-fecha-input').value||diaAct;
+  const {data:ex}=await sb.from('registros_horas').select('id,horas').eq('colaborador_id',USER.id).eq('entregable_id',eid).eq('fecha',fechaReg).maybeSingle();
   const nota=document.getElementById('rnota').value;
-  if(ex){
-    const total=Math.round((ex.horas+rH)*60)/60;
-    await sb.from('registros_horas').update({horas:total,nota}).eq('id',ex.id);
-    toast(`✓ ${hT(rH)} agregadas · Total hoy: ${hT(total)}`);
-  } else {
-    await sb.from('registros_horas').insert({colaborador_id:USER.id,entregable_id:eid,proyecto_id:pid,etapa_clave:etapaClave,fecha:diaAct,horas:rH,nota});
-    toast(`✓ ${hT(rH)} guardadas`);
-  }
+  if(ex){const total=Math.round((ex.horas+rH)*60)/60;await sb.from('registros_horas').update({horas:total,nota}).eq('id',ex.id);toast(`✓ ${hT(rH)} agregadas · Total hoy: ${hT(total)}`);}
+  else{await sb.from('registros_horas').insert({colaborador_id:USER.id,entregable_id:eid,proyecto_id:pid,etapa_clave:etapaClave,fecha:fechaReg,horas:rH,nota});toast(`✓ ${hT(rH)} guardadas`);}
   btn.disabled=false;btn.textContent='Guardar';
   closeOv('ov-reg');updateCounter();renderMisTareas();
 }
 
-// ── DASHBOARD ADMIN ──
+// ── DASHBOARD ──
 async function renderDashboard(){
-  const cont=document.getElementById('pane-dashboard');
-  if(!cont)return;
-  cont.innerHTML=`<div style="padding:16px"><div class="ldg">Cargando dashboard...</div></div>`;
-
-  // Obtener datos en paralelo
-  const hoyStr=diaAct;
-  const diasSem=semana();
-  const [
-    {data:ents},
-    {data:colabs},
-    {data:regs},
-    {data:proys}
-  ] = await Promise.all([
+  const cont=document.getElementById('pane-dashboard');if(!cont)return;
+  cont.innerHTML=`<div class="ldg">Cargando dashboard...</div>`;
+  const hoyStr=diaAct,diasSem=semana();
+  const [{data:ents},{data:colabs},{data:regs},{data:proys}]=await Promise.all([
     sb.from('entregables').select('id,nombre,done,eliminado,fecha_fin,fecha_unica,asignado_id,etapa_clave,proyecto_id,proyectos(codigo)').eq('eliminado',false).eq('done',false),
     sb.from('colaboradores').select('*').order('nombre'),
     sb.from('registros_horas').select('colaborador_id,horas,fecha').in('fecha',diasSem),
     sb.from('proyectos').select('id,codigo,nombre').order('codigo')
   ]);
 
-  let html='<div style="padding:16px">';
-
-  // ── SECCIÓN 1: Alertas ──
-  html+=`<div class="sec">Entregables atrasados</div>`;
   const alertas=[];
   (ents||[]).forEach(e=>{
-    const fechaRef=e.fecha_unica||e.fecha_fin;
-    if(!fechaRef)return;
-    const d=dH(fechaRef);
-    const colab=(colabs||[]).find(c=>c.id===e.asignado_id);
+    const fechaRef=e.fecha_unica||e.fecha_fin;if(!fechaRef)return;
+    const d=dH(fechaRef);const colab=(colabs||[]).find(c=>c.id===e.asignado_id);
     const resp=colab?colab.nombre+' '+(colab.apellido||''):'Sin asignar';
-    if(d<0) alertas.push({tipo:'vencida',ico:'🔴',nombre:e.nombre,proyecto:e.proyectos?.codigo||'',etapa:e.etapa_clave||'',resp,dias:Math.abs(d)});
-    else if(d===0) alertas.push({tipo:'hoy',ico:'🟡',nombre:e.nombre,proyecto:e.proyectos?.codigo||'',etapa:e.etapa_clave||'',resp,dias:0});
+    if(d<0)alertas.push({tipo:'vencida',ico:'🔴',nombre:e.nombre,proyecto:e.proyectos?.codigo||'',etapa:e.etapa_clave||'',resp,dias:Math.abs(d)});
+    else if(d===0)alertas.push({tipo:'hoy',ico:'🟡',nombre:e.nombre,proyecto:e.proyectos?.codigo||'',etapa:e.etapa_clave||'',resp,dias:0});
   });
 
+  const estaSemana=(ents||[]).filter(e=>{const f=e.fecha_unica||e.fecha_fin;return f&&f>=hoyStr&&f<=diasSem[diasSem.length-1];}).sort((a,b)=>(a.fecha_unica||a.fecha_fin||'').localeCompare(b.fecha_unica||b.fecha_fin||''));
+
+  const hrsColab={};(regs||[]).forEach(r=>{if(!hrsColab[r.colaborador_id])hrsColab[r.colaborador_id]=0;hrsColab[r.colaborador_id]+=r.horas;});
+  const diasTransc=Math.max(1,diasSem.indexOf(hoyStr)+1);
+  const metaHastaHoy=diasTransc*8;
+
+  // ── Alertas ──
+  let alertasHtml='';
   if(!alertas.length){
-    html+=`<div class="card" style="padding:12px 14px;margin-bottom:14px;display:flex;align-items:center;gap:10px">
-      <span style="font-size:18px">✅</span>
-      <div><div style="font-size:11px;color:var(--ink);font-weight:500">Sin atrasos</div>
-      <div style="font-size:10px;color:var(--ink3)">Todos los entregables van a tiempo</div></div>
-    </div>`;
+    alertasHtml=`<div class="card" style="padding:12px 14px;display:flex;align-items:center;gap:10px"><span style="font-size:18px">✅</span><div><div style="font-size:11px;color:var(--ink);font-weight:500">Sin atrasos</div><div style="font-size:10px;color:var(--ink3)">Todos los entregables van a tiempo</div></div></div>`;
   } else {
     alertas.sort((a,b)=>b.dias-a.dias).forEach(a=>{
-      html+=`<div class="card" style="padding:12px 14px;margin-bottom:8px;display:flex;align-items:center;gap:10px;border-left:3px solid ${a.tipo==='vencida'?'var(--rose)':'var(--amber)'}">
+      alertasHtml+=`<div class="card" style="padding:12px 14px;margin-bottom:8px;display:flex;align-items:center;gap:10px;border-left:3px solid ${a.tipo==='vencida'?'var(--rose)':'var(--amber)'}">
         <span style="font-size:16px">${a.ico}</span>
-        <div style="flex:1;min-width:0">
-          <div style="font-size:11px;color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${a.nombre}</div>
-          <div style="font-size:9px;color:var(--ink3);margin-top:2px">${a.proyecto}${a.etapa?' · '+a.etapa:''} · ${a.resp}</div>
-        </div>
+        <div style="flex:1;min-width:0"><div style="font-size:11px;color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${a.nombre}</div>
+        <div style="font-size:9px;color:var(--ink3);margin-top:2px">${a.proyecto}${a.etapa?' · '+a.etapa:''} · ${a.resp}</div></div>
         <span style="font-size:10px;font-weight:600;color:${a.tipo==='vencida'?'var(--rose)':'var(--amber)'};white-space:nowrap;flex-shrink:0">${a.dias>0?a.dias+'d tarde':'Hoy'}</span>
       </div>`;
     });
   }
 
-  // ── SECCIÓN 2: Entregables que vencen esta semana ──
-  html+=`<div class="sec" style="margin-top:8px">Esta semana</div>`;
-  const estaSemana=(ents||[]).filter(e=>{
-    const f=e.fecha_unica||e.fecha_fin;
-    return f&&f>=hoyStr&&f<=diasSem[diasSem.length-1];
-  }).sort((a,b)=>(a.fecha_unica||a.fecha_fin||'').localeCompare(b.fecha_unica||b.fecha_fin||''));
-
+  // ── Esta semana ──
+  let semHtml='';
   if(!estaSemana.length){
-    html+=`<div class="card" style="padding:12px 14px;margin-bottom:14px;font-size:11px;color:var(--ink3);text-align:center">Sin entregables esta semana</div>`;
+    semHtml=`<div class="card" style="padding:12px 14px;font-size:11px;color:var(--ink3);text-align:center">Sin entregables esta semana</div>`;
   } else {
     estaSemana.forEach(e=>{
       const colab=(colabs||[]).find(c=>c.id===e.asignado_id);
-      const fechaRef=e.fecha_unica||e.fecha_fin;
-      const d=dH(fechaRef);
-      const cls=d===0?'hoy':d<=2?'pronto':'ok';
-      html+=`<div class="card" style="padding:10px 14px;margin-bottom:8px;display:flex;align-items:center;gap:10px">`;
-      if(colab) html+=`<div style="width:28px;height:28px;border-radius:50%;background:${colab.color||'var(--accent)'};display:flex;align-items:center;justify-content:center;font-size:9px;color:#fff;font-weight:600;flex-shrink:0">${(colab.nombre[0]||'')+(colab.apellido?colab.apellido[0]:'')}</div>`;
-      else html+=`<div style="width:28px;height:28px;border-radius:50%;background:var(--bg2);display:flex;align-items:center;justify-content:center;font-size:10px;color:var(--ink3);flex-shrink:0">?</div>`;
-      html+=`<div style="flex:1;min-width:0">
-        <div style="font-size:11px;color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${e.nombre}</div>
-        <div style="font-size:9px;color:var(--ink3);margin-top:2px">${e.proyectos?.codigo||''}${colab?' · '+colab.nombre:''}</div>
-      </div>
-      <span class="efecha ${cls}">${d===0?'Hoy':fF(fechaRef)}</span>`;
-      html+=`</div>`;
+      const fechaRef=e.fecha_unica||e.fecha_fin;const d2=dH(fechaRef);
+      const cls2=d2===0?'hoy':d2<=2?'pronto':'ok';
+      semHtml+=`<div class="card" style="padding:10px 14px;margin-bottom:8px;display:flex;align-items:center;gap:10px">`;
+      if(colab)semHtml+=`<div style="width:28px;height:28px;border-radius:50%;background:${colab.color||'var(--accent)'};display:flex;align-items:center;justify-content:center;font-size:9px;color:#fff;font-weight:600;flex-shrink:0">${(colab.nombre[0]||'')+(colab.apellido?colab.apellido[0]:'')}</div>`;
+      else semHtml+=`<div style="width:28px;height:28px;border-radius:50%;background:var(--bg2);display:flex;align-items:center;justify-content:center;font-size:10px;color:var(--ink3);flex-shrink:0">?</div>`;
+      semHtml+=`<div style="flex:1;min-width:0"><div style="font-size:11px;color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${e.nombre}</div>
+        <div style="font-size:9px;color:var(--ink3);margin-top:2px">${e.proyectos?.codigo||''}${colab?' · '+colab.nombre:''}</div></div>
+      <span class="efecha ${cls2}">${d2===0?'Hoy':fF(fechaRef)}</span></div>`;
     });
   }
 
-  // ── SECCIÓN 3: Registro semanal del equipo ──
-  html+=`<div class="sec" style="margin-top:8px">Registro semanal del equipo</div>`;
-  const hrsColab={};
-  (regs||[]).forEach(r=>{if(!hrsColab[r.colaborador_id])hrsColab[r.colaborador_id]=0;hrsColab[r.colaborador_id]+=r.horas;});
-
-  // Días transcurridos esta semana incluyendo hoy
-  const diasTransc=Math.max(1,diasSem.indexOf(hoyStr)+1);
-  const metaHastaHoy=diasTransc*8;
-  const metaSemana=40;
-
+  // ── Equipo ──
+  let equipoHtml='';
   (colabs||[]).filter(c=>c.rol!=='admin').forEach(c=>{
-    const hrs=hrsColab[c.id]||0;
-    const pct=Math.min(100,Math.round(hrs/metaSemana*100));
-    const pctMeta=Math.min(100,Math.round(metaHastaHoy/metaSemana*100));
+    const hrs=hrsColab[c.id]||0;const pct=Math.min(100,Math.round(hrs/40*100));
+    const pctMeta=Math.min(100,Math.round(metaHastaHoy/40*100));
     const ok=hrs>=metaHastaHoy;
     const color=ok?'var(--green)':hrs>=metaHastaHoy*.75?'var(--amber)':'var(--rose)';
     const faltante=Math.max(0,metaHastaHoy-hrs);
-    html+=`<div class="card" style="padding:12px 14px;margin-bottom:8px">
+    equipoHtml+=`<div class="card" style="padding:12px 14px;margin-bottom:8px">
       <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px">
         <div style="width:30px;height:30px;border-radius:50%;background:${c.color||'var(--accent)'};display:flex;align-items:center;justify-content:center;font-size:10px;color:#fff;font-weight:600;flex-shrink:0">${(c.nombre[0]||'')+(c.apellido?c.apellido[0]:'')}</div>
         <div style="flex:1"><div style="font-size:11px;color:var(--ink);font-weight:500">${c.nombre} ${c.apellido||''}</div></div>
-        <div style="text-align:right">
-          <div style="font-size:13px;font-weight:600;color:${color}">${hT(hrs)}</div>
-          <div style="font-size:9px;color:var(--ink3)">${faltante>0?'−'+hT(faltante)+' por registrar':'✓ Al día'}</div>
-        </div>
+        <div style="text-align:right"><div style="font-size:13px;font-weight:600;color:${color}">${hT(hrs)}</div>
+        <div style="font-size:9px;color:var(--ink3)">${faltante>0?'−'+hT(faltante)+' por registrar':'✓ Al día'}</div></div>
       </div>
       <div style="position:relative;height:5px;background:var(--bg2);border-radius:3px;overflow:hidden">
         <div style="position:absolute;height:100%;width:${pct}%;background:${color};border-radius:3px"></div>
         <div style="position:absolute;height:100%;width:2px;background:var(--ink3);opacity:.3;left:${pctMeta}%"></div>
       </div>
-      <div style="font-size:9px;color:var(--ink3);margin-top:4px;text-align:right">${hT(hrs)} / ${metaSemana}h semana</div>
+      <div style="font-size:9px;color:var(--ink3);margin-top:4px;text-align:right">${hT(hrs)} / 40h semana</div>
     </div>`;
   });
 
-  html+='</div>';
-  cont.innerHTML=html;
+  cont.innerHTML=`<div class="dashboard-layout">
+    <div class="dash-grid">
+      <div class="dash-col">
+        <div class="sec">Entregables atrasados</div>${alertasHtml}
+        <div class="sec" style="margin-top:16px">Esta semana</div>${semHtml}
+      </div>
+      <div class="dash-col">
+        <div class="sec">Registro semanal del equipo</div>${equipoHtml}
+      </div>
+    </div>
+  </div>`;
 }
 
+// ── PROYECTOS ──
 async function renderProy(){
   const cont=document.getElementById('pane-proyectos');
-  cont.innerHTML=`<div style="padding:16px"><div class="ldg">Cargando...</div></div>`;
+  cont.innerHTML=`<div class="ldg">Cargando...</div>`;
   const esAdmin=PERFIL?.rol==='admin';
   let q=sb.from('proyectos').select('*').order('codigo');
   if(!esAdmin){
     const {data:acceso}=await sb.from('proyecto_colaboradores').select('proyecto_id').eq('colaborador_id',USER.id);
     const ids=(acceso||[]).map(a=>a.proyecto_id);
-    if(!ids.length){cont.innerHTML=`<div style="padding:16px"><div class="empty"><div class="empty-i">📁</div><div>Sin proyectos asignados</div></div></div>`;return;}
+    if(!ids.length){cont.innerHTML=`<div style="padding:20px"><div class="empty"><div class="empty-i">📁</div><div>Sin proyectos asignados</div></div></div>`;return;}
     q=q.in('id',ids);
   }
   const {data:ps}=await q;
-  if(!ps||!ps.length){cont.innerHTML=`<div style="padding:16px"><div class="empty"><div class="empty-i">📁</div><div>Sin proyectos aún</div></div></div>`;return;}
+  if(!ps||!ps.length){cont.innerHTML=`<div style="padding:20px"><div class="empty"><div class="empty-i">📁</div><div>Sin proyectos aún</div></div></div>`;return;}
 
-  // Entregables para barra de avance
   const {data:es}=await sb.from('entregables').select('proyecto_id,done,eliminado');
   const ep={};(es||[]).forEach(e=>{if(!ep[e.proyecto_id])ep[e.proyecto_id]={t:0,d:0};if(!e.eliminado){ep[e.proyecto_id].t++;if(e.done)ep[e.proyecto_id].d++;}});
 
-  // Consumo presupuestal: horas × tarifa por proyecto
   const proyIds=ps.map(p=>p.id);
-  const {data:regs}=await sb.from('registros_horas')
-    .select('proyecto_id,horas,colaboradores(tarifa)')
-    .in('proyecto_id',proyIds);
-  const consumo={};
-  (regs||[]).forEach(r=>{
-    if(!consumo[r.proyecto_id])consumo[r.proyecto_id]=0;
-    consumo[r.proyecto_id]+=(r.horas*(r.colaboradores?.tarifa||0));
-  });
+  const {data:regs}=await sb.from('registros_horas').select('proyecto_id,horas,colaboradores(tarifa)').in('proyecto_id',proyIds);
+  const consumo={};(regs||[]).forEach(r=>{if(!consumo[r.proyecto_id])consumo[r.proyecto_id]=0;consumo[r.proyecto_id]+=(r.horas*(r.colaboradores?.tarifa||0));});
 
-  let html='<div style="padding:16px">';
+  let listHtml='<div style="padding:16px">';
   ps.forEach(p=>{
     const s=ep[p.id]||{t:0,d:0};
     const av=s.t>0?Math.round(s.d/s.t*100):0;
     const tienePresup=p.presupuesto_total>0&&p.tipo!=='en_blanco';
     const pctConsumido=tienePresup?Math.min(100,Math.round((consumo[p.id]||0)/p.presupuesto_total*100)):null;
     const colorConsumido=pctConsumido>=90?'var(--rose)':pctConsumido>=70?'var(--amber)':'var(--green)';
-
-    html+=`<div class="card" style="padding:14px;margin-bottom:12px">
+    listHtml+=`<div class="proy-card" onclick="abrirDetalleProy('${p.id}')">
       <div style="display:flex;align-items:flex-start;gap:10px;margin-bottom:10px">
         <span class="cod">${p.codigo}</span>
         <div style="flex:1;min-width:0">
-          <div style="font-family:'Fraunces',serif;font-size:14px;font-weight:300;color:var(--ink);cursor:pointer" onclick="abrirDetalleProy('${p.id}')">${p.nombre}</div>
+          <div style="font-family:'Fraunces',serif;font-size:14px;font-weight:300;color:var(--ink)">${p.nombre}</div>
           <div style="font-size:10px;color:var(--ink3);margin-top:2px">${p.cliente||''}</div>
         </div>
       </div>
       <div style="display:flex;align-items:center;gap:6px;margin-bottom:6px">
-        <div style="flex:1;height:5px;background:var(--bg2);border-radius:3px;overflow:hidden">
-          <div style="height:100%;width:${av}%;background:var(--accent);border-radius:3px"></div>
-        </div>
+        <div style="flex:1;height:4px;background:var(--bg2);border-radius:3px;overflow:hidden"><div style="height:100%;width:${av}%;background:var(--accent);border-radius:3px"></div></div>
         <span style="font-size:10px;color:var(--accent);font-weight:500;min-width:28px;text-align:right">${av}%</span>
         <span style="font-size:9px;color:var(--ink3);min-width:60px">entregables</span>
       </div>
-      ${tienePresup?`<div style="display:flex;align-items:center;gap:6px;margin-bottom:6px">
-        <div style="flex:1;height:5px;background:var(--bg2);border-radius:3px;overflow:hidden">
-          <div style="height:100%;width:${pctConsumido}%;background:${colorConsumido};border-radius:3px"></div>
-        </div>
+      ${tienePresup?`<div style="display:flex;align-items:center;gap:6px">
+        <div style="flex:1;height:4px;background:var(--bg2);border-radius:3px;overflow:hidden"><div style="height:100%;width:${pctConsumido}%;background:${colorConsumido};border-radius:3px"></div></div>
         <span style="font-size:10px;color:${colorConsumido};font-weight:500;min-width:28px;text-align:right">${pctConsumido}%</span>
         <span style="font-size:9px;color:var(--ink3);min-width:60px">presupuesto</span>
       </div>`:''}
-      <div style="display:flex;justify-content:space-between;align-items:center;margin-top:4px">
-        <div style="font-size:10px;color:var(--ink3)">${s.d}/${s.t} entregables</div>
-        <button style="font-size:10px;color:var(--accent);background:none;border:none;cursor:pointer;letter-spacing:.04em" onclick="abrirDetalleProy('${p.id}')">Ver entregables ›</button>
-      </div>
+      <div style="font-size:10px;color:var(--ink3);margin-top:8px">${s.d}/${s.t} entregables completados</div>
     </div>`;
   });
-  cont.innerHTML=html+'</div>';
+  listHtml+=`</div>`;
+
+  cont.innerHTML=listHtml;
 }
 
 // ── DETALLE PROYECTO ──
-let proyDetalleId=null, proyDetalleTipo='productivo';
+let proyDetalleId=null, proyDetalleTipo='productivo', detProyTab='entregables';
 
-let detProyTab='entregables';
-
-function switchDetProy(tab, btn){
+function switchDetProy(tab,btn){
   detProyTab=tab;
-  document.querySelectorAll('#ov-det-proy .det-tab').forEach(t=>t.classList.remove('on'));
-  btn.classList.add('on');
+  document.querySelectorAll('#ov-det-proy .det-tab').forEach(t=>t.classList.remove('on'));btn.classList.add('on');
   renderDetProyBody();
 }
-
 async function abrirDetalleProy(proyId){
-  proyDetalleId=proyId;
-  detProyTab='entregables';
+  proyDetalleId=proyId;detProyTab='entregables';
   const {data:p}=await sb.from('proyectos').select('*').eq('id',proyId).single();
   proyDetalleTipo=p?.tipo||'productivo';
   document.getElementById('det-proy-title').textContent=p.nombre;
@@ -1009,191 +1331,180 @@ async function abrirDetalleProy(proyId){
   document.getElementById('ov-det-proy').classList.add('on');
   await renderDetProyBody();
 }
-
 async function renderDetProyBody(){
-  if(detProyTab==='entregables') await renderEntregablesDetalle();
-  else if(detProyTab==='gantt') await renderGanttDetalle();
+  if(detProyTab==='entregables')await renderEntregablesDetalle();
+  else if(detProyTab==='gantt')await renderGanttDetalle();
   else await renderHorasDetalle();
 }
-
 async function renderGanttDetalle(){
   const cont=document.getElementById('det-proy-body');
   cont.innerHTML=`<div class="ldg">Cargando Gantt...</div>`;
-
-  const {data:ents}=await sb.from('entregables')
-    .select('*')
-    .eq('proyecto_id',proyDetalleId)
-    .eq('eliminado',false)
-    .order('etapa_clave').order('grupo').order('orden').order('created_at');
-
+  const {data:ents}=await sb.from('entregables').select('*').eq('proyecto_id',proyDetalleId).eq('eliminado',false).order('etapa_clave').order('grupo').order('orden').order('created_at');
   const conFecha=(ents||[]).filter(e=>e.fecha_inicio&&e.fecha_fin);
-  if(!conFecha.length){
-    cont.innerHTML=`<div class="empty"><div class="empty-i">📅</div><div>Sin fechas asignadas todavía</div><div style="font-size:10px;color:var(--ink3);margin-top:6px">Ve a Entregables y agrega fechas de inicio y entrega</div></div>`;
-    return;
-  }
-
-  // Calcular rango
+  if(!conFecha.length){cont.innerHTML=`<div class="empty"><div class="empty-i">📅</div><div>Sin fechas asignadas todavía</div></div>`;return;}
   const fechas=conFecha.flatMap(e=>[e.fecha_inicio,e.fecha_fin]);
-  const minD=fechas.reduce((a,b)=>a<b?a:b);
-  const maxD=fechas.reduce((a,b)=>a>b?a:b);
-  const start=new Date(minD+' 00:00'), end=new Date(maxD+' 00:00');
+  const minD=fechas.reduce((a,b)=>a<b?a:b),maxD=fechas.reduce((a,b)=>a>b?a:b);
+  const start=new Date(minD+' 00:00'),end=new Date(maxD+' 00:00');
   const span=Math.max(1,end-start);
-  const hoyD=new Date(hoy()+' 00:00');
-  const hoyPct=Math.max(0,Math.min(100,((hoyD-start)/span)*100));
-
-  // Agrupar por etapa
-  const porEtapa={};
-  conFecha.forEach(e=>{
-    if(!porEtapa[e.etapa_clave])porEtapa[e.etapa_clave]=[];
-    porEtapa[e.etapa_clave].push(e);
-  });
-
+  const hoyD=new Date(hoy()+' 00:00'),hoyPct=Math.max(0,Math.min(100,((hoyD-start)/span)*100));
+  const porEtapa={};conFecha.forEach(e=>{if(!porEtapa[e.etapa_clave])porEtapa[e.etapa_clave]=[];porEtapa[e.etapa_clave].push(e);});
   const coloresBarra={DE:'#7b9ec0',SD:'#9e7bc0',DD:'#7bc09e',CD:'#c0a77b',PC:'#c07b9e'};
-
-  let html=`<div style="padding:14px;overflow-x:auto">
+  let html=`<div style="padding:16px;overflow-x:auto">
     <div style="display:flex;justify-content:space-between;font-size:8px;color:var(--ink3);padding:0 0 8px;letter-spacing:.03em">
       <span>${fF(minD)}</span><span style="color:var(--rose)">Hoy</span><span>${fF(maxD)}</span>
     </div>`;
-
   ETAPAS_C.forEach(et=>{
     if(!porEtapa[et.k])return;
     html+=`<div style="font-size:9px;letter-spacing:.1em;text-transform:uppercase;color:var(--ink3);padding:8px 0 4px">${et.k} · ${et.n}</div>`;
     porEtapa[et.k].forEach(e=>{
-      const eS=new Date(e.fecha_inicio+' 00:00'), eE=new Date(e.fecha_fin+' 00:00');
-      const left=((eS-start)/span)*100;
-      const width=Math.max(1.5,((eE-eS)/span)*100);
+      const eS=new Date(e.fecha_inicio+' 00:00'),eE=new Date(e.fecha_fin+' 00:00');
+      const left=((eS-start)/span)*100,width=Math.max(1.5,((eE-eS)/span)*100);
       const color=coloresBarra[et.k]||'var(--accent)';
       html+=`<div style="display:flex;align-items:center;gap:8px;margin-bottom:5px">
-        <div style="font-size:10px;color:var(--ink2);width:110px;flex-shrink:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis" title="${e.nombre}">${e.nombre}</div>
-        <div style="flex:1;height:20px;background:var(--bg2);border-radius:4px;position:relative;min-width:80px;cursor:pointer" onclick="abrirDPDetalle('${e.id}','${e.fecha_inicio}','${e.fecha_fin}')" title="Click para editar fechas">
-          <div style="position:absolute;height:100%;left:${left}%;width:${width}%;border-radius:4px;background:${color};opacity:${e.done?.45:1}" title="${fF(e.fecha_inicio)} → ${fF(e.fecha_fin)}"></div>
+        <div style="font-size:10px;color:var(--ink2);width:130px;flex-shrink:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis" title="${e.nombre}">${e.nombre}</div>
+        <div style="flex:1;height:20px;background:var(--bg2);border-radius:4px;position:relative;min-width:120px;cursor:pointer" onclick="abrirDPDetalle('${e.id}','${e.fecha_inicio}','${e.fecha_fin}')" title="Click para editar fechas">
+          <div style="position:absolute;height:100%;left:${left}%;width:${width}%;border-radius:4px;background:${color};opacity:${e.done?.45:1}"></div>
           <div style="position:absolute;top:-2px;bottom:-2px;left:${hoyPct}%;width:2px;background:var(--rose);opacity:.8;border-radius:1px"></div>
         </div>
       </div>`;
     });
   });
-
-  html+=`</div><div style="padding:4px 14px 12px;font-size:9px;color:var(--ink3)">Click en cualquier barra para editar fechas · línea roja = hoy</div>`;
+  html+=`</div><div style="padding:4px 16px 12px;font-size:9px;color:var(--ink3)">Click en barra para editar fechas · línea roja = hoy</div>`;
   cont.innerHTML=html;
 }
-
 async function renderHorasDetalle(){
-  const cont=document.getElementById('det-proy-body');
-  cont.innerHTML=`<div class="ldg">Cargando...</div>`;
-
-  const {data:regs}=await sb.from('registros_horas')
-    .select('horas,etapa_clave,colaborador_id,colaboradores(nombre,apellido,color)')
-    .eq('proyecto_id',proyDetalleId);
-
-  if(!regs||!regs.length){
-    cont.innerHTML=`<div class="empty"><div class="empty-i">⏱</div><div>Sin horas registradas aún</div></div>`;
-    return;
-  }
-
-  // Agrupar por colaborador
+  const cont=document.getElementById('det-proy-body');cont.innerHTML=`<div class="ldg">Cargando...</div>`;
+  const {data:regs}=await sb.from('registros_horas').select('horas,etapa_clave,colaborador_id,colaboradores(nombre,apellido,color)').eq('proyecto_id',proyDetalleId);
+  if(!regs||!regs.length){cont.innerHTML=`<div class="empty"><div class="empty-i">⏱</div><div>Sin horas registradas aún</div></div>`;return;}
   const porColab={};
-  regs.forEach(r=>{
-    const cid=r.colaborador_id;
-    if(!porColab[cid])porColab[cid]={col:r.colaboradores,horas:0,etapas:{}};
-    porColab[cid].horas+=r.horas;
-    if(!porColab[cid].etapas[r.etapa_clave])porColab[cid].etapas[r.etapa_clave]=0;
-    porColab[cid].etapas[r.etapa_clave]+=r.horas;
-  });
-
+  regs.forEach(r=>{const cid=r.colaborador_id;if(!porColab[cid])porColab[cid]={col:r.colaboradores,horas:0,etapas:{}};porColab[cid].horas+=r.horas;if(!porColab[cid].etapas[r.etapa_clave])porColab[cid].etapas[r.etapa_clave]=0;porColab[cid].etapas[r.etapa_clave]+=r.horas;});
   const totalH=Object.values(porColab).reduce((s,d)=>s+d.horas,0);
-
   let html='';
   Object.entries(porColab).sort((a,b)=>b[1].horas-a[1].horas).forEach(([cid,data])=>{
-    const c=data.col;
-    const pct=Math.round(data.horas/totalH*100);
+    const c=data.col,pct=Math.round(data.horas/totalH*100);
     const etStr=Object.entries(data.etapas).map(([k,h])=>`${k}: ${hT(h)}`).join(' · ');
     html+=`<div style="display:flex;align-items:center;gap:10px;padding:12px 16px;border-bottom:1px solid var(--border)">
       <div style="width:32px;height:32px;border-radius:50%;background:${c?.color||'var(--accent)'};display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:500;color:#fff;flex-shrink:0">${ini(c?.nombre,c?.apellido)}</div>
-      <div style="flex:1;min-width:0">
-        <div style="font-size:11px;color:var(--ink)">${c?.nombre} ${c?.apellido||''}</div>
-        <div style="font-size:9px;color:var(--ink3);margin-top:2px">${etStr}</div>
-        <div style="height:4px;background:var(--bg2);border-radius:2px;overflow:hidden;margin-top:5px">
-          <div style="height:100%;width:${pct}%;background:var(--accent);border-radius:2px"></div>
-        </div>
-      </div>
-      <div style="text-align:right;flex-shrink:0">
-        <div style="font-size:14px;font-weight:500;color:var(--accent)">${hT(data.horas)}</div>
-        <div style="font-size:9px;color:var(--ink3)">${pct}%</div>
-      </div>
+      <div style="flex:1;min-width:0"><div style="font-size:11px;color:var(--ink)">${c?.nombre} ${c?.apellido||''}</div>
+      <div style="font-size:9px;color:var(--ink3);margin-top:2px">${etStr}</div>
+      <div style="height:4px;background:var(--bg2);border-radius:2px;overflow:hidden;margin-top:5px"><div style="height:100%;width:${pct}%;background:var(--accent);border-radius:2px"></div></div></div>
+      <div style="text-align:right;flex-shrink:0"><div style="font-size:14px;font-weight:500;color:var(--accent)">${hT(data.horas)}</div><div style="font-size:9px;color:var(--ink3)">${pct}%</div></div>
     </div>`;
   });
-
-  // Total
   html+=`<div style="display:flex;justify-content:space-between;align-items:center;padding:12px 16px;background:var(--ink)">
     <span style="font-size:10px;letter-spacing:.08em;text-transform:uppercase;color:var(--ink3)">Total proyecto</span>
     <span style="font-family:'Fraunces',serif;font-size:22px;font-weight:300;color:#fff">${hT(totalH)}</span>
   </div>`;
-
   cont.innerHTML=html;
 }
 
-// ── Fila de entregable reutilizable ──
-function _filaEnt(e,colabs,esAdmin){
-  // Soportar fecha_unica (recurrente) y fecha_fin (rango)
-  const fechaRef=e.fecha_unica||e.fecha_fin;
-  const d=dH(fechaRef);
-  let fC='sin',fT='+ fecha';
-  if(e.fecha_unica){
-    fT=(e.recurrente?'↻ ':'')+fF(e.fecha_unica);
-    fC=e.done?'ok':d<0?'vencida':d<=5?'pronto':'ok';
-  } else if(e.fecha_fin){
-    fT=fF(e.fecha_fin);fC=e.done?'ok':d<0?'vencida':d<=5?'pronto':'ok';
-  }
-  const optionsColab='<option value="">Sin asignar</option>'+
-    (colabs||[]).map(c=>'<option value="'+c.id+'" '+(e.asignado_id===c.id?'selected':'')+'>'+c.nombre+' '+(c.apellido||'')+'</option>').join('');
-  const checkStyle='width:17px;height:17px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:9px;color:#fff;flex-shrink:0;cursor:pointer;border:1.5px solid '+(e.done?'var(--green)':'var(--border)')+';background:'+(e.done?'var(--green)':'transparent');
-  const etClave=e.etapa_clave||'_';
-  let row='<div style="border-bottom:1px solid var(--border);background:'+(e.done?'rgba(58,122,74,.03)':'#fff')+'">';
-  row+='<div style="display:flex;align-items:center;gap:8px;padding:9px 16px">';
-  row+='<div style="'+checkStyle+'" onclick="toggleDoneDetalle(\''+e.id+'\','+e.done+')">'+(e.done?'✓':'')+'</div>';
-  if(esAdmin){
-    row+='<span class="ent-nombre" data-edit-id="'+e.id+'" style="flex:1;font-size:11px;color:var(--ink);cursor:pointer;'+(e.done?'text-decoration:line-through;opacity:.5':'')+'" title="Click para editar">'+e.nombre+'</span>';
-    row+='<div class="drag-handle" style="font-size:14px;color:var(--ink3);cursor:grab;padding:2px 6px;user-select:none" title="Arrastrar">⠿</div>';
-    row+='<button style="font-size:16px;color:var(--ink3);background:none;border:none;cursor:pointer;padding:2px 4px" onclick="eliminarEntregableDetalle(\''+ e.id +'\')" title="Eliminar">×</button>';
-  } else {
-    row+='<span style="flex:1;font-size:11px;color:var(--ink);'+(e.done?'text-decoration:line-through;opacity:.5':'')+'">'+e.nombre+'</span>';
-  }
-  row+='</div>';
-  row+='<div style="display:flex;align-items:center;gap:8px;padding:0 16px 9px 41px">';
-  row+='<span class="efecha '+fC+'" onclick="abrirDPDetalle(\''+e.id+'\',\''+(e.fecha_inicio||'')+'\',\''+(e.fecha_fin||'')+'\')">' +fT+'</span>';
-  row+='<select style="flex:1;font-size:10px;padding:3px 6px;border-radius:5px;border:1.5px solid var(--border);background:#fff" onchange="asignarDetalle(\''+e.id+'\',this.value)">'+optionsColab+'</select>';
-  row+='<button class="bplay'+(timerEnt===e.id?' on':'')+'" onclick="tTimer(\''+e.id+'\',\''+e.nombre.replace(/'/g,"\\'")+'\')" title="'+(timerEnt===e.id?'Detener timer':'Iniciar timer')+'">'+(timerEnt===e.id?'■':'▶')+'</button>';
-  row+='<button class="bhrs" onclick="openReg(\''+e.proyecto_id+'\',\''+etClave+'\',\''+e.id+'\')" title="Registrar horas">+</button>';
-  row+='</div></div>';
-  return row;
+// ── FILA ENTREGABLE ──
+// ── FILA ENTREGABLE → tabla ──
+function _tdFecha(label, entId, inicio, fin){
+  // Clickeable solo si hay fecha o es admin
+  return `<span class="efecha sin" style="cursor:pointer;font-size:10px" onclick="abrirDPDetalle('${entId}','${inicio||''}','${fin||''}')">${label||'+ fecha'}</span>`;
 }
+
+function _filaTabla(e, colabs, esAdmin){
+  const etClave = e.etapa_clave||'_';
+  const colab = (colabs||[]).find(c=>c.id===e.asignado_id);
+
+  // Fecha inicio
+  let fIni = '—', fIniClass = '';
+  if(e.fecha_inicio){ fIni = fF(e.fecha_inicio); fIniClass=''; }
+
+  // Fecha fin / única
+  let fFin = '—', fFinClass = 'sin';
+  const fechaRef = e.fecha_unica||e.fecha_fin;
+  if(fechaRef){
+    const d = dH(fechaRef);
+    fFin = (e.recurrente?'↻ ':'')+fF(fechaRef);
+    fFinClass = e.done?'ok':d<0?'vencida':d<=5?'pronto':'ok';
+  }
+
+  // Check circle
+  const chkBg = e.done?'var(--green)':'transparent';
+  const chkBorder = e.done?'var(--green)':'var(--border)';
+  const chkStyle = `width:16px;height:16px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;font-size:8px;color:#fff;cursor:pointer;border:1.5px solid ${chkBorder};background:${chkBg};flex-shrink:0;vertical-align:middle`;
+
+  // Responsable cell
+  let respCell = '';
+  if(esAdmin){
+    const opts = '<option value="">Sin asignar</option>'+(colabs||[]).map(c=>`<option value="${c.id}" ${e.asignado_id===c.id?'selected':''}>${c.nombre} ${c.apellido||''}</option>`).join('');
+    if(colab){
+      respCell = `<div style="display:flex;align-items:center;gap:6px">
+        <span class="av" style="background:${colab.color||'var(--accent)'}">${ini(colab.nombre,colab.apellido)}</span>
+        <select style="font-size:10px;padding:2px 5px;border-radius:5px;border:1.5px solid var(--border);background:#fff;flex:1;min-width:0" onchange="asignarDetalle('${e.id}',this.value)">${opts}</select>
+      </div>`;
+    } else {
+      respCell = `<select style="font-size:10px;padding:2px 5px;border-radius:5px;border:1.5px solid var(--border);background:#fff;width:100%" onchange="asignarDetalle('${e.id}',this.value)">${opts}</select>`;
+    }
+  } else {
+    if(colab){
+      respCell = `<div style="display:flex;align-items:center;gap:6px">
+        <span class="av" style="background:${colab.color||'var(--accent)'}">${ini(colab.nombre,colab.apellido)}</span>
+        <span style="font-size:10px;color:var(--ink2)">${colab.nombre}</span>
+      </div>`;
+    } else {
+      respCell = `<span style="font-size:10px;color:var(--ink3)">—</span>`;
+    }
+  }
+
+  // Nombre cell
+  let nombreCell = '';
+  if(esAdmin){
+    nombreCell = `<div style="display:flex;align-items:center;gap:7px">
+      <div style="${chkStyle}" onclick="toggleDoneDetalle('${e.id}',${e.done})">${e.done?'✓':''}</div>
+      <span class="ent-nombre" data-edit-id="${e.id}" style="flex:1;cursor:pointer;${e.done?'text-decoration:line-through;opacity:.5':''}" title="Click para editar">${e.nombre}</span>
+      <div class="drag-handle" style="font-size:13px;color:var(--ink3);cursor:grab;user-select:none;opacity:.5" title="Arrastrar">⠿</div>
+    </div>`;
+  } else {
+    nombreCell = `<div style="display:flex;align-items:center;gap:7px">
+      <div style="${chkStyle}" onclick="toggleDoneDetalle('${e.id}',${e.done})">${e.done?'✓':''}</div>
+      <span style="${e.done?'text-decoration:line-through;opacity:.5':''}">${e.nombre}</span>
+    </div>`;
+  }
+
+  // Acciones cell
+  const accCell = `<div style="display:flex;gap:4px;justify-content:center;align-items:center">
+    <button class="bplay${timerEnt===e.id?' on':''}" onclick="tTimer('${e.id}','${e.nombre.replace(/'/g,"\'")}')" title="${timerEnt===e.id?'Detener':'Iniciar timer'}">${timerEnt===e.id?'■':'▶'}</button>
+    <button class="bhrs" onclick="openReg('${e.proyecto_id}','${etClave}','${e.id}')" title="Registrar horas">+</button>
+    ${esAdmin?`<button style="font-size:15px;color:var(--ink3);background:none;border:none;cursor:pointer;padding:1px 3px;opacity:.6" onclick="eliminarEntregableDetalle('${e.id}')" title="Eliminar">×</button>`:''}
+  </div>`;
+
+  const trClass = e.done?'done-row':'';
+  return `<tr class="${trClass}" data-id="${e.id}">
+    <td class="col-nombre">${nombreCell}</td>
+    <td class="col-resp">${respCell}</td>
+    <td class="col-fecha"><span class="efecha ${fIniClass||'sin'}" onclick="abrirDPDetalle('${e.id}','${e.fecha_inicio||''}','${e.fecha_fin||''}')" style="cursor:pointer">${fIni}</span></td>
+    <td class="col-fecha"><span class="efecha ${fFinClass}" onclick="abrirDPDetalle('${e.id}','${e.fecha_inicio||''}','${e.fecha_fin||''}')" style="cursor:pointer">${fFin}</span></td>
+    <td class="col-acc">${accCell}</td>
+  </tr>`;
+}
+
+function _tablaHeader(){
+  return `<thead><tr>
+    <th class="col-nombre">Tarea</th>
+    <th class="col-resp">Responsable</th>
+    <th class="col-fecha">Inicio</th>
+    <th class="col-fecha">Término</th>
+    <th class="col-acc">—</th>
+  </tr></thead>`;
+}
+
 async function renderEntregablesDetalle(){
-  const cont=document.getElementById('det-proy-body');
-  cont.innerHTML=`<div class="ldg">Cargando entregables...</div>`;
+  const cont=document.getElementById('det-proy-body');cont.innerHTML=`<div class="ldg">Cargando entregables...</div>`;
   const esAdmin=PERFIL?.rol==='admin';
   const {data:colabs}=await sb.from('colaboradores').select('id,nombre,apellido,color').order('nombre');
-  if(proyDetalleTipo==='en_blanco'){
-    await _renderEntBlanco(cont,colabs,esAdmin);
-  } else {
-    await _renderEntProductivo(cont,colabs,esAdmin);
-  }
-  // Edición inline de nombre de entregable (click en nombre)
+  if(proyDetalleTipo==='en_blanco')await _renderEntBlanco(cont,colabs,esAdmin);
+  else await _renderEntProductivo(cont,colabs,esAdmin);
   cont.querySelectorAll('.ent-nombre').forEach(span=>{
     span.addEventListener('click',()=>{
-      const entId=span.dataset.editId;
-      const nombreActual=span.textContent.trim();
-      const input=document.createElement('input');
-      input.value=nombreActual;
-      input.style.cssText='flex:1;font-size:11px;padding:2px 6px;border:1.5px solid var(--accent);border-radius:5px;outline:none;';
-      span.replaceWith(input);
-      input.focus();input.select();
-      const guardar=async()=>{
-        const nuevo=input.value.trim();
-        if(nuevo&&nuevo!==nombreActual){
-          await sb.from('entregables').update({nombre:nuevo}).eq('id',entId);
-        }
-        await renderDetProyBody();
-      };
+      const entId=span.dataset.editId;const nombreActual=span.textContent.trim();
+      const input=document.createElement('input');input.value=nombreActual;
+      input.style.cssText='flex:1;font-size:11px;padding:2px 6px;border:1.5px solid var(--accent);border-radius:5px;outline:none;width:100%;';
+      span.replaceWith(input);input.focus();input.select();
+      const guardar=async()=>{const nuevo=input.value.trim();if(nuevo&&nuevo!==nombreActual){await sb.from('entregables').update({nombre:nuevo}).eq('id',entId);}await renderDetProyBody();};
       input.addEventListener('blur',guardar);
       input.addEventListener('keydown',e=>{if(e.key==='Enter')input.blur();if(e.key==='Escape'){input.value=nombreActual;input.blur();}});
     });
@@ -1202,172 +1513,107 @@ async function renderEntregablesDetalle(){
 }
 
 async function _renderEntBlanco(cont,colabs,esAdmin){
-  const {data:ents}=await sb.from('entregables')
-    .select('*,colaboradores(nombre,apellido,color)')
-    .eq('proyecto_id',proyDetalleId)
-    .eq('eliminado',false)
-    .eq('etapa_clave','_')
-    .order('orden_grupo').order('grupo').order('orden').order('created_at');
-  const porGrupo={};
-  const ordenGrupo={};
-  (ents||[]).forEach(e=>{
-    const g=e.grupo||'General';
-    if(!porGrupo[g])porGrupo[g]=[];
-    porGrupo[g].push(e);
-    if(!(g in ordenGrupo))ordenGrupo[g]=e.orden_grupo||0;
-  });
+  const {data:ents}=await sb.from('entregables').select('*,colaboradores(nombre,apellido,color)').eq('proyecto_id',proyDetalleId).eq('eliminado',false).eq('etapa_clave','_').order('orden_grupo').order('grupo').order('orden').order('created_at');
+  const porGrupo={},ordenGrupo={};
+  (ents||[]).forEach(e=>{const g=e.grupo||'General';if(!porGrupo[g])porGrupo[g]=[];porGrupo[g].push(e);if(!(g in ordenGrupo))ordenGrupo[g]=e.orden_grupo||0;});
   const grupos=Object.keys(porGrupo).sort((a,b)=>(ordenGrupo[a]||0)-(ordenGrupo[b]||0));
-  let html='<div id="sortable-grupos-blank">';
+  if(!grupos.length){
+    cont.innerHTML=`<div class="empty"><div class="empty-i">📋</div><div style="margin-bottom:4px">Sin tareas todavía</div></div>`;
+    if(esAdmin)cont.innerHTML+=`<button onclick="abrirNuevoEntBlanco('')" style="display:flex;align-items:center;gap:6px;padding:12px 16px;font-size:10px;color:var(--accent);background:var(--acc-lt);border:none;width:100%;cursor:pointer">+ Nueva tarea</button>`;
+    return;
+  }
+  let html='<table class="ent-table"><colgroup><col class="col-nombre"><col class="col-resp"><col class="col-fecha"><col class="col-fecha"><col class="col-acc"></colgroup>'+_tablaHeader()+'<tbody id="sortable-grupos-blank">';
   grupos.forEach(grupo=>{
-    const pend=porGrupo[grupo].filter(e=>!e.done);
-    const comp=porGrupo[grupo].filter(e=>e.done);
-    html+=`<div class="grupo-bloque" data-grupo="${grupo}">`;
-    // Cabecera del grupo — clickeable para editar
-    html+=`<div class="grupo-hdr" style="display:flex;align-items:center;padding:5px 16px 3px;background:var(--bg2);border-bottom:1px dashed var(--border)">`;
-    if(esAdmin) html+=`<div class="grupo-drag" style="font-size:12px;color:var(--ink3);cursor:grab;padding:2px 6px 2px 0;user-select:none">⠿</div>`;
-    html+=`<span class="grupo-nombre" data-grupo="${grupo}" style="flex:1;font-size:9px;color:var(--ink3);letter-spacing:.05em;cursor:${esAdmin?'pointer':'default'}" title="${esAdmin?'Click para editar':''}"> ${grupo}</span>`;
-    html+=`</div>`;
-    // Entregables pendientes sortable
-    html+=`<div class="sortable-group" data-proyecto="${proyDetalleId}" data-grupo="${grupo}">`;
-    pend.forEach(e=>{ html+=`<div data-id="${e.id}">`+_filaEnt(e,colabs,esAdmin)+'</div>'; });
-    html+=`</div>`;
+    const pend=porGrupo[grupo].filter(e=>!e.done),comp=porGrupo[grupo].filter(e=>e.done);
+    // Grupo header row
+    let grupoLabel = esAdmin
+      ? `<span class="grupo-nombre" data-grupo="${grupo}" style="cursor:pointer;font-size:9px;color:var(--ink3);letter-spacing:.06em" title="Click para editar"> ${grupo}</span>${esAdmin?`<span class="grupo-drag" style="font-size:11px;color:var(--ink3);cursor:grab;padding:0 0 0 8px;user-select:none;opacity:.5">⠿</span>`:''}`
+      : `<span style="font-size:9px;color:var(--ink3);letter-spacing:.06em"> ${grupo}</span>`;
+    html+=`<tr class="grupo-bloque" data-grupo="${grupo}" style="background:var(--bg2)"><td colspan="5" class="et-grupo-hdr" style="padding:5px 16px 4px"><div style="display:flex;align-items:center;gap:8px">${grupoLabel}</div></td></tr>`;
+    // Sortable group wrapper — for table we use a tbody trick: wrap rows in tbody with class
+    html+=`</tbody><tbody class="sortable-group" data-proyecto="${proyDetalleId}" data-grupo="${grupo}">`;
+    pend.forEach(e=>{ html+=_filaTabla(e,colabs,esAdmin); });
+    html+=`</tbody><tbody>`;
     if(comp.length){
-      html+=`<div style="padding:6px 16px;font-size:9px;color:var(--ink3);cursor:pointer;display:flex;align-items:center;gap:6px;background:var(--bg)" onclick="const s=this.nextElementSibling;s.style.display=s.style.display==='none'?'block':'none'">▼ Completadas <span class="ccount">${comp.length}</span></div><div style="display:none">`;
-      comp.forEach(e=>{ html+=_filaEnt(e,colabs,esAdmin); });
-      html+=`</div>`;
+      html+=`<tr style="background:var(--bg)"><td colspan="5" style="padding:6px 16px;font-size:9px;color:var(--ink3);cursor:pointer" onclick="const s=this.closest('tr').nextElementSibling;s.style.display=s.style.display==='none'?'':'none'">▼ Completadas <span class="ccount">${comp.length}</span></td></tr>`;
+      comp.forEach(e=>{ html+=_filaTabla(e,colabs,esAdmin); });
     }
-    if(esAdmin) html+=`<button onclick="abrirNuevoEntBlanco('${grupo}')" style="display:flex;align-items:center;gap:6px;padding:8px 16px;font-size:10px;color:var(--accent);background:none;border:none;border-top:1px dashed var(--border);width:100%;cursor:pointer">+ Agregar tarea aquí</button>`;
-    html+=`</div>`;
+    if(esAdmin)html+=`<tr><td colspan="5" style="padding:0"><button onclick="abrirNuevoEntBlanco('${grupo}')" style="display:flex;align-items:center;gap:6px;padding:8px 16px;font-size:10px;color:var(--accent);background:none;border:none;border-top:1px dashed var(--border);width:100%;cursor:pointer">+ Agregar tarea aquí</button></td></tr>`;
   });
-  html+=`</div>`;
-  if(!grupos.length) html=`<div class="empty"><div class="empty-i">📋</div><div style="margin-bottom:4px">Sin tareas todavía</div></div>`;
-  if(esAdmin) html+=`<button onclick="abrirNuevoEntBlanco('')" style="display:flex;align-items:center;gap:6px;padding:12px 16px;font-size:10px;color:var(--accent);background:var(--acc-lt);border:none;border-top:1.5px dashed rgba(40,40,184,.2);width:100%;cursor:pointer">+ Nueva tarea${grupos.length?' en grupo nuevo':''}</button>`;
+  html+=`</tbody></table>`;
+  if(esAdmin)html+=`<button onclick="abrirNuevoEntBlanco('')" style="display:flex;align-items:center;gap:6px;padding:10px 16px;font-size:10px;color:var(--accent);background:var(--acc-lt);border:none;border-top:1.5px dashed rgba(40,40,184,.2);width:100%;cursor:pointer">+ Nueva tarea en grupo nuevo</button>`;
   cont.innerHTML=html;
 }
 
 async function _renderEntProductivo(cont,colabs,esAdmin){
-  const {data:ents}=await sb.from('entregables')
-    .select('*,colaboradores(nombre,apellido,color)')
-    .eq('proyecto_id',proyDetalleId)
-    .eq('eliminado',false)
-    .order('etapa_clave').order('orden_grupo').order('grupo').order('orden').order('created_at');
-  const porEtapa={};
-  const ordenGrupoProd={};
+  const {data:ents}=await sb.from('entregables').select('*,colaboradores(nombre,apellido,color)').eq('proyecto_id',proyDetalleId).eq('eliminado',false).order('etapa_clave').order('orden_grupo').order('grupo').order('orden').order('created_at');
+  const porEtapa={},ordenGrupoProd={};
   (ents||[]).forEach(e=>{
     if(!porEtapa[e.etapa_clave])porEtapa[e.etapa_clave]={};
     if(!porEtapa[e.etapa_clave][e.grupo])porEtapa[e.etapa_clave][e.grupo]=[];
     porEtapa[e.etapa_clave][e.grupo].push(e);
-    const key=e.etapa_clave+'|'+e.grupo;
-    if(!(key in ordenGrupoProd))ordenGrupoProd[key]=e.orden_grupo||0;
+    const key=e.etapa_clave+'|'+e.grupo;if(!(key in ordenGrupoProd))ordenGrupoProd[key]=e.orden_grupo||0;
   });
+  if(!Object.keys(porEtapa).length){cont.innerHTML=`<div class="empty"><div class="empty-i">📋</div><div>Sin entregables</div></div>`;return;}
   let html='';
   ETAPAS_C.forEach(et=>{
     if(!porEtapa[et.k])return;
-    html+=`<div style="padding:8px 16px;background:var(--bg2);font-size:9px;letter-spacing:.1em;text-transform:uppercase;color:var(--ink2);display:flex;align-items:center;gap:8px;position:sticky;top:0;z-index:2"><span class="ec">${et.k}</span>${et.n}</div>`;
-    const gruposEtapa=Object.keys(porEtapa[et.k]).sort((a,b)=>(ordenGrupoProd[et.k+'|'+a]||0)-(ordenGrupoProd[et.k+'|'+b]||0));
-    html+=`<div class="sortable-grupos" data-etapa="${et.k}">`;
-    gruposEtapa.forEach(grupo=>{
-      const es=porEtapa[et.k][grupo];
-      const pend=es.filter(e=>!e.done);
-      const comp=es.filter(e=>e.done);
-      html+=`<div class="grupo-bloque" data-grupo="${grupo}" data-etapa="${et.k}">`;
-      html+=`<div class="grupo-hdr" style="display:flex;align-items:center;padding:5px 16px 3px;border-bottom:1px dashed var(--border)">`;
-      if(esAdmin) html+=`<div class="grupo-drag" style="font-size:12px;color:var(--ink3);cursor:grab;padding:2px 6px 2px 0;user-select:none">⠿</div>`;
-      html+=`<span class="grupo-nombre" data-grupo="${grupo}" data-etapa="${et.k}" style="flex:1;font-size:9px;color:var(--ink3);letter-spacing:.05em;cursor:${esAdmin?'pointer':'default'}">${grupo}</span>`;
-      html+=`</div>`;
-      html+=`<div class="sortable-group" data-proyecto="${proyDetalleId}" data-etapa="${et.k}" data-grupo="${grupo}">`;
-      pend.forEach(e=>{ html+=`<div data-id="${e.id}">`+_filaEnt(e,colabs,esAdmin)+'</div>'; });
-      html+=`</div>`;
+    const grupos=Object.keys(porEtapa[et.k]).sort((a,b)=>(ordenGrupoProd[et.k+'|'+a]||0)-(ordenGrupoProd[et.k+'|'+b]||0));
+    // Etapa section header
+    html+=`<div class="et-section-hdr"><span class="ec">${et.k}</span><span style="font-size:11px;color:var(--ink2)">${et.n}</span></div>`;
+    html+=`<table class="ent-table"><colgroup><col class="col-nombre"><col class="col-resp"><col class="col-fecha"><col class="col-fecha"><col class="col-acc"></colgroup>${_tablaHeader()}<tbody>`;
+    grupos.forEach(grupo=>{
+      const es=porEtapa[et.k][grupo];const pend=es.filter(e=>!e.done),comp=es.filter(e=>e.done);
+      html+=`</tbody><tbody><tr style="background:var(--bg2)"><td colspan="5" class="et-grupo-hdr"><span style="font-size:9px;color:var(--ink3);letter-spacing:.06em"> ${grupo}</span></td></tr></tbody>`;
+      html+=`<tbody class="sortable-group" data-proyecto="${proyDetalleId}" data-etapa="${et.k}" data-grupo="${grupo}">`;
+      pend.forEach(e=>{ html+=_filaTabla(e,colabs,esAdmin); });
+      html+=`</tbody><tbody>`;
       if(comp.length){
-        html+=`<div style="padding:6px 16px;font-size:9px;color:var(--ink3);cursor:pointer;display:flex;align-items:center;gap:6px;background:var(--bg)" onclick="const s=this.nextElementSibling;s.style.display=s.style.display==='none'?'block':'none'">▼ Completadas <span>${comp.length}</span></div><div style="display:none">`;
-        comp.forEach(e=>{ html+=_filaEnt(e,colabs,esAdmin); });
-        html+=`</div>`;
+        html+=`<tr style="background:var(--bg)"><td colspan="5" style="padding:6px 16px;font-size:9px;color:var(--ink3);cursor:pointer" onclick="const s=this.closest('tr').nextElementSibling;s.style.display=s.style.display===''?'none':''">▼ Completadas <span class="ccount">${comp.length}</span></td></tr>`;
+        comp.forEach(e=>{ html+=_filaTabla(e,colabs,esAdmin); });
       }
-      if(esAdmin) html+=`<button onclick="abrirNuevoEntDetalle('${et.k}','${grupo}')" style="display:flex;align-items:center;gap:6px;padding:8px 16px;font-size:10px;color:var(--accent);background:none;border:none;border-top:1px dashed var(--border);width:100%;cursor:pointer">+ Agregar entregable</button>`;
-      html+=`</div>`;
     });
-    html+=`</div>`;
-    if(esAdmin) html+=`<button onclick="abrirNuevoEntDetalle('${et.k}','')" style="display:flex;align-items:center;gap:6px;padding:8px 16px;font-size:10px;color:var(--ink3);background:var(--bg);border:none;border-top:1px dashed var(--border);width:100%;cursor:pointer">+ Agregar en grupo nuevo</button>`;
+    if(esAdmin)html+=`<tr><td colspan="5" style="padding:0"><button onclick="abrirNuevoEntDetalle('${et.k}','')" style="display:flex;align-items:center;gap:6px;padding:8px 16px;font-size:10px;color:var(--accent);background:none;border:none;border-top:1px dashed var(--border);width:100%;cursor:pointer">+ Agregar entregable</button></td></tr>`;
+    html+=`</tbody></table>`;
   });
-  if(esAdmin){
-    const {data:proy}=await sb.from('proyectos').select('etapas_activas').eq('id',proyDetalleId).single();
-    (proy?.etapas_activas||[]).forEach(k=>{
-      if(porEtapa[k])return;
-      const et=ETAPAS_C.find(x=>x.k===k);
-      html+=`<div style="padding:8px 16px;background:var(--bg2);font-size:9px;letter-spacing:.1em;text-transform:uppercase;color:var(--ink2);display:flex;align-items:center;gap:8px"><span class="ec">${k}</span>${et?.n||k}</div><button onclick="abrirNuevoEntDetalle('${k}','')" style="display:flex;align-items:center;gap:6px;padding:10px 16px;font-size:10px;color:var(--accent);background:#fff;border:none;border-top:1px dashed var(--border);width:100%;cursor:pointer">+ Agregar entregable</button>`;
-    });
-  }
-  if(!html) html=`<div class="empty"><div class="empty-i">📋</div><div>Sin entregables</div></div>`;
   cont.innerHTML=html;
 }
 
 
+// ── SORTABLES ──
 function initSortables(){
-  const esAdmin=PERFIL?.rol==='admin';
-  if(!esAdmin)return;
-
-  // 1. Sortable de ENTREGABLES dentro de cada grupo (con soporte de mover entre grupos)
   document.querySelectorAll('.sortable-group').forEach(el=>{
     Sortable.create(el,{
-      group:'entregables', // mismo grupo = pueden moverse entre listas
-      animation:150,
-      handle:'.drag-handle',
-      ghostClass:'sortable-ghost',
-      onEnd: async function(evt){
-        const nuevoGrupo=evt.to.dataset.grupo;
-        const entId=evt.item.dataset.id;
-        // Si cambió de grupo, actualizar el campo grupo
-        if(evt.from!==evt.to&&nuevoGrupo){
-          await sb.from('entregables').update({grupo:nuevoGrupo}).eq('id',entId);
-        }
-        // Actualizar orden de todos los items en el grupo destino
-        const items=[...evt.to.children];
-        for(let i=0;i<items.length;i++){
-          if(items[i].dataset.id) await sb.from('entregables').update({orden:i}).eq('id',items[i].dataset.id);
-        }
+      animation:150,ghostClass:'sortable-ghost',handle:'.drag-handle',
+      onEnd:async evt=>{
+        const items=Array.from(evt.to.children);const ids=items.map(i=>i.dataset.id).filter(Boolean);
+        for(let i=0;i<ids.length;i++){await sb.from('entregables').update({orden:i}).eq('id',ids[i]);}
       }
     });
   });
-
-  // 2. Sortable de GRUPOS dentro de cada etapa (productivo) o global (blanco)
-  document.querySelectorAll('.sortable-grupos, #sortable-grupos-blank').forEach(el=>{
-    Sortable.create(el,{
-      animation:150,
-      handle:'.grupo-drag',
-      ghostClass:'sortable-ghost',
-      onEnd: async function(evt){
-        const bloques=[...evt.to.children].filter(el=>el.classList.contains('grupo-bloque'));
-        // Guardar nuevo orden_grupo en todos los entregables de cada grupo
+  const sbGrupo=document.getElementById('sortable-grupos-blank');
+  if(sbGrupo&&PERFIL?.rol==='admin'){
+    Sortable.create(sbGrupo,{
+      animation:150,ghostClass:'sortable-ghost',handle:'.grupo-drag',
+      onEnd:async evt=>{
+        const bloques=Array.from(sbGrupo.children);
         for(let i=0;i<bloques.length;i++){
-          const grupo=bloques[i].dataset.grupo;
-          const etapa=bloques[i].dataset.etapa||'_';
-          let q=sb.from('entregables').update({orden_grupo:i}).eq('proyecto_id',proyDetalleId).eq('grupo',grupo);
-          if(etapa!=='_') q=q.eq('etapa_clave',etapa);
-          await q;
+          const g=bloques[i].dataset.grupo;
+          if(g)await sb.from('entregables').update({orden_grupo:i}).eq('proyecto_id',proyDetalleId).eq('grupo',g);
         }
       }
     });
-  });
-
-  // 3. Edición inline de nombre de GRUPO
+  }
   document.querySelectorAll('.grupo-nombre').forEach(span=>{
-    if(!esAdmin)return;
+    if(PERFIL?.rol!=='admin')return;
     span.addEventListener('click',()=>{
       const grupoActual=span.dataset.grupo;
-      const etapa=span.dataset.etapa||null;
-      const input=document.createElement('input');
-      input.value=grupoActual;
-      input.style.cssText='flex:1;font-size:9px;padding:1px 6px;border:1.5px solid var(--accent);border-radius:5px;outline:none;letter-spacing:.05em;';
-      span.replaceWith(input);
-      input.focus();input.select();
+      const input=document.createElement('input');input.value=grupoActual;
+      input.style.cssText='font-size:9px;padding:2px 6px;border:1.5px solid var(--accent);border-radius:4px;outline:none;flex:1;letter-spacing:.05em;';
+      span.replaceWith(input);input.focus();input.select();
       const guardar=async()=>{
         const nuevo=input.value.trim();
-        if(nuevo&&nuevo!==grupoActual){
-          let q=sb.from('entregables').update({grupo:nuevo}).eq('proyecto_id',proyDetalleId).eq('grupo',grupoActual);
-          if(etapa) q=q.eq('etapa_clave',etapa);
-          await q;
-          toast('✓ Grupo renombrado');
-        }
+        if(nuevo&&nuevo!==grupoActual){await sb.from('entregables').update({grupo:nuevo}).eq('proyecto_id',proyDetalleId).eq('grupo',grupoActual);}
         await renderDetProyBody();
       };
       input.addEventListener('blur',guardar);
@@ -1376,151 +1622,59 @@ function initSortables(){
   });
 }
 
-
-// Agregar tarea en proyecto en blanco
-let nuevoEntEtapa=null, nuevoEntGrupo=null;
+// ── NUEVO ENTREGABLE ──
+let nuevoEntEtapa=null,nuevoEntGrupo=null;
 function abrirNuevoEntBlanco(grupo){
   nuevoEntEtapa='_';nuevoEntGrupo=grupo;
-  document.getElementById('ned-etapa').textContent=grupo?`Grupo: ${grupo}`:'Nueva tarea';
-  document.getElementById('ned-nom').value='';
-  document.getElementById('ned-grupo').value=grupo;
-  document.getElementById('ned-grupo-wrap').style.display='block';
+  document.getElementById('ned-etapa').textContent=grupo?`en grupo: ${grupo}`:'(nuevo grupo)';
+  document.getElementById('ned-nom').value='';document.getElementById('ned-grupo').value=grupo||'';
+  document.getElementById('ned-grupo-wrap').style.display=grupo?'none':'block';
   document.getElementById('ov-ned').classList.add('on');
 }
-
-function abrirNuevoEntDetalle(etapaClave, grupo){
+function abrirNuevoEntDetalle(etapaClave,grupo){
   nuevoEntEtapa=etapaClave;nuevoEntGrupo=grupo;
-  document.getElementById('ned-etapa').textContent=`${etapaClave} · ${ETAPAS_C.find(x=>x.k===etapaClave)?.n||etapaClave}`;
-  document.getElementById('ned-nom').value='';
-  document.getElementById('ned-grupo').value=grupo;
-  document.getElementById('ned-grupo-wrap').style.display=grupo?'none':'block';
+  const et=ETAPAS_C.find(x=>x.k===etapaClave);
+  document.getElementById('ned-etapa').textContent=`${etapaClave} · ${et?.n||''}`;
+  document.getElementById('ned-nom').value='';document.getElementById('ned-grupo').value=grupo||'';
+  document.getElementById('ned-grupo-wrap').style.display='block';
   document.getElementById('ov-ned').classList.add('on');
 }
 async function guardarNuevoEntDetalle(){
   const nombre=document.getElementById('ned-nom').value.trim();
-  const grupo=document.getElementById('ned-grupo').value.trim()||'General';
-  if(!nombre){toast('Escribe el nombre');return;}
+  if(!nombre){toast('Escribe el nombre del entregable');return;}
+  const grupo=document.getElementById('ned-grupo').value.trim()||nuevoEntGrupo||'General';
   const btn=document.getElementById('ned-save');btn.disabled=true;btn.textContent='Guardando...';
-  const etapaClave=(nuevoEntEtapa===null||nuevoEntEtapa==='_')?'_':nuevoEntEtapa;
-  await sb.from('entregables').insert({proyecto_id:proyDetalleId,etapa_clave:etapaClave,grupo,nombre,done:false,eliminado:false});
+  const {data:last}=await sb.from('entregables').select('orden').eq('proyecto_id',proyDetalleId).eq('etapa_clave',nuevoEntEtapa).eq('grupo',grupo).order('orden',{ascending:false}).limit(1).maybeSingle();
+  const orden=(last?.orden||0)+1;
+  await sb.from('entregables').insert({proyecto_id:proyDetalleId,etapa_clave:nuevoEntEtapa,grupo,nombre,done:false,eliminado:false,orden});
   btn.disabled=false;btn.textContent='Agregar';
-  closeOv('ov-ned');
-  await renderDetProyBody();
-  toast('✓ Tarea agregada');
+  closeOv('ov-ned');await renderDetProyBody();toast('✓ Entregable agregado');
 }
 
-// Editar nombre de entregable
 let editEntId=null;
-function abrirEditarEntregable(entId, nombreActual){
-  editEntId=entId;
-  document.getElementById('eed-nom').value=nombreActual;
-  document.getElementById('ov-eed').classList.add('on');
-}
+function abrirEditarEntregable(entId,nombreActual){editEntId=entId;document.getElementById('eed-nom').value=nombreActual;document.getElementById('ov-eed').classList.add('on');}
 async function guardarEditarEntregable(){
-  const nombre=document.getElementById('eed-nom').value.trim();
-  if(!nombre){toast('El nombre no puede estar vacío');return;}
+  const nombre=document.getElementById('eed-nom').value.trim();if(!nombre){toast('El nombre no puede estar vacío');return;}
   const btn=document.getElementById('eed-save');btn.disabled=true;btn.textContent='Guardando...';
   await sb.from('entregables').update({nombre}).eq('id',editEntId);
-  btn.disabled=false;btn.textContent='Guardar';
-  closeOv('ov-eed');
-  await renderDetProyBody();
-  toast('✓ Entregable actualizado');
+  btn.disabled=false;btn.textContent='Guardar';closeOv('ov-eed');await renderDetProyBody();toast('✓ Entregable actualizado');
 }
 
-// Eliminar entregable desde detalle
+eliminarEntregableDetalle._pending={};
 async function eliminarEntregableDetalle(entId){
-  const row=document.querySelector(`[data-ent-id="${entId}"]`);
-  // doble tap para confirmar
-  if(!eliminarEntregableDetalle._pending) eliminarEntregableDetalle._pending={};
   if(eliminarEntregableDetalle._pending[entId]){
     clearTimeout(eliminarEntregableDetalle._pending[entId]);
     delete eliminarEntregableDetalle._pending[entId];
     await sb.from('entregables').update({eliminado:true}).eq('id',entId);
-    await renderDetProyBody();
-    toast('Entregable eliminado');
+    await renderDetProyBody();toast('Entregable eliminado');
   } else {
-    eliminarEntregableDetalle._pending[entId]=setTimeout(()=>{
-      delete eliminarEntregableDetalle._pending[entId];
-    },3000);
+    eliminarEntregableDetalle._pending[entId]=setTimeout(()=>{delete eliminarEntregableDetalle._pending[entId];},3000);
     toast('Toca × de nuevo para confirmar');
   }
 }
 
-function dpSiguienteFecha(desde, frec, dias){
-  const d=new Date(desde);
-  if(frec==='daily'){d.setDate(d.getDate()+1);return d;}
-  if(frec==='weekly'){
-    const diasArr=[...dias].sort();
-    if(!diasArr.length)return null;
-    // Buscar el siguiente día de la semana seleccionado
-    for(let i=1;i<=7;i++){
-      const nd=new Date(d);nd.setDate(nd.getDate()+i);
-      if(diasArr.includes(nd.getDay()))return nd;
-    }
-    return null;
-  }
-  if(frec==='monthly'){d.setMonth(d.getMonth()+1);return d;}
-  if(frec==='yearly'){d.setFullYear(d.getFullYear()+1);return d;}
-  return null;
-}
-async function toggleDoneDetalle(entId, cur){
-  const done=cur===true||cur==='true'?false:true;
-  await sb.from('entregables').update({done}).eq('id',entId);
-
-  // Si se marca como completada y es recurrente, crear la siguiente ocurrencia
-  if(done){
-    const {data:e}=await sb.from('entregables').select('*').eq('id',entId).single();
-    if(e?.recurrente&&e?.frecuencia){
-      const baseDate=e.fecha_unica?new Date(e.fecha_unica+'T12:00:00'):new Date();
-      const dias=new Set(e.dias_semana||[]);
-      const siguiente=dpSiguienteFecha(baseDate, e.frecuencia, dias);
-      if(siguiente){
-        const sigStr=fechaAStr(siguiente);
-        // Verificar que no exista ya una tarea igual pendiente
-        const {data:exist}=await sb.from('entregables')
-          .select('id').eq('proyecto_id',e.proyecto_id)
-          .eq('nombre',e.nombre).eq('fecha_unica',sigStr).eq('done',false).maybeSingle();
-        if(!exist){
-          await sb.from('entregables').insert({
-            proyecto_id:e.proyecto_id,
-            etapa_clave:e.etapa_clave,
-            grupo:e.grupo,
-            nombre:e.nombre,
-            done:false,
-            eliminado:false,
-            recurrente:true,
-            frecuencia:e.frecuencia,
-            dias_semana:e.dias_semana,
-            fecha_unica:sigStr,
-            asignado_id:e.asignado_id,
-            orden:e.orden
-          });
-          toast(`✓ Completado · Próxima: ${fF(sigStr)}`);
-        } else {
-          toast('✓ Completado');
-        }
-      } else {
-        toast('✓ Completado');
-      }
-    } else {
-      toast('✓ Completado');
-    }
-  } else {
-    toast('Desmarcado');
-  }
-  await renderDetProyBody();
-}
-
-async function asignarDetalle(entId, colabId){
-  await sb.from('entregables').update({asignado_id:colabId||null}).eq('id',entId);
-  toast('✓ Responsable actualizado');
-}
-
-// Date picker para detalle proyecto
-let dpDetalleEntId=null;
-// ── DATE PICKER CON RECURRENCIA ──
-let dpMode='unica', dpDiasSel=new Set();
-
+// ── DATE PICKER DETALLE ──
+let dpDetalleEntId=null,dpMode='unica',dpDiasSel=new Set();
 function dpSetMode(mode){
   dpMode=mode;
   document.getElementById('dpd-sec-unica').style.display=mode==='unica'?'block':'none';
@@ -1530,91 +1684,52 @@ function dpSetMode(mode){
   document.getElementById('dpd-tab-rango').style.background=mode==='rango'?'var(--accent)':'none';
   document.getElementById('dpd-tab-rango').style.color=mode==='rango'?'#fff':'var(--ink2)';
 }
-
-function dpFrecChange(){
-  const frec=document.getElementById('dpd-frecuencia').value;
-  document.getElementById('dpd-dias-semana').style.display=frec==='weekly'?'block':'none';
-  dpUpdatePreview();
-}
-
+function dpFrecChange(){const frec=document.getElementById('dpd-frecuencia').value;document.getElementById('dpd-dias-semana').style.display=frec==='weekly'?'block':'none';dpUpdatePreview();}
 function dpToggleDia(i){
   const btn=document.getElementById('dpd-dia-'+i);
   if(dpDiasSel.has(i)){dpDiasSel.delete(i);btn.style.background='#fff';btn.style.color='var(--ink2)';}
   else{dpDiasSel.add(i);btn.style.background='var(--accent)';btn.style.color='#fff';}
   dpUpdatePreview();
 }
-
 function dpUpdatePreview(){
-  const frec=document.getElementById('dpd-frecuencia').value;
-  const fecha=document.getElementById('dpd-unica').value;
-  const prev=document.getElementById('dpd-preview');
+  const frec=document.getElementById('dpd-frecuencia').value,fecha=document.getElementById('dpd-unica').value,prev=document.getElementById('dpd-preview');
   if(!frec||!fecha){prev.style.display='none';return;}
   const meses=['ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic'];
-  const siguientes=[];
-  let d=new Date(fecha+'T12:00:00');
-  for(let i=0;i<4;i++){
-    d=dpSiguienteFecha(d,frec,dpDiasSel);
-    if(!d)break;
-    siguientes.push(`${d.getDate()} ${meses[d.getMonth()]}`);
-  }
-  if(siguientes.length){
-    prev.style.display='block';
-    prev.textContent='Próximas: '+siguientes.join(', ')+'...';
-  }
+  const siguientes=[];let d=new Date(fecha+'T12:00:00');
+  for(let i=0;i<4;i++){d=dpSiguienteFecha(d,frec,dpDiasSel);if(!d)break;siguientes.push(`${d.getDate()} ${meses[d.getMonth()]}`);}
+  if(siguientes.length){prev.style.display='block';prev.textContent='Próximas: '+siguientes.join(', ')+'...';}
 }
-
-
-
+function dpSiguienteFecha(desde,frec,dias){
+  const d=new Date(desde);
+  if(frec==='daily'){d.setDate(d.getDate()+1);return d;}
+  if(frec==='weekly'){const diasArr=[...dias].sort();if(!diasArr.length)return null;for(let i=1;i<=7;i++){const nd=new Date(d);nd.setDate(nd.getDate()+i);if(diasArr.includes(nd.getDay()))return nd;}return null;}
+  if(frec==='monthly'){d.setMonth(d.getMonth()+1);return d;}
+  if(frec==='yearly'){d.setFullYear(d.getFullYear()+1);return d;}
+  return null;
+}
 function dpLimpiar(){
-  document.getElementById('dpd-unica').value='';
-  document.getElementById('dpd-inicio').value='';
-  document.getElementById('dpd-fin').value='';
-  document.getElementById('dpd-frecuencia').value='';
-  dpDiasSel=new Set();
-  [0,1,2,3,4,5,6].forEach(i=>{
-    const btn=document.getElementById('dpd-dia-'+i);
-    if(btn){btn.style.background='#fff';btn.style.color='var(--ink2)';}
-  });
-  document.getElementById('dpd-dias-semana').style.display='none';
-  document.getElementById('dpd-preview').style.display='none';
+  document.getElementById('dpd-unica').value='';document.getElementById('dpd-inicio').value='';document.getElementById('dpd-fin').value='';
+  document.getElementById('dpd-frecuencia').value='';dpDiasSel=new Set();
+  [0,1,2,3,4,5,6].forEach(i=>{const btn=document.getElementById('dpd-dia-'+i);if(btn){btn.style.background='#fff';btn.style.color='var(--ink2)';}});
+  document.getElementById('dpd-dias-semana').style.display='none';document.getElementById('dpd-preview').style.display='none';
 }
-
-async function abrirDPDetalle(entId, inicio, fin){
+async function abrirDPDetalle(entId,inicio,fin){
   dpDetalleEntId=entId;
-  // Cargar datos actuales del entregable
   const {data:e}=await sb.from('entregables').select('fecha_unica,fecha_inicio,fecha_fin,recurrente,frecuencia,dias_semana').eq('id',entId).single();
-  dpDiasSel=new Set(e?.dias_semana||[]);
-  // Resetear UI
-  dpLimpiar();
-  // Determinar modo
+  dpDiasSel=new Set(e?.dias_semana||[]);dpLimpiar();
   if(e?.fecha_unica||e?.recurrente){
-    dpSetMode('unica');
-    document.getElementById('dpd-unica').value=e.fecha_unica||'';
-    if(e.frecuencia){
-      document.getElementById('dpd-frecuencia').value=e.frecuencia;
-      dpFrecChange();
-    }
-    if(e.dias_semana?.length){
-      dpDiasSel=new Set(e.dias_semana);
-      e.dias_semana.forEach(i=>{
-        const btn=document.getElementById('dpd-dia-'+i);
-        if(btn){btn.style.background='var(--accent)';btn.style.color='#fff';}
-      });
-    }
+    dpSetMode('unica');document.getElementById('dpd-unica').value=e.fecha_unica||'';
+    if(e.frecuencia){document.getElementById('dpd-frecuencia').value=e.frecuencia;dpFrecChange();}
+    if(e.dias_semana?.length){dpDiasSel=new Set(e.dias_semana);e.dias_semana.forEach(i=>{const btn=document.getElementById('dpd-dia-'+i);if(btn){btn.style.background='var(--accent)';btn.style.color='#fff';}});}
     dpUpdatePreview();
   } else {
-    dpSetMode('rango');
-    document.getElementById('dpd-inicio').value=e?.fecha_inicio||inicio||'';
-    document.getElementById('dpd-fin').value=e?.fecha_fin||fin||'';
+    dpSetMode('rango');document.getElementById('dpd-inicio').value=e?.fecha_inicio||inicio||'';document.getElementById('dpd-fin').value=e?.fecha_fin||fin||'';
   }
   document.getElementById('ov-dpd').classList.add('on');
 }
-
 async function guardarFechasDetalle(){
-  const btn=document.querySelector('#ov-dpd .bsave')||document.querySelector('#ov-dpd button[onclick="guardarFechasDetalle()"]');
   if(dpMode==='rango'){
-    const ini=document.getElementById('dpd-inicio').value;
-    const fin=document.getElementById('dpd-fin').value;
+    const ini=document.getElementById('dpd-inicio').value,fin=document.getElementById('dpd-fin').value;
     if(ini&&fin&&fin<ini){toast('La entrega debe ser después del inicio');return;}
     await sb.from('entregables').update({fecha_inicio:ini||null,fecha_fin:fin||null,fecha_unica:null,recurrente:false,frecuencia:null,dias_semana:null}).eq('id',dpDetalleEntId);
   } else {
@@ -1623,103 +1738,105 @@ async function guardarFechasDetalle(){
     const dias=frec==='weekly'&&dpDiasSel.size?[...dpDiasSel]:null;
     await sb.from('entregables').update({fecha_unica:fecha,fecha_inicio:null,fecha_fin:null,recurrente:!!frec,frecuencia:frec,dias_semana:dias}).eq('id',dpDetalleEntId);
   }
-  document.getElementById('ov-dpd').classList.remove('on');
+  document.getElementById('ov-dpd').classList.remove('on');await renderDetProyBody();toast('✓ Fechas guardadas');
+}
+async function asignarDetalle(entId,colabId){await sb.from('entregables').update({asignado_id:colabId||null}).eq('id',entId);toast('✓ Responsable actualizado');}
+async function toggleDoneDetalle(entId,cur){
+  const done=cur===true||cur==='true'?false:true;
+  await sb.from('entregables').update({done}).eq('id',entId);
+  if(done){
+    const {data:e}=await sb.from('entregables').select('*').eq('id',entId).single();
+    if(e?.recurrente&&e?.frecuencia){
+      const baseDate=e.fecha_unica?new Date(e.fecha_unica+'T12:00:00'):new Date();
+      const dias=new Set(e.dias_semana||[]);const siguiente=dpSiguienteFecha(baseDate,e.frecuencia,dias);
+      if(siguiente){
+        const sigStr=fechaAStr(siguiente);
+        const {data:exist}=await sb.from('entregables').select('id').eq('proyecto_id',e.proyecto_id).eq('nombre',e.nombre).eq('fecha_unica',sigStr).eq('done',false).maybeSingle();
+        if(!exist){await sb.from('entregables').insert({proyecto_id:e.proyecto_id,etapa_clave:e.etapa_clave,grupo:e.grupo,nombre:e.nombre,done:false,eliminado:false,recurrente:true,frecuencia:e.frecuencia,dias_semana:e.dias_semana,fecha_unica:sigStr,asignado_id:e.asignado_id,orden:e.orden});toast(`✓ Completado · Próxima: ${fF(sigStr)}`);}
+        else toast('✓ Completado');
+      } else toast('✓ Completado');
+    } else toast('✓ Completado');
+  } else toast('Desmarcado');
   await renderDetProyBody();
-  toast('✓ Fechas guardadas');
 }
 
+// ── SEMANA ──
 async function renderSemana(){
-  const cont=document.getElementById('pane-semana');
-  cont.innerHTML=`<div style="padding:16px"><div class="ldg">Cargando...</div></div>`;
-  const dias=semana();
-  // Traer últimos 7 días para el historial (5 días hábiles aprox)
-  const ultimos5=[];
-  for(let i=0;i<7&&ultimos5.length<5;i++){
-    const d=new Date();d.setDate(d.getDate()-i);
-    const ds=fechaAStr(d);
-    ultimos5.push(ds);
-  }
+  const cont=document.getElementById('pane-semana');cont.innerHTML=`<div class="ldg">Cargando...</div>`;
+  const dias=semana();const ultimos5=[];
+  for(let i=0;i<7&&ultimos5.length<5;i++){const d=new Date();d.setDate(d.getDate()-i);ultimos5.push(fechaAStr(d));}
   const todasFechas=[...new Set([...dias,...ultimos5])];
-  const {data:rs}=await sb.from('registros_horas')
-    .select('id,horas,fecha,nota,proyecto_id,entregable_id,proyectos(codigo,nombre),entregables(nombre)')
-    .eq('colaborador_id',USER.id)
-    .in('fecha',todasFechas)
-    .order('fecha',{ascending:false});
-
+  const {data:rs}=await sb.from('registros_horas').select('id,horas,fecha,nota,proyecto_id,entregable_id,proyectos(codigo,nombre),entregables(nombre)').eq('colaborador_id',USER.id).in('fecha',todasFechas).order('fecha',{ascending:false});
   const rsSemana=(rs||[]).filter(r=>dias.includes(r.fecha));
   const tot=rsSemana.reduce((s,r)=>s+r.horas,0);
-  const pp={};
-  rsSemana.forEach(r=>{const pid=r.proyecto_id;if(!pp[pid])pp[pid]={n:r.proyectos?.nombre||pid,c:r.proyectos?.codigo||'',h:0};pp[pid].h+=r.horas;});
+  const pp={};rsSemana.forEach(r=>{const pid=r.proyecto_id;if(!pp[pid])pp[pid]={n:r.proyectos?.nombre||pid,c:r.proyectos?.codigo||'',h:0};pp[pid].h+=r.horas;});
 
-  let html='<div style="padding:16px">';
+  const porFecha={};(rs||[]).forEach(r=>{if(!porFecha[r.fecha])porFecha[r.fecha]=[];porFecha[r.fecha].push(r);});
 
-  // Contador semanal
-  html+=`<div class="card" style="padding:14px;margin-bottom:14px">
-    <div style="font-family:'Fraunces',serif;font-size:40px;font-weight:300;color:var(--ink);line-height:1">${hT(tot)}</div>
+  // Left: resumen semanal
+  let leftHtml=`<div class="sec">Resumen semanal</div>
+  <div class="card" style="padding:16px;margin-bottom:14px">
+    <div style="font-family:'Fraunces',serif;font-size:44px;font-weight:300;color:var(--ink);line-height:1">${hT(tot)}</div>
     <div style="font-size:9px;letter-spacing:.1em;text-transform:uppercase;color:var(--ink3);margin-top:4px">Esta semana</div>
     <div style="margin-top:10px;height:6px;background:var(--bg2);border-radius:3px;overflow:hidden"><div style="height:100%;width:${Math.min(100,Math.round(tot/40*100))}%;background:${tot>=40?'var(--green)':tot>=32?'var(--amber)':'var(--accent)'};border-radius:3px"></div></div>
     <div style="font-size:10px;color:var(--ink3);margin-top:4px">${tot>=40?'✓ Meta semanal alcanzada':'Faltan '+hT(Math.max(0,40-tot))+' para 40h'}</div>
-  </div>`;
+  </div>
+  <div class="sec">Por proyecto</div>`;
+  Object.entries(pp).sort((a,b)=>b[1].h-a[1].h).forEach(([pid,pd])=>{
+    const pct=Math.round(pd.h/Math.max(tot,1)*100);
+    leftHtml+=`<div class="card" style="padding:10px 14px;margin-bottom:8px;display:flex;align-items:center;gap:10px">
+      <span class="cod">${pd.c}</span>
+      <div style="flex:1;min-width:0"><div style="font-size:11px;color:var(--ink)">${pd.n}</div>
+      <div style="height:3px;background:var(--bg2);border-radius:2px;overflow:hidden;margin-top:4px"><div style="height:100%;width:${pct}%;background:var(--accent);border-radius:2px"></div></div></div>
+      <span style="font-size:12px;font-weight:500;color:var(--accent)">${hT(pd.h)}</span>
+    </div>`;
+  });
 
-  // Historial últimos 5 días
-  html+=`<div class="sec">Historial reciente</div>`;
-  const porFecha={};
-  (rs||[]).forEach(r=>{if(!porFecha[r.fecha])porFecha[r.fecha]=[];porFecha[r.fecha].push(r);});
+  // Right: historial
   const diasConReg=ultimos5.filter(d=>porFecha[d]?.length);
-
+  let rightHtml=`<div class="sec">Historial reciente</div>`;
   if(!diasConReg.length){
-    html+=`<div style="font-size:11px;color:var(--ink3);text-align:center;padding:20px">Sin registros recientes</div>`;
+    rightHtml+=`<div style="font-size:11px;color:var(--ink3);text-align:center;padding:20px">Sin registros recientes</div>`;
   } else {
-    const diasSemana=['Dom','Lun','Mar','Mié','Jue','Vie','Sáb'];
-    const meses=['ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic'];
+    const diasSemana=['Dom','Lun','Mar','Mié','Jue','Vie','Sáb'],meses=['ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic'];
     diasConReg.forEach(fecha=>{
-      const d=new Date(fecha+'T12:00:00');
-      const label=`${diasSemana[d.getDay()]} ${d.getDate()} ${meses[d.getMonth()]}`;
-      const regs=porFecha[fecha];
-      const totDia=regs.reduce((s,r)=>s+r.horas,0);
-      html+=`<div style="margin-bottom:10px">
+      const d=new Date(fecha+'T12:00:00'),label=`${diasSemana[d.getDay()]} ${d.getDate()} ${meses[d.getMonth()]}`;
+      const regs=porFecha[fecha],totDia=regs.reduce((s,r)=>s+r.horas,0);
+      rightHtml+=`<div style="margin-bottom:12px">
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
           <span style="font-size:10px;font-weight:600;color:var(--ink2);text-transform:uppercase;letter-spacing:.05em">${label}</span>
           <span style="font-size:10px;color:var(--ink3)">${hT(totDia)}</span>
         </div>`;
       regs.forEach(r=>{
-        const entNom=r.entregables?.nombre||'Sin entregable';
-        const pCod=r.proyectos?.codigo||'';
-        html+=`<div class="card reg-row" style="padding:10px 14px;margin-bottom:6px;display:flex;align-items:center;gap:10px;cursor:pointer"
+        const entNom=r.entregables?.nombre||'Sin entregable',pCod=r.proyectos?.codigo||'';
+        rightHtml+=`<div class="card reg-row" style="padding:10px 14px;margin-bottom:6px;display:flex;align-items:center;gap:10px;cursor:pointer"
           data-rid="${r.id}" data-horas="${r.horas}" data-nota="${encodeURIComponent(r.nota||'')}"
-          data-ent="${encodeURIComponent(entNom)}" data-cod="${pCod}">`;
-        html+=`<div style="flex:1;min-width:0">`;
-        html+=`<div style="font-size:11px;color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${entNom}</div>`;
-        html+=`<div style="font-size:9px;color:var(--ink3);margin-top:2px">${pCod}${r.nota?' · '+r.nota:''}</div>`;
-        html+=`</div>`;
-        html+=`<span style="font-size:13px;font-weight:500;color:var(--accent);white-space:nowrap;flex-shrink:0">${hT(r.horas)}</span>`;
-        html+=`<span style="font-size:10px;color:var(--ink3);flex-shrink:0">✏</span>`;
-        html+=`</div>`;
+          data-ent="${encodeURIComponent(entNom)}" data-cod="${pCod}">
+          <div style="flex:1;min-width:0">
+            <div style="font-size:11px;color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${entNom}</div>
+            <div style="font-size:9px;color:var(--ink3);margin-top:2px">${pCod}${r.nota?' · '+r.nota:''}</div>
+          </div>
+          <span style="font-size:13px;font-weight:500;color:var(--accent);white-space:nowrap;flex-shrink:0">${hT(r.horas)}</span>
+          <span style="font-size:10px;color:var(--ink3);flex-shrink:0">✏</span>
+        </div>`;
       });
-      html+=`</div>`;
+      rightHtml+=`</div>`;
     });
   }
 
-  cont.innerHTML=html+'</div>';
-  // Delegación de eventos para filas de registros
+  cont.innerHTML=`<div class="semana-layout">
+    <div class="semana-left">${leftHtml}</div>
+    <div class="semana-right">${rightHtml}</div>
+  </div>`;
   cont.querySelectorAll('.reg-row').forEach(el=>{
-    el.addEventListener('click',()=>{
-      abrirEditReg(
-        el.dataset.rid,
-        parseFloat(el.dataset.horas),
-        el.dataset.nota,
-        decodeURIComponent(el.dataset.ent),
-        el.dataset.cod
-      );
-    });
+    el.addEventListener('click',()=>{abrirEditReg(el.dataset.rid,parseFloat(el.dataset.horas),el.dataset.nota,decodeURIComponent(el.dataset.ent),el.dataset.cod);});
   });
 }
 
-// ── EDITAR REGISTRO DESDE MI SEMANA ──
+// ── EDITAR REGISTRO ──
 let editRegId=null,editRegH=0;
 function abrirEditReg(id,horas,notaEnc,entNombre,proyCode){
-  editRegId=id;
-  editRegH=horas;
+  editRegId=id;editRegH=horas;
   document.getElementById('er-confirm').style.display='none';
   document.getElementById('er-ent').textContent=entNombre+(proyCode?' · '+proyCode:'');
   document.getElementById('er-horas').textContent=hT(horas);
@@ -1730,25 +1847,21 @@ async function guardarEditReg(){
   const nota=document.getElementById('er-nota').value.trim();
   const btn=document.getElementById('er-save');btn.disabled=true;btn.textContent='Guardando...';
   await sb.from('registros_horas').update({horas:editRegH,nota}).eq('id',editRegId);
-  btn.disabled=false;btn.textContent='Guardar';
-  closeOv('ov-er');
-  updateCounter();renderSemana();
-  toast('✓ Registro actualizado');
+  btn.disabled=false;btn.textContent='Guardar';closeOv('ov-er');updateCounter();renderSemana();toast('✓ Registro actualizado');
 }
 async function eliminarEditReg(){
   await sb.from('registros_horas').delete().eq('id',editRegId);
-  closeOv('ov-er');
-  updateCounter();renderSemana();
-  toast('✓ Registro eliminado');
+  closeOv('ov-er');updateCounter();renderSemana();toast('✓ Registro eliminado');
 }
 
+// ── REPORTES ──
 function renderRepUI(){
   const cont=document.getElementById('pane-reportes');if(!cont)return;
-  cont.innerHTML=`<div style="padding:16px">
+  cont.innerHTML=`<div class="rep-layout">
     <div class="sec">Reporte por colaborador</div>
-    <div class="card" style="padding:14px;margin-bottom:14px">
+    <div class="card" style="padding:18px;margin-bottom:16px">
       <div class="fl"><label>Colaborador</label><select id="rc2"><option value="">— todos —</option></select></div>
-      <div style="display:flex;gap:10px;margin-bottom:14px">
+      <div style="display:flex;gap:12px;margin-bottom:14px">
         <div style="flex:1"><div style="font-size:9px;letter-spacing:.1em;text-transform:uppercase;color:var(--ink3);margin-bottom:5px">Desde</div><input type="date" id="rd" value="${hace(13)}"></div>
         <div style="flex:1"><div style="font-size:9px;letter-spacing:.1em;text-transform:uppercase;color:var(--ink3);margin-bottom:5px">Hasta</div><input type="date" id="rh2" value="${hoy()}"></div>
       </div>
@@ -1756,9 +1869,7 @@ function renderRepUI(){
     </div>
     <div id="rep-res"></div>
   </div>`;
-  sb.from('colaboradores').select('id,nombre,apellido,color').then(({data})=>{
-    const s=document.getElementById('rc2');(data||[]).forEach(c=>s.innerHTML+=`<option value="${c.id}">${c.nombre} ${c.apellido||''}</option>`);
-  });
+  sb.from('colaboradores').select('id,nombre,apellido,color').then(({data})=>{const s=document.getElementById('rc2');(data||[]).forEach(c=>s.innerHTML+=`<option value="${c.id}">${c.nombre} ${c.apellido||''}</option>`);});
 }
 async function genRep(){
   const cid=document.getElementById('rc2').value,desde=document.getElementById('rd').value,hasta=document.getElementById('rh2').value;
@@ -1771,51 +1882,46 @@ async function genRep(){
   const pc={};
   rs.forEach(r=>{const c=r.colaborador_id;if(!pc[c])pc[c]={col:r.colaboradores,h:0,ps:{}};pc[c].h+=r.horas;const pid=r.proyecto_id;if(!pc[c].ps[pid])pc[c].ps[pid]={n:r.proyectos?.nombre||pid,c:r.proyectos?.codigo||'',h:0};pc[c].ps[pid].h+=r.horas;});
   let html='';
-  Object.entries(pc).forEach(([cid,d])=>{
-    const col=d.col;
-    let pH='';
-    Object.entries(d.ps).sort((a,b)=>b[1].h-a[1].h).forEach(([pid,pd])=>{
-      const pct=Math.round(pd.h/d.h*100);
-      pH+=`<div style="display:flex;align-items:center;gap:10px;padding:9px 14px;border-bottom:1px solid var(--border)"><span class="cod">${pd.c}</span><div style="flex:1;min-width:0"><div style="font-size:11px;color:var(--ink)">${pd.n}</div><div style="height:3px;background:var(--bg2);border-radius:2px;overflow:hidden;margin-top:4px"><div style="height:100%;width:${pct}%;background:var(--accent);border-radius:2px"></div></div></div><span style="font-size:12px;font-weight:500;color:var(--accent)">${hT(pd.h)}</span></div>`;
-    });
+  Object.entries(pc).forEach(([cid2,d])=>{
+    const col=d.col;let pH='';
+    Object.entries(d.ps).sort((a,b)=>b[1].h-a[1].h).forEach(([pid,pd])=>{const pct=Math.round(pd.h/d.h*100);pH+=`<div style="display:flex;align-items:center;gap:10px;padding:9px 14px;border-bottom:1px solid var(--border)"><span class="cod">${pd.c}</span><div style="flex:1;min-width:0"><div style="font-size:11px;color:var(--ink)">${pd.n}</div><div style="height:3px;background:var(--bg2);border-radius:2px;overflow:hidden;margin-top:4px"><div style="height:100%;width:${pct}%;background:var(--accent);border-radius:2px"></div></div></div><span style="font-size:12px;font-weight:500;color:var(--accent)">${hT(pd.h)}</span></div>`;});
     html+=`<div class="card" style="margin-bottom:12px"><div style="padding:12px 14px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:10px"><div style="width:30px;height:30px;border-radius:50%;background:${col?.color||'var(--accent)'};display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:500;color:#fff;flex-shrink:0">${ini(col?.nombre,col?.apellido)}</div><div><div style="font-size:12px;color:var(--ink)">${col?.nombre} ${col?.apellido||''}</div><div style="font-size:10px;color:var(--ink3)">${fF(desde)} — ${fF(hasta)}</div></div></div>${pH}<div style="display:flex;justify-content:space-between;padding:11px 14px;background:var(--ink)"><span style="font-size:10px;letter-spacing:.08em;text-transform:uppercase;color:var(--ink3)">Total período</span><span style="font-family:'Fraunces',serif;font-size:20px;font-weight:300;color:#fff">${hT(d.h)}</span></div></div>`;
   });
   cont.innerHTML=html;
 }
 
+// ── GESTIÓN ──
 async function renderGestion(){
   const cont=document.getElementById('pane-gestion');if(!cont)return;
-  cont.innerHTML=`<div style="padding:16px">
-    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
-      <div class="sec" style="margin:0">Colaboradores</div>
-      <button class="btn-nuevo" onclick="abrirNuevoColab()">+ Agregar</button>
+  cont.innerHTML=`<div class="gestion-layout">
+    <div class="gestion-col">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+        <div class="sec" style="margin:0">Colaboradores</div>
+        <button class="btn-nuevo" onclick="abrirNuevoColab()">+ Agregar</button>
+      </div>
+      <div id="g-colabs"><div class="ldg">Cargando...</div></div>
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;margin-top:24px">
+        <div class="sec" style="margin:0">Proyectos</div>
+        <button class="btn-nuevo" onclick="abrirNuevoProy()">+ Nuevo</button>
+      </div>
+      <div id="g-proys"><div class="ldg">Cargando...</div></div>
     </div>
-    <div id="g-colabs"><div class="ldg">Cargando...</div></div>
-    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;margin-top:20px">
-      <div class="sec" style="margin:0">Proyectos</div>
-      <button class="btn-nuevo" onclick="abrirNuevoProy()">+ Nuevo</button>
+    <div class="gestion-col">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+        <div class="sec" style="margin:0">Templates de entregables</div>
+      </div>
+      <div id="g-tpls"><div class="ldg">Cargando...</div></div>
     </div>
-    <div id="g-proys"><div class="ldg">Cargando...</div></div>
-    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;margin-top:20px">
-      <div class="sec" style="margin:0">Templates de entregables</div>
-    </div>
-    <div id="g-tpls"><div class="ldg">Cargando...</div></div>
   </div>`;
-  await loadGColabs();
-  await loadGProys();
-  await loadGTemplates();
+  await loadGColabs();await loadGProys();await loadGTemplates();
 }
-
 async function loadGColabs(){
   const cont=document.getElementById('g-colabs');if(!cont)return;
   const {data:cs}=await sb.from('colaboradores').select('*').order('nombre');
   if(!cs||!cs.length){cont.innerHTML=`<div class="empty"><div class="empty-i">👤</div><div>Sin colaboradores</div></div>`;return;}
   cont.innerHTML=cs.map(c=>`<div class="card" style="padding:12px 14px;margin-bottom:8px;display:flex;align-items:center;gap:10px">
     <div style="width:32px;height:32px;border-radius:50%;background:${c.color};display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:500;color:#fff;flex-shrink:0">${ini(c.nombre,c.apellido)}</div>
-    <div style="flex:1;min-width:0">
-      <div style="font-size:12px;color:var(--ink)">${c.nombre} ${c.apellido||''}</div>
-      <div style="font-size:10px;color:var(--ink3)">${c.email}</div>
-    </div>
+    <div style="flex:1;min-width:0"><div style="font-size:12px;color:var(--ink)">${c.nombre} ${c.apellido||''}</div><div style="font-size:10px;color:var(--ink3)">${c.email}</div></div>
     <div style="display:flex;gap:6px;align-items:center">
       <span style="font-size:9px;padding:2px 7px;border-radius:4px;background:${c.rol==='admin'?'var(--acc-lt)':'var(--bg2)'};color:${c.rol==='admin'?'var(--accent)':'var(--ink2)'}">${c.rol}</span>
       <span style="font-size:9px;padding:2px 7px;border-radius:4px;background:var(--ink);color:var(--bg)">$${c.tarifa}/h</span>
@@ -1823,17 +1929,13 @@ async function loadGColabs(){
     </div>
   </div>`).join('');
 }
-
 async function loadGProys(){
   const cont=document.getElementById('g-proys');if(!cont)return;
   const {data:ps}=await sb.from('proyectos').select('*').order('codigo');
   if(!ps||!ps.length){cont.innerHTML=`<div class="empty"><div class="empty-i">📁</div><div>Sin proyectos</div></div>`;return;}
   cont.innerHTML=ps.map(p=>`<div class="card" style="padding:12px 14px;margin-bottom:8px;display:flex;align-items:center;gap:10px">
     <div style="flex:1;min-width:0">
-      <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px">
-        <span class="cod">${p.codigo}</span>
-        <span style="font-size:12px;color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${p.nombre}</span>
-      </div>
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px"><span class="cod">${p.codigo}</span><span style="font-size:12px;color:var(--ink)">${p.nombre}</span></div>
       <div style="font-size:10px;color:var(--ink3)">${p.etapas_activas?.join(', ')||''} · $${Math.round(p.presupuesto_total).toLocaleString('es-MX')}</div>
     </div>
     <button style="width:28px;height:28px;border-radius:6px;border:1.5px solid var(--border);background:none;font-size:13px;color:var(--ink2);display:flex;align-items:center;justify-content:center;cursor:pointer" onclick="abrirEditProy('${p.id}')">✏</button>
@@ -1842,184 +1944,103 @@ async function loadGProys(){
 
 // ── COLABORADOR FORM ──
 let colabEditId=null,colSel='#2828b8',rolSel2='colaborador';
-const COLS=['#2828b8','#ed254e','#3a7a4a','#c28a10','#7b6fa0','#2a7a8a','#8a5a2a'];
-const ETAPAS_C=[{k:'PC',n:'Procesos'},{k:'DE',n:'Definición'},{k:'SD',n:'Diseño Esquemático'},{k:'DD',n:'Desarrollo de Diseño'},{k:'CD',n:'Documentos Constructivos'}];
-
 function abrirNuevoColab(){
   colabEditId=null;rolSel2='colaborador';colSel=COLS[0];
   document.getElementById('cf-title2').textContent='Nuevo colaborador';
   ['cf-nom','cf-ape','cf-email2','cf-tarifa2'].forEach(id=>document.getElementById(id).value='');
   document.getElementById('cf-del').style.display='none';
-  renderRoles2();renderColPicker2(colSel);
-  document.getElementById('ov-colab2').classList.add('on');
+  renderRoles2();renderColPicker2(colSel);document.getElementById('ov-colab2').classList.add('on');
 }
 async function abrirEditColab(id){
-  const {data:c}=await sb.from('colaboradores').select('*').eq('id',id).single();
-  if(!c)return;
+  const {data:c}=await sb.from('colaboradores').select('*').eq('id',id).single();if(!c)return;
   colabEditId=id;rolSel2=c.rol;colSel=c.color;
   document.getElementById('cf-title2').textContent='Editar colaborador';
-  document.getElementById('cf-nom').value=c.nombre;
-  document.getElementById('cf-ape').value=c.apellido||'';
-  document.getElementById('cf-email2').value=c.email;
-  document.getElementById('cf-tarifa2').value=c.tarifa;
+  document.getElementById('cf-nom').value=c.nombre;document.getElementById('cf-ape').value=c.apellido||'';
+  document.getElementById('cf-email2').value=c.email;document.getElementById('cf-tarifa2').value=c.tarifa;
   document.getElementById('cf-del').style.display='block';
-  renderRoles2();renderColPicker2(colSel);
-  document.getElementById('ov-colab2').classList.add('on');
+  renderRoles2();renderColPicker2(colSel);document.getElementById('ov-colab2').classList.add('on');
 }
-function renderRoles2(){
-  document.querySelectorAll('.rol-b2').forEach(b=>b.classList.toggle('on2',b.dataset.rol===rolSel2));
-}
+function renderRoles2(){document.querySelectorAll('.rol-b2').forEach(b=>b.classList.toggle('on2',b.dataset.rol===rolSel2));}
 function selRol2(r){rolSel2=r;renderRoles2();}
 function renderColPicker2(sel){
   const c=document.getElementById('cp2');c.innerHTML='';
   COLS.forEach(col=>{const b=document.createElement('button');b.type='button';b.style.cssText=`width:28px;height:28px;border-radius:50%;background:${col};border:3px solid ${col===sel?'var(--ink)':'transparent'};cursor:pointer;`;b.onclick=()=>{colSel=col;renderColPicker2(col);};c.appendChild(b);});
 }
 async function guardarColab2(){
-  const nom=document.getElementById('cf-nom').value.trim();
-  const email=document.getElementById('cf-email2').value.trim();
-  const tarifa=parseFloat(document.getElementById('cf-tarifa2').value)||0;
+  const nom=document.getElementById('cf-nom').value.trim(),email=document.getElementById('cf-email2').value.trim(),tarifa=parseFloat(document.getElementById('cf-tarifa2').value)||0;
   if(!nom||!email||!tarifa){toast('Completa los campos obligatorios');return;}
   const btn=document.getElementById('cf-save');btn.disabled=true;btn.textContent='Guardando...';
   const datos={nombre:nom,apellido:document.getElementById('cf-ape').value.trim(),email,tarifa,color:colSel,rol:rolSel2};
-  if(colabEditId){
-    await sb.from('colaboradores').update(datos).eq('id',colabEditId);
-  } else {
-    // Crear usuario en Auth primero via Admin API no disponible en cliente
-    // Insertamos solo en colaboradores — el usuario debe crearse en Supabase Auth manualmente
-    const tempId=crypto.randomUUID();
-    await sb.from('colaboradores').insert({id:tempId,...datos});
-    toast('Colaborador agregado. Recuerda crear su usuario en Supabase Auth con el mismo email.');
-    closeOv('ov-colab2');btn.disabled=false;btn.textContent='Guardar';
-    await loadGColabs();return;
-  }
-  closeOv('ov-colab2');btn.disabled=false;btn.textContent='Guardar';
-  await loadGColabs();toast('✓ Colaborador guardado');
+  if(colabEditId){await sb.from('colaboradores').update(datos).eq('id',colabEditId);}
+  else{const tempId=crypto.randomUUID();await sb.from('colaboradores').insert({id:tempId,...datos});toast('Colaborador agregado. Recuerda crear su usuario en Supabase Auth.');closeOv('ov-colab2');btn.disabled=false;btn.textContent='Guardar';await loadGColabs();return;}
+  closeOv('ov-colab2');btn.disabled=false;btn.textContent='Guardar';await loadGColabs();toast('✓ Colaborador guardado');
 }
 async function eliminarColab2(){
-  if(!colabEditId)return;
-  if(!confirm('¿Eliminar este colaborador?'))return;
+  if(!colabEditId)return;if(!confirm('¿Eliminar este colaborador?'))return;
   await sb.from('colaboradores').delete().eq('id',colabEditId);
   closeOv('ov-colab2');await loadGColabs();toast('Colaborador eliminado');
 }
 
 // ── PROYECTO FORM ──
 let proyEditId2=null,etapasSel2=new Set(),tipoProy='productivo',colabsSel=new Set();
-
 async function renderColabsCheck(proyId){
   colabsSel=new Set();
   const {data:colabs}=await sb.from('colaboradores').select('id,nombre,apellido,rol').order('nombre');
-  if(proyId){
-    const {data:asig}=await sb.from('proyecto_colaboradores').select('colaborador_id').eq('proyecto_id',proyId);
-    (asig||[]).forEach(a=>colabsSel.add(a.colaborador_id));
-  }
+  if(proyId){const {data:asig}=await sb.from('proyecto_colaboradores').select('colaborador_id').eq('proyecto_id',proyId);(asig||[]).forEach(a=>colabsSel.add(a.colaborador_id));}
   const cont=document.getElementById('pf-colabs');
-  cont.innerHTML=(colabs||[]).filter(c=>c.rol!=='admin').map(c=>{
-    const sel=colabsSel.has(c.id);
-    return `<button type="button" class="rol-b2 ${sel?'on2':''}" id="pc-${c.id}" onclick="toggleColabProy('${c.id}')">${c.nombre} ${c.apellido||''}</button>`;
-  }).join('');
+  cont.innerHTML=(colabs||[]).filter(c=>c.rol!=='admin').map(c=>{const sel=colabsSel.has(c.id);return `<button type="button" class="rol-b2 ${sel?'on2':''}" id="pc-${c.id}" onclick="toggleColabProy('${c.id}')">${c.nombre} ${c.apellido||''}</button>`;}).join('');
 }
-
-function toggleColabProy(id){
-  if(colabsSel.has(id)){colabsSel.delete(id);document.getElementById('pc-'+id).classList.remove('on2');}
-  else{colabsSel.add(id);document.getElementById('pc-'+id).classList.add('on2');}
-}
-
+function toggleColabProy(id){if(colabsSel.has(id)){colabsSel.delete(id);document.getElementById('pc-'+id).classList.remove('on2');}else{colabsSel.add(id);document.getElementById('pc-'+id).classList.add('on2');}}
 function selTipoProy(tipo){
   tipoProy=tipo;
   document.getElementById('ptipo-prod').classList.toggle('on2',tipo==='productivo');
   document.getElementById('ptipo-blank').classList.toggle('on2',tipo==='en_blanco');
-  const sec=document.getElementById('pf-section-etapas');
-  const desc=document.getElementById('ptipo-desc');
-  if(tipo==='en_blanco'){
-    sec.style.display='none';
-    desc.textContent='Sin etapas ni presupuesto. Para capacitaciones, cultura organizacional y proyectos internos.';
-    desc.style.background='var(--amb-lt)';desc.style.color='var(--amber)';
-  } else {
-    sec.style.display='block';
-    desc.textContent='Proyecto con etapas DE/SD/DD/CD y presupuesto definido.';
-    desc.style.background='var(--bg2)';desc.style.color='var(--ink3)';
-  }
+  const sec=document.getElementById('pf-section-etapas'),desc=document.getElementById('ptipo-desc');
+  if(tipo==='en_blanco'){sec.style.display='none';desc.textContent='Sin etapas ni presupuesto. Para capacitaciones, cultura y proyectos internos.';desc.style.background='var(--amb-lt)';desc.style.color='var(--amber)';}
+  else{sec.style.display='block';desc.textContent='Proyecto con etapas DE/SD/DD/CD y presupuesto definido.';desc.style.background='var(--bg2)';desc.style.color='var(--ink3)';}
 }
-
 async function abrirNuevoProy(){
   proyEditId2=null;etapasSel2=new Set();
   document.getElementById('pf-title2').textContent='Nuevo proyecto';
   ['pf-cod','pf-nom2','pf-cli','pf-presup2','pf-gasto','pf-inicio'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
   document.getElementById('pf-del').style.display='none';
-  selTipoProy('productivo');
-  renderEtapasCheck2();actualizarDist2();
-  await renderColabsCheck(null);
+  selTipoProy('productivo');renderEtapasCheck2();actualizarDist2();await renderColabsCheck(null);
   document.getElementById('ov-proy2').classList.add('on');
 }
 async function abrirEditProy(id){
-  const {data:p}=await sb.from('proyectos').select('*').eq('id',id).single();
-  if(!p)return;
+  const {data:p}=await sb.from('proyectos').select('*').eq('id',id).single();if(!p)return;
   proyEditId2=id;etapasSel2=new Set(p.etapas_activas||[]);
   document.getElementById('pf-title2').textContent='Editar proyecto';
-  document.getElementById('pf-cod').value=p.codigo;
-  document.getElementById('pf-nom2').value=p.nombre;
-  document.getElementById('pf-cli').value=p.cliente||'';
-  document.getElementById('pf-presup2').value=p.presupuesto_total||'';
-  document.getElementById('pf-gasto').value=p.gasto_previo||0;
-  document.getElementById('pf-del').style.display='block';
-  selTipoProy(p.tipo||'productivo');
-  renderEtapasCheck2();actualizarDist2();
-  await renderColabsCheck(id);
+  document.getElementById('pf-cod').value=p.codigo;document.getElementById('pf-nom2').value=p.nombre;
+  document.getElementById('pf-cli').value=p.cliente||'';document.getElementById('pf-presup2').value=p.presupuesto_total||'';
+  document.getElementById('pf-gasto').value=p.gasto_previo||0;document.getElementById('pf-del').style.display='block';
+  selTipoProy(p.tipo||'productivo');renderEtapasCheck2();actualizarDist2();await renderColabsCheck(id);
   document.getElementById('ov-proy2').classList.add('on');
 }
 function renderEtapasCheck2(){
-  const c=document.getElementById('pf-etapas2');c.innerHTML='';
-  // PC siempre incluido
-  etapasSel2.add('PC');
+  const c=document.getElementById('pf-etapas2');c.innerHTML='';etapasSel2.add('PC');
   ETAPAS_C.forEach(et=>{
-    const b=document.createElement('button');b.type='button';
-    const esPC=et.k==='PC';
-    b.className='etapa-check-btn'+(etapasSel2.has(et.k)?' on':'');
-    b.textContent=`${et.k} · ${et.n}`;
-    if(esPC){
-      b.title='Siempre incluido';
-      b.style.opacity='0.7';b.style.cursor='default';
-    } else {
-      b.onclick=()=>{etapasSel2.has(et.k)?etapasSel2.delete(et.k):etapasSel2.add(et.k);b.classList.toggle('on');actualizarDist2();};
-    }
+    const b=document.createElement('button');b.type='button';const esPC=et.k==='PC';
+    b.className='etapa-check-btn'+(etapasSel2.has(et.k)?' on':'');b.textContent=`${et.k} · ${et.n}`;
+    if(esPC){b.title='Siempre incluido';b.style.opacity='0.7';b.style.cursor='default';}
+    else{b.onclick=()=>{etapasSel2.has(et.k)?etapasSel2.delete(et.k):etapasSel2.add(et.k);b.classList.toggle('on');actualizarDist2();};}
     c.appendChild(b);
   });
 }
 function actualizarDist2(){
-  const presup=parseFloat(document.getElementById('pf-presup2')?.value)||0;
-  const wrap=document.getElementById('pf-dist2');
-  if(!etapasSel2.size||!presup){if(wrap)wrap.style.display='none';return;}
-  if(wrap)wrap.style.display='block';
-  const cont=document.getElementById('pf-dist-cont');if(!cont)return;
-  const pctDef=Math.round(100/etapasSel2.size);
-  cont.innerHTML='';
-  etapasSel2.forEach(k=>{
-    const et=ETAPAS_C.find(x=>x.k===k);
-    const monto=Math.round(presup*pctDef/100);
-    cont.innerHTML+=`<div style="display:flex;align-items:center;gap:8px;margin-bottom:10px">
-      <span style="font-size:10px;color:var(--ink2);width:100px;flex-shrink:0"><b style="color:var(--accent)">${k}</b> · ${et?.n}</span>
-      <input type="number" id="dist2-${k}" value="${pctDef}" min="0" max="100" style="width:60px;padding:6px 8px;text-align:right" oninput="recalcDist2()"> %
-      <span style="font-size:11px;color:var(--ink3);flex:1;text-align:right" id="dm2-${k}">$${monto.toLocaleString('es-MX')}</span>
-    </div>`;
-  });
+  const presup=parseFloat(document.getElementById('pf-presup2')?.value)||0;const wrap=document.getElementById('pf-dist2');
+  if(!etapasSel2.size||!presup){if(wrap)wrap.style.display='none';return;}if(wrap)wrap.style.display='block';
+  const cont=document.getElementById('pf-dist-cont');if(!cont)return;const pctDef=Math.round(100/etapasSel2.size);cont.innerHTML='';
+  etapasSel2.forEach(k=>{const et=ETAPAS_C.find(x=>x.k===k);const monto=Math.round(presup*pctDef/100);cont.innerHTML+=`<div style="display:flex;align-items:center;gap:8px;margin-bottom:10px"><span style="font-size:10px;color:var(--ink2);width:120px;flex-shrink:0"><b style="color:var(--accent)">${k}</b> · ${et?.n}</span><input type="number" id="dist2-${k}" value="${pctDef}" min="0" max="100" style="width:60px;padding:6px 8px;text-align:right" oninput="recalcDist2()"> %<span style="font-size:11px;color:var(--ink3);flex:1;text-align:right" id="dm2-${k}">$${monto.toLocaleString('es-MX')}</span></div>`;});
 }
 function recalcDist2(){
-  const presup=parseFloat(document.getElementById('pf-presup2').value)||0;
-  let tot=0;
-  etapasSel2.forEach(k=>{
-    const pct=parseFloat(document.getElementById(`dist2-${k}`)?.value)||0;
-    tot+=pct;
-    const el=document.getElementById(`dm2-${k}`);
-    if(el)el.textContent='$'+Math.round(presup*pct/100).toLocaleString('es-MX');
-  });
-  const tel=document.getElementById('pf-dist-total2');
-  if(tel){tel.textContent=`Total: ${tot}%`;tel.style.color=Math.abs(tot-100)>1?'var(--rose)':'var(--green)';}
+  const presup=parseFloat(document.getElementById('pf-presup2').value)||0;let tot=0;
+  etapasSel2.forEach(k=>{const pct=parseFloat(document.getElementById(`dist2-${k}`)?.value)||0;tot+=pct;const el=document.getElementById(`dm2-${k}`);if(el)el.textContent='$'+Math.round(presup*pct/100).toLocaleString('es-MX');});
+  const tel=document.getElementById('pf-dist-total2');if(tel){tel.textContent=`Total: ${tot}%`;tel.style.color=Math.abs(tot-100)>1?'var(--rose)':'var(--green)';}
 }
 async function guardarProy2(){
-  const codigo=document.getElementById('pf-cod').value.trim();
-  const nombre=document.getElementById('pf-nom2').value.trim();
-  const esBlanco=tipoProy==='en_blanco';
-  const presup=esBlanco?0:parseFloat(document.getElementById('pf-presup2').value)||0;
+  const codigo=document.getElementById('pf-cod').value.trim(),nombre=document.getElementById('pf-nom2').value.trim();
+  const esBlanco=tipoProy==='en_blanco';const presup=esBlanco?0:parseFloat(document.getElementById('pf-presup2').value)||0;
   if(!codigo||!nombre){toast('Completa los campos obligatorios');return;}
   if(!esBlanco&&!presup){toast('Completa los campos obligatorios');return;}
   if(!esBlanco&&!etapasSel2.size){toast('Selecciona al menos una etapa');return;}
@@ -2028,93 +2049,51 @@ async function guardarProy2(){
   const fechaInicio=esBlanco?null:document.getElementById('pf-inicio').value||null;
   const presupEtapas={};
   if(!esBlanco)etapasSel2.forEach(k=>{const pct=parseFloat(document.getElementById(`dist2-${k}`)?.value)||0;presupEtapas[k]=Math.round(presup*pct/100);});
-  const datos={codigo,nombre,cliente:document.getElementById('pf-cli').value.trim(),presupuesto_total:presup,gasto_previo:gastoPrevio,etapas_activas:esBlanco?[]: [...etapasSel2],tipo:tipoProy};
-
+  const datos={codigo,nombre,cliente:document.getElementById('pf-cli').value.trim(),presupuesto_total:presup,gasto_previo:gastoPrevio,etapas_activas:esBlanco?[]:[...etapasSel2],tipo:tipoProy};
+  let npId=proyEditId2;
   if(proyEditId2){
     await sb.from('proyectos').update(datos).eq('id',proyEditId2);
-    if(!esBlanco){
-      await sb.from('presupuesto_etapas').delete().eq('proyecto_id',proyEditId2);
-      const inserts=Object.entries(presupEtapas).map(([k,m])=>({proyecto_id:proyEditId2,etapa_clave:k,monto:m}));
-      if(inserts.length)await sb.from('presupuesto_etapas').insert(inserts);
-    }
+    if(!esBlanco){await sb.from('presupuesto_etapas').delete().eq('proyecto_id',proyEditId2);const inserts=Object.entries(presupEtapas).map(([k,m])=>({proyecto_id:proyEditId2,etapa_clave:k,monto:m}));if(inserts.length)await sb.from('presupuesto_etapas').insert(inserts);}
   } else {
-    const {data:np}=await sb.from('proyectos').insert(datos).select().single();
+    const {data:np}=await sb.from('proyectos').insert(datos).select().single();npId=np?.id;
     if(np&&!esBlanco){
-      // cargar entregables template con fechas calculadas en secuencia
       const {data:tpls}=await sb.from('templates').select('*').in('etapa_clave',[...etapasSel2]).order('orden');
       if(tpls?.length){
-        // ordenar por catálogo: DE, SD, DD, CD, PC
         const ordenEtapas=['DE','SD','DD','CD','PC'];
-        tpls.sort((a,b)=>{
-          const ia=ordenEtapas.indexOf(a.etapa_clave), ib=ordenEtapas.indexOf(b.etapa_clave);
-          if(ia!==ib)return ia-ib;
-          return (a.orden||0)-(b.orden||0);
-        });
+        tpls.sort((a,b)=>{const ia=ordenEtapas.indexOf(a.etapa_clave),ib=ordenEtapas.indexOf(b.etapa_clave);if(ia!==ib)return ia-ib;return (a.orden||0)-(b.orden||0);});
         let fechaCursor=fechaInicio?new Date(fechaInicio+' 00:00'):null;
         const ents=tpls.map(t=>{
           let fIni=null,fFin=null;
-          if(fechaCursor){
-            fIni=fechaAStr(fechaCursor);
-            const dur=t.duracion_semanas||1;
-            const fFinDate=new Date(fechaCursor);
-            fFinDate.setDate(fFinDate.getDate()+Math.round(dur*7));
-            fFin=fechaAStr(fFinDate);
-            fechaCursor=new Date(fFinDate); // siguiente empieza donde termina este
-          }
+          if(fechaCursor){fIni=fechaAStr(fechaCursor);const dur=t.duracion_semanas||1;const fFinDate=new Date(fechaCursor);fFinDate.setDate(fFinDate.getDate()+Math.round(dur*7));fFin=fechaAStr(fFinDate);fechaCursor=new Date(fFinDate);}
           return {proyecto_id:np.id,etapa_clave:t.etapa_clave,grupo:t.grupo,nombre:t.nombre,done:false,eliminado:false,fecha_inicio:fIni,fecha_fin:fFin};
         });
         await sb.from('entregables').insert(ents);
       }
-      const inserts=Object.entries(presupEtapas).map(([k,m])=>({proyecto_id:np.id,etapa_clave:k,monto:m}));
-      if(inserts.length)await sb.from('presupuesto_etapas').insert(inserts);
+      const inserts=Object.entries(presupEtapas).map(([k,m])=>({proyecto_id:np.id,etapa_clave:k,monto:m}));if(inserts.length)await sb.from('presupuesto_etapas').insert(inserts);
     }
   }
-  // Guardar colaboradores asignados
-  const pid=proyEditId2||(np?.id);
-  if(pid){
-    await sb.from('proyecto_colaboradores').delete().eq('proyecto_id',pid);
-    if(colabsSel.size){
-      const insColabs=[...colabsSel].map(cid=>({proyecto_id:pid,colaborador_id:cid}));
-      await sb.from('proyecto_colaboradores').insert(insColabs);
-    }
-  }
-  closeOv('ov-proy2');btn.disabled=false;btn.textContent='Guardar';
-  await loadGProys();toast('✓ Proyecto guardado');
-}
-
-function fechaAStr(d){
-  const y=d.getFullYear(),m=String(d.getMonth()+1).padStart(2,'0'),dd=String(d.getDate()).padStart(2,'0');
-  return `${y}-${m}-${dd}`;
+  if(npId){await sb.from('proyecto_colaboradores').delete().eq('proyecto_id',npId);if(colabsSel.size){const insColabs=[...colabsSel].map(cid=>({proyecto_id:npId,colaborador_id:cid}));await sb.from('proyecto_colaboradores').insert(insColabs);}}
+  closeOv('ov-proy2');btn.disabled=false;btn.textContent='Guardar';await loadGProys();toast('✓ Proyecto guardado');
 }
 async function eliminarProy2(){
-  if(!proyEditId2)return;
-  if(!confirm('¿Eliminar este proyecto? Se eliminarán todos sus entregables y registros.'))return;
-  await sb.from('proyectos').delete().eq('id',proyEditId2);
-  closeOv('ov-proy2');await loadGProys();toast('Proyecto eliminado');
+  if(!proyEditId2)return;if(!confirm('¿Eliminar este proyecto? Se eliminarán todos sus entregables y registros.'))return;
+  await sb.from('proyectos').delete().eq('id',proyEditId2);closeOv('ov-proy2');await loadGProys();toast('Proyecto eliminado');
 }
 
 // ── TEMPLATES ──
 let tplEtapaSel=null;
-
 async function loadGTemplates(){
   const cont=document.getElementById('g-tpls');if(!cont)return;
   const {data:tpls}=await sb.from('templates').select('*').order('orden');
   if(!tpls||!tpls.length){cont.innerHTML=`<div class="empty"><div class="empty-i">📋</div><div>Sin templates</div></div>`;return;}
-  const porEtapa={};
-  tpls.forEach(t=>{if(!porEtapa[t.etapa_clave])porEtapa[t.etapa_clave]=[];porEtapa[t.etapa_clave].push(t);});
-  let html='';
+  const porEtapa={};tpls.forEach(t=>{if(!porEtapa[t.etapa_clave])porEtapa[t.etapa_clave]=[];porEtapa[t.etapa_clave].push(t);});
+  let html=`<div style="background:var(--acc-lt);border-radius:8px;padding:10px 12px;margin-bottom:12px;font-size:10px;color:var(--ink2)">📅 Asigna duración en semanas a cada entregable. Al crear un proyecto nuevo, las fechas se calcularán en secuencia.</div>`;
   ETAPAS_C.forEach(et=>{
     const ents=porEtapa[et.k]||[];
     let rowsHTML=ents.map(e=>`<div style="display:flex;align-items:center;gap:8px;padding:8px 14px;border-bottom:1px solid var(--border)">
-      <div style="flex:1;min-width:0">
-        <div style="font-size:11px;color:var(--ink)">${e.nombre}</div>
-        <div style="font-size:9px;color:var(--ink3);margin-top:1px">${e.grupo}</div>
-      </div>
+      <div style="flex:1;min-width:0"><div style="font-size:11px;color:var(--ink)">${e.nombre}</div><div style="font-size:9px;color:var(--ink3);margin-top:1px">${e.grupo}</div></div>
       <div style="display:flex;align-items:center;gap:4px;flex-shrink:0">
-        <input type="number" value="${e.duracion_semanas||1}" min="0.5" max="52" step="0.5"
-          style="width:48px;padding:4px 6px;font-size:11px;text-align:center;border:1.5px solid var(--border);border-radius:5px;background:#fff"
-          onchange="actualizarDuracion('${e.id}',this.value)"
-          title="Duración en semanas">
+        <input type="number" value="${e.duracion_semanas||1}" min="0.5" max="52" step="0.5" style="width:48px;padding:4px 6px;font-size:11px;text-align:center;border:1.5px solid var(--border);border-radius:5px;background:#fff" onchange="actualizarDuracion('${e.id}',this.value)" title="Semanas">
         <span style="font-size:9px;color:var(--ink3)">sem</span>
       </div>
       <button style="font-size:12px;color:var(--ink3);background:none;border:none;cursor:pointer;padding:2px 4px" onclick="abrirEditarTemplate('${e.id}','${e.nombre}','${e.grupo}')">✏</button>
@@ -2122,76 +2101,42 @@ async function loadGTemplates(){
     </div>`).join('');
     html+=`<div class="card" style="margin-bottom:10px">
       <div style="padding:9px 14px;background:var(--bg2);display:flex;align-items:center;gap:8px;border-bottom:1px solid var(--border)">
-        <span class="ec">${et.k}</span>
-        <span style="font-size:11px;color:var(--ink2);flex:1">${et.n}</span>
+        <span class="ec">${et.k}</span><span style="font-size:11px;color:var(--ink2);flex:1">${et.n}</span>
         <button class="btn-nuevo" style="padding:4px 10px;font-size:9px" onclick="abrirNuevoTemplate('${et.k}')">+ Agregar</button>
       </div>
       ${rowsHTML||`<div style="padding:10px 14px;font-size:10px;color:var(--ink3)">Sin entregables — agrega el primero</div>`}
     </div>`;
   });
-  // nota explicativa
-  html=`<div style="background:var(--acc-lt);border-radius:8px;padding:10px 12px;margin-bottom:12px;font-size:10px;color:var(--ink2)">
-    📅 Asigna duración en semanas a cada entregable. Al crear un proyecto nuevo, las fechas se calcularán automáticamente en secuencia.
-  </div>`+html;
   cont.innerHTML=html;
 }
-
-async function actualizarDuracion(tplId, valor){
-  const dur=Math.max(0.5,parseFloat(valor)||1);
-  await sb.from('templates').update({duracion_semanas:dur}).eq('id',tplId);
-  toast('✓ Duración actualizada');
-}
-
-// Editar template
+async function actualizarDuracion(tplId,valor){const dur=Math.max(0.5,parseFloat(valor)||1);await sb.from('templates').update({duracion_semanas:dur}).eq('id',tplId);toast('✓ Duración actualizada');}
 let editTplId=null;
-function abrirEditarTemplate(tplId, nombre, grupo){
-  editTplId=tplId;
-  document.getElementById('etpl-nom').value=nombre;
-  document.getElementById('etpl-grupo').value=grupo;
-  document.getElementById('ov-etpl').classList.add('on');
-}
+function abrirEditarTemplate(tplId,nombre,grupo){editTplId=tplId;document.getElementById('etpl-nom').value=nombre;document.getElementById('etpl-grupo').value=grupo;document.getElementById('ov-etpl').classList.add('on');}
 async function guardarEditarTemplate(){
-  const nombre=document.getElementById('etpl-nom').value.trim();
-  const grupo=document.getElementById('etpl-grupo').value.trim()||'General';
+  const nombre=document.getElementById('etpl-nom').value.trim(),grupo=document.getElementById('etpl-grupo').value.trim()||'General';
   if(!nombre){toast('El nombre no puede estar vacío');return;}
   const btn=document.getElementById('etpl-save');btn.disabled=true;btn.textContent='Guardando...';
   await sb.from('templates').update({nombre,grupo}).eq('id',editTplId);
-  btn.disabled=false;btn.textContent='Guardar';
-  closeOv('ov-etpl');
-  await loadGTemplates();
-  toast('✓ Template actualizado');
+  btn.disabled=false;btn.textContent='Guardar';closeOv('ov-etpl');await loadGTemplates();toast('✓ Template actualizado');
 }
-
 function abrirNuevoTemplate(clave){
-  tplEtapaSel=clave;
-  const et=ETAPAS_C.find(x=>x.k===clave);
+  tplEtapaSel=clave;const et=ETAPAS_C.find(x=>x.k===clave);
   document.getElementById('tf-ctx').textContent=`${clave} · ${et?.n}`;
-  document.getElementById('tf-nom').value='';
-  document.getElementById('tf-grupo').value='';
+  document.getElementById('tf-nom').value='';document.getElementById('tf-grupo').value='';
   document.getElementById('ov-tpl').classList.add('on');
 }
-
 async function guardarTemplate(){
-  const nombre=document.getElementById('tf-nom').value.trim();
-  const grupo=document.getElementById('tf-grupo').value.trim()||'General';
+  const nombre=document.getElementById('tf-nom').value.trim(),grupo=document.getElementById('tf-grupo').value.trim()||'General';
   if(!nombre){toast('Escribe el nombre del entregable');return;}
   const btn=document.getElementById('tf-save');btn.disabled=true;btn.textContent='Guardando...';
-  // obtener el orden máximo actual para esta etapa
   const {data:last}=await sb.from('templates').select('orden').eq('etapa_clave',tplEtapaSel).order('orden',{ascending:false}).limit(1).maybeSingle();
   const orden=(last?.orden||0)+1;
   await sb.from('templates').insert({etapa_clave:tplEtapaSel,grupo,nombre,orden});
-  btn.disabled=false;btn.textContent='Agregar';
-  closeOv('ov-tpl');
-  await loadGTemplates();
-  toast('✓ Entregable agregado al template');
+  btn.disabled=false;btn.textContent='Agregar';closeOv('ov-tpl');await loadGTemplates();toast('✓ Entregable agregado al template');
 }
+async function eliminarTemplate(id){await sb.from('templates').delete().eq('id',id);await loadGTemplates();toast('Entregable eliminado del template');}
 
-async function eliminarTemplate(id){
-  await sb.from('templates').delete().eq('id',id);
-  await loadGTemplates();
-  toast('Entregable eliminado del template');
-}
-
+// ── UTILS ──
 function closeOv(id,e){if(!e||e.target.id===id)document.getElementById(id).classList.remove('on');}
 function toast(msg){const t=document.getElementById('toast');t.textContent=msg;t.classList.add('on');setTimeout(()=>t.classList.remove('on'),2400);}
 

@@ -417,6 +417,7 @@ tr.comp-toggle-row:hover td{background:var(--bg2);}
       <div class="det-tabs">
         <button class="det-tab on" onclick="switchDetProy('entregables',this)">Entregables</button>
         <button class="det-tab" id="det-tab-gantt" onclick="switchDetProy('gantt',this)">Gantt</button>
+        <button class="det-tab" id="det-tab-reporte" onclick="switchDetProy('reporte',this)">Reporte</button>
         <button class="det-tab" id="det-tab-horas" onclick="switchDetProy('horas',this)" style="display:none">Horas × persona</button>
       </div>
     </div>
@@ -1146,6 +1147,7 @@ async function tDone(id,cur){
 // ── TIMER ──
 function tTimer(id,nom){
   if(timerEnt===id){stopTimer();return;}
+  if(_timerGuardando){toast('⏳ Espera, guardando registro anterior...');return;}
   if(timerInt)stopTimer();
   timerEnt=id;timerSecs=0;
   const startTime=Date.now();
@@ -1173,20 +1175,30 @@ async function reanudarTimer(){
     toast(`▶ Timer retomado · ${fS(timerSecs)} transcurridos`);
   }catch(e){localStorage.removeItem('timer');}
 }
+let _timerGuardando=false;
 async function _guardarTimer(){
+  // Capturar estado inmediatamente — antes de cualquier await — para evitar
+  // race condition si el usuario inicia otro timer mientras se guarda éste.
+  const entId=timerEnt;
   const secsEfectivos=Math.min(timerSecs,TIMER_MAX_SECS);
+  timerEnt=null;timerSecs=0;
   localStorage.removeItem('timer');
-  if(secsEfectivos>=60){
-    const hrs=Math.max(1/60,Math.round(secsEfectivos/60)/60);
-    const {data:ent}=await sb.from('entregables').select('proyecto_id,etapa_clave').eq('id',timerEnt).single();
-    if(ent){
-      const {data:ex}=await sb.from('registros_horas').select('id,horas').eq('colaborador_id',USER.id).eq('entregable_id',timerEnt).eq('fecha',diaAct).maybeSingle();
-      if(ex)await sb.from('registros_horas').update({horas:Math.round((ex.horas+hrs)*60)/60}).eq('id',ex.id);
-      else await sb.from('registros_horas').insert({colaborador_id:USER.id,entregable_id:timerEnt,proyecto_id:ent.proyecto_id,etapa_clave:ent.etapa_clave,fecha:diaAct,horas:hrs,nota:'(timer)'});
-      toast(`■ ${hT(hrs)} guardadas`);
+  _timerGuardando=true;
+  try{
+    if(secsEfectivos>=60){
+      const hrs=Math.max(1/60,Math.round(secsEfectivos/60)/60);
+      const {data:ent}=await sb.from('entregables').select('proyecto_id,etapa_clave').eq('id',entId).single();
+      if(ent){
+        const {data:ex}=await sb.from('registros_horas').select('id,horas').eq('colaborador_id',USER.id).eq('entregable_id',entId).eq('fecha',diaAct).maybeSingle();
+        if(ex)await sb.from('registros_horas').update({horas:Math.round((ex.horas+hrs)*60)/60}).eq('id',ex.id);
+        else await sb.from('registros_horas').insert({colaborador_id:USER.id,entregable_id:entId,proyecto_id:ent.proyecto_id,etapa_clave:ent.etapa_clave,fecha:diaAct,horas:hrs,nota:'(timer)'});
+        toast(`■ ${hT(hrs)} guardadas`);
+      }
     }
+  }finally{
+    _timerGuardando=false;
+    updateCounter();renderMisTareas();
   }
-  timerEnt=null;timerSecs=0;updateCounter();renderMisTareas();
 }
 async function stopTimer(){
   if(!timerInt)return;clearInterval(timerInt);timerInt=null;
@@ -1423,6 +1435,7 @@ async function abrirDetalleProy(proyId){
 async function renderDetProyBody(){
   if(detProyTab==='entregables')await renderEntregablesDetalle();
   else if(detProyTab==='gantt')await renderGanttDetalle();
+  else if(detProyTab==='reporte')await renderReporteDetalle();
   else await renderHorasDetalle();
 }
 async function renderGanttDetalle(){
@@ -1487,8 +1500,204 @@ async function renderHorasDetalle(){
   cont.innerHTML=html;
 }
 
-// ── FILA ENTREGABLE ──
-// ── TOGGLE COMPLETADAS ──
+// ── REPORTE PROYECTO ──
+async function renderReporteDetalle(){
+  const cont=document.getElementById('det-proy-body');
+  cont.innerHTML=`<div class="ldg">Cargando reporte...</div>`;
+  const esAdmin=PERFIL?.rol==='admin';
+  const esBlanco=proyDetalleTipo==='en_blanco';
+
+  const [{data:ents},{data:presupEtapas},{data:regs},{data:proyData}]=await Promise.all([
+    sb.from('entregables').select('etapa_clave,done,eliminado').eq('proyecto_id',proyDetalleId).eq('eliminado',false),
+    sb.from('presupuesto_etapas').select('etapa_clave,monto').eq('proyecto_id',proyDetalleId),
+    // Solo admins calculan consumo en $; colaboradores no tienen acceso a tarifa
+    esAdmin
+      ? sb.from('registros_horas').select('horas,etapa_clave,colaboradores(tarifa)').eq('proyecto_id',proyDetalleId)
+      : Promise.resolve({data:[]}),
+    sb.from('proyectos').select('presupuesto_total,gasto_previo,etapas_activas').eq('id',proyDetalleId).single()
+  ]);
+  const presupTotal=proyData?.presupuesto_total||0;
+  const gastoPrevio=proyData?.gasto_previo||0;
+
+  // ── Avance entregables por etapa ──
+  const avEtapa={};
+  (ents||[]).forEach(e=>{
+    const k=e.etapa_clave||'_';
+    if(!avEtapa[k])avEtapa[k]={t:0,d:0};
+    avEtapa[k].t++;if(e.done)avEtapa[k].d++;
+  });
+  const totalEnt=Object.values(avEtapa).reduce((s,v)=>s+v.t,0);
+  const totalDone=Object.values(avEtapa).reduce((s,v)=>s+v.d,0);
+  const pctGlobal=totalEnt>0?Math.round(totalDone/totalEnt*100):0;
+
+  // ── Presupuesto por etapa ──
+  // Si RLS bloquea presupuesto_etapas para colaboradores, construir distribución
+  // uniforme a partir de etapas_activas del proyecto como fallback.
+  let montoEtapa={};
+  if(presupEtapas&&presupEtapas.length){
+    presupEtapas.forEach(r=>montoEtapa[r.etapa_clave]=r.monto);
+  } else if(!esAdmin&&presupTotal>0&&proyData?.etapas_activas?.length){
+    // Fallback: distribución uniforme — muestra proporciones aunque no exactas
+    const etActivas=proyData.etapas_activas;
+    const montoPorEtapa=Math.round(presupTotal/etActivas.length);
+    etActivas.forEach(k=>montoEtapa[k]=montoPorEtapa);
+  }
+
+  const consumoEtapa={};
+  (regs||[]).forEach(r=>{
+    const k=r.etapa_clave||'_';
+    if(!consumoEtapa[k])consumoEtapa[k]=0;
+    consumoEtapa[k]+=(r.horas*(r.colaboradores?.tarifa||0));
+  });
+  const consumoTotal=Object.values(consumoEtapa).reduce((s,v)=>s+v,0)+gastoPrevio;
+  const pctConsumido=presupTotal>0?Math.min(100,Math.round(consumoTotal/presupTotal*100)):0;
+
+  const COLORES_ET={DE:'#7b9ec0',SD:'#9e7bc0',DD:'#7bc09e',CD:'#c0a77b',PC:'#c07b9e','_':'#8a8ae5'};
+  const etapasOrden=esBlanco?['_']:['DE','SD','DD','CD','PC'];
+
+  // ── Construir SVG donut (presupuesto) ──
+  function buildDonut(slices,cx,cy,r,stroke){
+    // slices: [{pct,color,label}]
+    let total=slices.reduce((s,sl)=>s+sl.pct,0);
+    if(total<=0)return'';
+    const circumference=2*Math.PI*r;
+    let offset=0;let paths='';
+    slices.forEach(sl=>{
+      const dash=(sl.pct/100)*circumference;
+      const gap=circumference-dash;
+      // rotate so first slice starts at top (-90deg)
+      const rotation=-90+(offset/100)*360;
+      paths+=`<circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="${sl.color}" stroke-width="${stroke}"
+        stroke-dasharray="${dash.toFixed(2)} ${gap.toFixed(2)}"
+        transform="rotate(${rotation.toFixed(2)} ${cx} ${cy})"
+        opacity="${sl.pct>0?1:0}"/>`;
+      offset+=sl.pct;
+    });
+    return paths;
+  }
+
+  // ── Sección avance global ──
+  const colorGlobal=pctGlobal>=75?'var(--green)':pctGlobal>=40?'var(--amber)':'var(--accent)';
+  let html=`<div style="padding:20px 20px 0">`;
+
+  // Tarjeta resumen global
+  html+=`<div style="display:grid;grid-template-columns:${!esBlanco&&presupTotal>0?'1fr 1fr':'1fr'};gap:12px;margin-bottom:20px">`;
+
+  // Card avance global
+  html+=`<div style="background:#fff;border:1.5px solid var(--border);border-radius:10px;padding:16px 18px">
+    <div style="font-size:9px;letter-spacing:.12em;text-transform:uppercase;color:var(--ink3);margin-bottom:10px">Avance global</div>
+    <div style="display:flex;align-items:center;gap:14px">
+      <svg width="72" height="72" viewBox="0 0 72 72">
+        <circle cx="36" cy="36" r="28" fill="none" stroke="var(--bg2)" stroke-width="9"/>
+        ${buildDonut([{pct:pctGlobal,color:colorGlobal},{pct:100-pctGlobal,color:'transparent'}],36,36,28,9)}
+        <text x="36" y="40" text-anchor="middle" font-family="DM Mono,monospace" font-size="14" font-weight="500" fill="${colorGlobal}">${pctGlobal}%</text>
+      </svg>
+      <div>
+        <div style="font-family:'Fraunces',serif;font-size:28px;font-weight:300;color:var(--ink);line-height:1">${totalDone}<span style="font-size:14px;color:var(--ink3)">/${totalEnt}</span></div>
+        <div style="font-size:10px;color:var(--ink3);margin-top:2px">entregables completados</div>
+      </div>
+    </div>
+  </div>`;
+
+  // Card presupuesto (solo productivo + admin o % para colab)
+  if(!esBlanco&&presupTotal>0){
+    const colorPres=pctConsumido>=90?'var(--rose)':pctConsumido>=70?'var(--amber)':'var(--green)';
+    const libre=Math.max(0,presupTotal-consumoTotal);
+    html+=`<div style="background:#fff;border:1.5px solid var(--border);border-radius:10px;padding:16px 18px">
+      <div style="font-size:9px;letter-spacing:.12em;text-transform:uppercase;color:var(--ink3);margin-bottom:10px">Presupuesto consumido</div>
+      <div style="display:flex;align-items:center;gap:14px">
+        <svg width="72" height="72" viewBox="0 0 72 72">
+          <circle cx="36" cy="36" r="28" fill="none" stroke="var(--bg2)" stroke-width="9"/>
+          ${buildDonut([{pct:pctConsumido,color:colorPres},{pct:100-pctConsumido,color:'transparent'}],36,36,28,9)}
+          <text x="36" y="40" text-anchor="middle" font-family="DM Mono,monospace" font-size="14" font-weight="500" fill="${colorPres}">${pctConsumido}%</text>
+        </svg>
+        <div>
+          ${esAdmin
+            ?`<div style="font-family:'Fraunces',serif;font-size:20px;font-weight:300;color:${colorPres};line-height:1">$${Math.round(consumoTotal).toLocaleString('es-MX')}</div>
+               <div style="font-size:9px;color:var(--ink3);margin-top:2px">de $${presupTotal.toLocaleString('es-MX')}</div>
+               <div style="font-size:9px;color:var(--green);margin-top:4px">Libre: $${Math.round(libre).toLocaleString('es-MX')}</div>`
+            :`<div style="font-size:11px;color:${colorPres};font-weight:500">${pctConsumido}% consumido</div>
+               <div style="font-size:9px;color:var(--ink3);margin-top:2px">${100-pctConsumido}% disponible</div>`
+          }
+        </div>
+      </div>
+    </div>`;
+  }
+  html+=`</div>`;
+
+  // ── Barras por etapa: avance de entregables ──
+  const etapasConDatos=etapasOrden.filter(k=>avEtapa[k]);
+  if(etapasConDatos.length){
+    html+=`<div style="background:#fff;border:1.5px solid var(--border);border-radius:10px;padding:16px 18px;margin-bottom:12px">
+      <div style="font-size:9px;letter-spacing:.12em;text-transform:uppercase;color:var(--ink3);margin-bottom:14px">Avance por etapa</div>`;
+    etapasConDatos.forEach(k=>{
+      const et=ETAPAS_C.find(x=>x.k===k);
+      const label=esBlanco?'Tareas':`${k} · ${et?.n||k}`;
+      const {t,d}=avEtapa[k];
+      const pct=t>0?Math.round(d/t*100):0;
+      const color=COLORES_ET[k]||'var(--accent)';
+      html+=`<div style="margin-bottom:12px">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
+          <span style="font-size:10px;color:var(--ink2)">${label}</span>
+          <span style="font-size:10px;color:var(--ink3)">${d}/${t} <span style="color:${color};font-weight:600">${pct}%</span></span>
+        </div>
+        <div style="height:8px;background:var(--bg2);border-radius:4px;overflow:hidden">
+          <div style="height:100%;width:${pct}%;background:${color};border-radius:4px;transition:width .4s"></div>
+        </div>
+      </div>`;
+    });
+    html+=`</div>`;
+  }
+
+  // ── Distribución presupuesto por etapa (productivo con presupuesto, todos los roles) ──
+  if(!esBlanco&&presupTotal>0&&Object.keys(montoEtapa).length){
+    // Construir slices para el donut de presupuesto
+    const slicesPresup=[];
+    etapasOrden.forEach(k=>{
+      if(!montoEtapa[k])return;
+      const pct=Math.round(montoEtapa[k]/presupTotal*100);
+      slicesPresup.push({k,pct,color:COLORES_ET[k]||'var(--accent)',monto:montoEtapa[k]});
+    });
+
+    if(slicesPresup.length){
+      html+=`<div style="background:#fff;border:1.5px solid var(--border);border-radius:10px;padding:16px 18px;margin-bottom:12px">
+        <div style="font-size:9px;letter-spacing:.12em;text-transform:uppercase;color:var(--ink3);margin-bottom:14px">Distribución de presupuesto por etapa</div>
+        <div style="display:flex;align-items:center;gap:20px;flex-wrap:wrap">
+          <svg width="110" height="110" viewBox="0 0 110 110" style="flex-shrink:0">
+            <circle cx="55" cy="55" r="42" fill="none" stroke="var(--bg2)" stroke-width="14"/>
+            ${buildDonut(slicesPresup,55,55,42,14)}
+          </svg>
+          <div style="flex:1;min-width:120px">`;
+      slicesPresup.forEach(sl=>{
+        const et=ETAPAS_C.find(x=>x.k===sl.k);
+        const consumidoEt=consumoEtapa[sl.k]||0;
+        const pctConsuEt=sl.monto>0?Math.min(100,Math.round(consumidoEt/sl.monto*100)):0;
+        const colorConsuEt=pctConsuEt>=90?'var(--rose)':pctConsuEt>=70?'var(--amber)':'var(--green)';
+        html+=`<div style="margin-bottom:10px">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:3px">
+            <div style="display:flex;align-items:center;gap:6px">
+              <span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${sl.color};margin-right:6px;flex-shrink:0"></span>
+              <span style="font-size:10px;color:var(--ink2)">${sl.k} · ${et?.n||sl.k}</span>
+            </div>
+            <span style="font-size:10px;font-weight:600;color:var(--ink);margin-left:8px">${sl.pct}%${esAdmin?` <span style="font-weight:400;color:var(--ink3)">· $${Math.round(sl.monto).toLocaleString('es-MX')}</span>`:''}</span>
+          </div>
+          ${esAdmin?`
+          <div style="height:5px;background:var(--bg2);border-radius:3px;overflow:hidden">
+            <div style="height:100%;width:${pctConsuEt}%;background:${colorConsuEt};border-radius:3px"></div>
+          </div>
+          <div style="font-size:9px;color:var(--ink3);margin-top:2px;text-align:right">Consumido: $${Math.round(consumidoEt).toLocaleString('es-MX')} (${pctConsuEt}%)</div>`
+          :''}
+        </div>`;
+      });
+      html+=`</div></div></div>`;
+    }
+  }
+
+  html+=`</div>`; // padding wrapper
+  cont.innerHTML=html;
+}
+
+
 function toggleCompletadas(grpId, toggleRow){
   const filas=document.querySelectorAll(`.comp-row-${grpId}`);
   const arrow=document.getElementById(`arr-${grpId}`);
@@ -2440,13 +2649,23 @@ async function abrirNuevoProy(){
   document.getElementById('ov-proy2').classList.add('on');
 }
 async function abrirEditProy(id){
-  const {data:p}=await sb.from('proyectos').select('*').eq('id',id).single();if(!p)return;
+  const [{data:p},{data:presupEtapasDB}]=await Promise.all([
+    sb.from('proyectos').select('*').eq('id',id).single(),
+    sb.from('presupuesto_etapas').select('etapa_clave,monto').eq('proyecto_id',id)
+  ]);
+  if(!p)return;
+  // Convertir montos guardados a porcentajes para pre-llenar el form
+  const presupTotal=p.presupuesto_total||0;
+  const pctGuardados={};
+  (presupEtapasDB||[]).forEach(r=>{
+    pctGuardados[r.etapa_clave]=presupTotal>0?Math.round(r.monto/presupTotal*100):0;
+  });
   proyEditId2=id;etapasSel2=new Set(p.etapas_activas||[]);
   document.getElementById('pf-title2').textContent='Editar proyecto';
   document.getElementById('pf-cod').value=p.codigo;document.getElementById('pf-nom2').value=p.nombre;
-  document.getElementById('pf-cli').value=p.cliente||'';document.getElementById('pf-presup2').value=p.presupuesto_total||'';
+  document.getElementById('pf-cli').value=p.cliente||'';document.getElementById('pf-presup2').value=presupTotal||'';
   document.getElementById('pf-gasto').value=p.gasto_previo||0;document.getElementById('pf-del').style.display='block';
-  selTipoProy(p.tipo||'productivo');renderEtapasCheck2();actualizarDist2();await renderColabsCheck(id);
+  selTipoProy(p.tipo||'productivo');renderEtapasCheck2();actualizarDist2(pctGuardados);await renderColabsCheck(id);
   document.getElementById('ov-proy2').classList.add('on');
 }
 function renderEtapasCheck2(){
@@ -2459,11 +2678,11 @@ function renderEtapasCheck2(){
     c.appendChild(b);
   });
 }
-function actualizarDist2(){
+function actualizarDist2(pctGuardados){
   const presup=parseFloat(document.getElementById('pf-presup2')?.value)||0;const wrap=document.getElementById('pf-dist2');
   if(!etapasSel2.size||!presup){if(wrap)wrap.style.display='none';return;}if(wrap)wrap.style.display='block';
   const cont=document.getElementById('pf-dist-cont');if(!cont)return;const pctDef=Math.round(100/etapasSel2.size);cont.innerHTML='';
-  etapasSel2.forEach(k=>{const et=ETAPAS_C.find(x=>x.k===k);const monto=Math.round(presup*pctDef/100);cont.innerHTML+=`<div style="display:flex;align-items:center;gap:8px;margin-bottom:10px"><span style="font-size:10px;color:var(--ink2);width:120px;flex-shrink:0"><b style="color:var(--accent)">${k}</b> · ${et?.n}</span><input type="number" id="dist2-${k}" value="${pctDef}" min="0" max="100" style="width:60px;padding:6px 8px;text-align:right" oninput="recalcDist2()"> %<span style="font-size:11px;color:var(--ink3);flex:1;text-align:right" id="dm2-${k}">$${monto.toLocaleString('es-MX')}</span></div>`;});
+  etapasSel2.forEach(k=>{const et=ETAPAS_C.find(x=>x.k===k);const pct=(pctGuardados&&pctGuardados[k]!=null)?pctGuardados[k]:pctDef;const monto=Math.round(presup*pct/100);cont.innerHTML+=`<div style="display:flex;align-items:center;gap:8px;margin-bottom:10px"><span style="font-size:10px;color:var(--ink2);width:120px;flex-shrink:0"><b style="color:var(--accent)">${k}</b> · ${et?.n}</span><input type="number" id="dist2-${k}" value="${pct}" min="0" max="100" style="width:60px;padding:6px 8px;text-align:right" oninput="recalcDist2()"> %<span style="font-size:11px;color:var(--ink3);flex:1;text-align:right" id="dm2-${k}">$${monto.toLocaleString('es-MX')}</span></div>`;});
 }
 function recalcDist2(){
   const presup=parseFloat(document.getElementById('pf-presup2').value)||0;let tot=0;

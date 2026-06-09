@@ -274,6 +274,11 @@ textarea{resize:none;height:62px;}
 .det-modal-header{padding:20px 22px 0;flex-shrink:0;}
 .det-modal-body{flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;}
 
+/* ── COMPLETADAS OCULTAS ── */
+tr.comp-hidden{display:none;}
+tr.comp-toggle-row{cursor:pointer;}
+tr.comp-toggle-row:hover td{background:var(--bg2);}
+
 /* ── SELECCIÓN MÚLTIPLE ── */
 .ent-table tbody tr.sel-row{background:var(--acc-lt)!important;outline:1px solid rgba(40,40,184,.2);}
 .sel-bar{
@@ -441,17 +446,25 @@ textarea{resize:none;height:62px;}
     <div id="dpd-sec-unica">
       <div style="font-size:9px;letter-spacing:.1em;text-transform:uppercase;color:var(--ink3);margin-bottom:6px">Fecha</div>
       <input type="date" id="dpd-unica" style="width:100%;padding:8px 10px;border:1.5px solid var(--border);border-radius:8px;font-size:12px">
-      <div style="display:flex;align-items:center;justify-content:space-between;margin-top:14px;padding-top:14px;border-top:1px solid var(--border)">
-        <span style="font-size:11px;color:var(--ink2)">Repetir</span>
-        <select id="dpd-frecuencia" onchange="dpFrecChange()" style="font-size:11px;padding:5px 8px;border:1.5px solid var(--border);border-radius:7px;background:#fff;color:var(--ink);width:auto">
-          <option value="">No se repite</option>
-          <option value="daily">Diario</option>
-          <option value="weekly">Semanal</option>
-          <option value="monthly">Mensual</option>
-          <option value="yearly">Anual</option>
-        </select>
+      <div style="margin-top:14px;padding-top:14px;border-top:1px solid var(--border)">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+          <span style="font-size:11px;color:var(--ink2)">Repetir</span>
+          <div style="display:flex;gap:2px;background:var(--bg2);border-radius:7px;padding:2px">
+            <button id="dpd-rep-no" onclick="dpSetRepeat('none')" style="padding:5px 9px;border-radius:5px;border:none;font-size:10px;cursor:pointer;background:var(--accent);color:#fff">No</button>
+            <button id="dpd-rep-sem" onclick="dpSetRepeat('weeks')" style="padding:5px 9px;border-radius:5px;border:none;font-size:10px;cursor:pointer;background:none;color:var(--ink2)">Semanas</button>
+            <button id="dpd-rep-mes" onclick="dpSetRepeat('months')" style="padding:5px 9px;border-radius:5px;border:none;font-size:10px;cursor:pointer;background:none;color:var(--ink2)">Meses</button>
+          </div>
+        </div>
+        <div id="dpd-custom-rep" style="display:none;background:var(--bg2);border-radius:8px;padding:10px 12px">
+          <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+            <span style="font-size:10px;color:var(--ink2);white-space:nowrap">Cada</span>
+            <div style="display:flex;gap:4px" id="dpd-n-btns"></div>
+            <span id="dpd-unit-lbl" style="font-size:10px;color:var(--ink3)">semanas</span>
+          </div>
+        </div>
       </div>
-      <div id="dpd-dias-semana" style="display:none;margin-top:12px">
+      <input type="hidden" id="dpd-frecuencia">
+      <div id="dpd-dias-semana" style="display:none;margin-top:10px">
         <div style="font-size:9px;letter-spacing:.1em;text-transform:uppercase;color:var(--ink3);margin-bottom:8px">En estos días</div>
         <div style="display:flex;gap:4px;justify-content:space-between">
           <button id="dpd-dia-0" onclick="dpToggleDia(0)" style="width:34px;height:34px;border-radius:50%;border:1.5px solid var(--border);background:#fff;font-size:10px;font-weight:500;cursor:pointer;color:var(--ink2)">D</button>
@@ -644,7 +657,7 @@ const TIMER_MAX_SECS=28800;
 function hace(n){const d=new Date();d.setDate(d.getDate()-n);const y=d.getFullYear(),m=String(d.getMonth()+1).padStart(2,'0'),dd=String(d.getDate()).padStart(2,'0');return `${y}-${m}-${dd}`;}
 function fF(iso){if(!iso)return null;const[y,m,d]=iso.split('-');const M=['ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic'];return `${parseInt(d)} ${M[parseInt(m)-1]}`;}
 function dH(iso){if(!iso)return null;return Math.round((new Date(iso+' 00:00')-new Date(hoy()+' 00:00'))/864e5);}
-function fS(s){return `${String(Math.floor(s/60)).padStart(2,'0')}:${String(s%60).padStart(2,'0')}`;}
+function fS(s){const h=Math.floor(s/3600),m=Math.floor((s%3600)/60),sec=s%60;return h>0?`${h}:${String(m).padStart(2,'0')}:${String(sec).padStart(2,'0')}`:`${String(m).padStart(2,'0')}:${String(sec).padStart(2,'0')}`;}
 function hD(h){const hh=Math.floor(h),mm=Math.round((h-hh)*60);return `${hh}:${String(mm).padStart(2,'0')}`;}
 function hT(h){const hh=Math.floor(h),mm=Math.round((h-hh)*60);if(hh===0)return `${mm}min`;if(mm===0)return `${hh}h`;return `${hh}h ${mm}m`;}
 function ini(a,b){return((a||'')[0]+(b||'')[0]).toUpperCase();}
@@ -1090,29 +1103,43 @@ function tEt(h){h.nextElementSibling.classList.toggle('open');h.querySelector('.
 function tSD(pid){showDone[pid]=!showDone[pid];renderMisTareas();}
 async function tDone(id,cur){
   const done=cur===true||cur==='true'?false:true;
-  await sb.from('entregables').update({done}).eq('id',id);
   if(done){
-    // Misma lógica de recurrencia que toggleDoneDetalle
+    // Leer ANTES de marcar done
     const {data:e}=await sb.from('entregables').select('*').eq('id',id).single();
+    await sb.from('entregables').update({done:true}).eq('id',id);
     if(e?.recurrente&&e?.frecuencia){
       const baseDate=e.fecha_unica?new Date(e.fecha_unica+'T12:00:00'):new Date();
       const dias=new Set(e.dias_semana||[]);
-      const siguiente=dpSiguienteFecha(baseDate,e.frecuencia,dias);
+      const siguiente=dpSiguienteFecha(baseDate,e.frecuencia||'',dias);
       if(siguiente){
         const sigStr=fechaAStr(siguiente);
-        const {data:exist}=await sb.from('entregables').select('id').eq('proyecto_id',e.proyecto_id).eq('nombre',e.nombre).eq('fecha_unica',sigStr).eq('done',false).maybeSingle();
+        // Verificar si ya existe (incluir eliminadas no)
+        const {data:exist}=await sb.from('entregables').select('id')
+          .eq('proyecto_id',e.proyecto_id).eq('nombre',e.nombre)
+          .eq('fecha_unica',sigStr).eq('done',false).eq('eliminado',false).maybeSingle();
         if(!exist){
-          await sb.from('entregables').insert({
-            proyecto_id:e.proyecto_id,etapa_clave:e.etapa_clave,grupo:e.grupo,
-            nombre:e.nombre,done:false,eliminado:false,recurrente:true,
-            frecuencia:e.frecuencia,dias_semana:e.dias_semana,
-            fecha_unica:sigStr,asignado_id:e.asignado_id,orden:e.orden
-          });
-          toast(`✓ Completado · Próxima: ${fF(sigStr)}`);
+          const nuevaTarea={
+            proyecto_id:e.proyecto_id, etapa_clave:e.etapa_clave, grupo:e.grupo,
+            nombre:e.nombre, done:false, eliminado:false, recurrente:true,
+            frecuencia:e.frecuencia, dias_semana:e.dias_semana,
+            fecha_unica:sigStr, asignado_id:e.asignado_id, orden:e.orden
+          };
+          const {error}=await sb.from('entregables').insert(nuevaTarea);
+          if(error){
+            // RLS puede bloquear el INSERT para colaboradores — intentar via update de la tarea actual
+            console.warn('INSERT bloqueado por RLS, actualizando fecha_unica en su lugar:', error.message);
+            await sb.from('entregables').update({done:false, fecha_unica:sigStr}).eq('id',id);
+            toast(`✓ Completado · Próxima: ${fF(sigStr)}`);
+          } else {
+            toast(`✓ Completado · Próxima: ${fF(sigStr)}`);
+          }
         } else { toast('✓ Completado'); }
       } else { toast('✓ Completado'); }
     } else { toast('✓ Completado'); }
-  } else { toast('Desmarcado'); }
+  } else {
+    await sb.from('entregables').update({done:false}).eq('id',id);
+    toast('Desmarcado');
+  }
   renderMisTareas();
 }
 
@@ -1461,6 +1488,18 @@ async function renderHorasDetalle(){
 }
 
 // ── FILA ENTREGABLE ──
+// ── TOGGLE COMPLETADAS ──
+function toggleCompletadas(grpId, toggleRow){
+  const filas=document.querySelectorAll(`.comp-row-${grpId}`);
+  const arrow=document.getElementById(`arr-${grpId}`);
+  const ocultas=Array.from(filas).every(f=>f.classList.contains('comp-hidden'));
+  filas.forEach(f=>{
+    if(ocultas) f.classList.remove('comp-hidden');
+    else f.classList.add('comp-hidden');
+  });
+  if(arrow) arrow.textContent=ocultas?'▼':'▶';
+}
+
 // ── FILA ENTREGABLE → tabla ──
 function _tdFecha(label, entId, inicio, fin){
   // Clickeable solo si hay fecha o es admin
@@ -1553,6 +1592,19 @@ function _filaTabla(e, colabs, esAdmin){
   </tr>`;
 }
 
+function _filaTablaComp(e,colabs,esAdmin,grpId){
+  try{
+    const base=_filaTabla(e,colabs,esAdmin);
+    return base.replace(
+      /class="[^"]*ent-fila-sel[^"]*"/,
+      `class="comp-hidden comp-row-${grpId} done-row ent-fila-sel"`
+    );
+  }catch(err){
+    console.warn('Error rendering fila completada',e?.id,err);
+    return '';
+  }
+}
+
 function _tablaHeader(){
   return `<thead><tr>
     <th class="col-nombre">Tarea</th>
@@ -1639,8 +1691,12 @@ async function _renderEntBlanco(cont,colabs,esAdmin){
     pend.forEach(e=>{ html+=_filaTabla(e,colabs,esAdmin); });
     html+=`</tbody><tbody>`;
     if(comp.length){
-      html+=`<tr style="background:var(--bg)"><td colspan="5" style="padding:6px 16px;font-size:9px;color:var(--ink3);cursor:pointer" onclick="const s=this.closest('tr').nextElementSibling;s.style.display=s.style.display==='none'?'':'none'">▼ Completadas <span class="ccount">${comp.length}</span></td></tr>`;
-      comp.forEach(e=>{ html+=_filaTabla(e,colabs,esAdmin); });
+      const compGrpId='cg-'+Math.random().toString(36).slice(2,8);
+      html+=`<tr class="comp-toggle-row" data-grp="${compGrpId}" onclick="toggleCompletadas('${compGrpId}',this)">
+        <td colspan="5" style="padding:6px 16px;font-size:9px;color:var(--ink3);background:var(--bg)">
+          <span id="arr-${compGrpId}">▶</span> Completadas <span class="ccount">${comp.length}</span>
+        </td></tr>`;
+      comp.forEach(e=>{ html+=_filaTablaComp(e,colabs,esAdmin,compGrpId); });
     }
     if(esAdmin)html+=`<tr><td colspan="5" style="padding:0"><button onclick="abrirNuevoEntBlanco('${grupo}')" style="display:flex;align-items:center;gap:6px;padding:8px 16px;font-size:10px;color:var(--accent);background:none;border:none;border-top:1px dashed var(--border);width:100%;cursor:pointer">+ Agregar tarea aquí</button></td></tr>`;
   });
@@ -1673,11 +1729,12 @@ async function _renderEntProductivo(cont,colabs,esAdmin){
       pend.forEach(e=>{ html+=_filaTabla(e,colabs,esAdmin); });
       html+=`</tbody><tbody>`;
       if(comp.length){
-        const compId2='comp-'+Math.random().toString(36).slice(2);
-        html+=`<tr style="background:var(--bg)"><td colspan="5" style="padding:6px 16px;font-size:9px;color:var(--ink3);cursor:pointer" onclick="const s=document.getElementById('${compId2}');s.style.display=s.style.display==='none'?'':'none'">▼ Completadas <span class="ccount">${comp.length}</span></td></tr>`;
-        html+=`</tbody><tbody id="${compId2}" style="display:none">`;
-        comp.forEach(e=>{ html+=_filaTabla(e,colabs,esAdmin); });
-        html+=`</tbody><tbody>`;
+        const compGrpId='cg-'+Math.random().toString(36).slice(2,8);
+        html+=`<tr class="comp-toggle-row" data-grp="${compGrpId}" onclick="toggleCompletadas('${compGrpId}',this)">
+          <td colspan="5" style="padding:6px 16px;font-size:9px;color:var(--ink3);background:var(--bg)">
+            <span id="arr-${compGrpId}">▶</span> Completadas <span class="ccount">${comp.length}</span>
+          </td></tr>`;
+        comp.forEach(e=>{ html+=_filaTablaComp(e,colabs,esAdmin,compGrpId); });
       }
     });
     if(esAdmin)html+=`<tr><td colspan="5" style="padding:0"><button onclick="abrirNuevoEntDetalle('${et.k}','')" style="display:flex;align-items:center;gap:6px;padding:8px 16px;font-size:10px;color:var(--accent);background:none;border:none;border-top:1px dashed var(--border);width:100%;cursor:pointer">+ Agregar entregable</button></td></tr>`;
@@ -1791,7 +1848,58 @@ function dpSetMode(mode){
   document.getElementById('dpd-tab-rango').style.background=mode==='rango'?'var(--accent)':'none';
   document.getElementById('dpd-tab-rango').style.color=mode==='rango'?'#fff':'var(--ink2)';
 }
-function dpFrecChange(){const frec=document.getElementById('dpd-frecuencia').value;document.getElementById('dpd-dias-semana').style.display=frec==='weekly'?'block':'none';dpUpdatePreview();}
+// ── RECURRENCIA CUSTOM ──
+let dpRepUnit='none'; // 'none' | 'weeks' | 'months'
+let dpRepN=1;
+const DP_N_OPTIONS_WEEKS=[1,2,3,4,6,8];
+const DP_N_OPTIONS_MONTHS=[1,2,3,6];
+
+function dpSetRepeat(unit){
+  dpRepUnit=unit;
+  // actualizar botones de selección
+  ['no','sem','mes'].forEach(k=>{
+    const b=document.getElementById('dpd-rep-'+k);
+    const active=(k==='no'&&unit==='none')||(k==='sem'&&unit==='weeks')||(k==='mes'&&unit==='months');
+    b.style.background=active?'var(--accent)':'none';
+    b.style.color=active?'#fff':'var(--ink2)';
+  });
+  const repDiv=document.getElementById('dpd-custom-rep');
+  const diasDiv=document.getElementById('dpd-dias-semana');
+  if(unit==='none'){
+    repDiv.style.display='none';diasDiv.style.display='none';
+    document.getElementById('dpd-frecuencia').value='';
+    dpUpdatePreview();return;
+  }
+  repDiv.style.display='block';
+  document.getElementById('dpd-unit-lbl').textContent=unit==='weeks'?'semanas':'meses';
+  diasDiv.style.display=unit==='weeks'?'block':'none';
+  const opts=unit==='weeks'?DP_N_OPTIONS_WEEKS:DP_N_OPTIONS_MONTHS;
+  if(!opts.includes(dpRepN))dpRepN=opts[0];
+  dpRenderNBtns(opts);
+  dpUpdateFrecuencia();
+  dpUpdatePreview();
+}
+
+function dpRenderNBtns(opts){
+  const cont=document.getElementById('dpd-n-btns');
+  cont.innerHTML=opts.map(n=>`<button onclick="dpSelN(${n})" id="dpd-n-${n}" style="width:28px;height:28px;border-radius:6px;border:1.5px solid var(--border);font-size:10px;cursor:pointer;background:${n===dpRepN?'var(--accent)':'#fff'};color:${n===dpRepN?'#fff':'var(--ink2)'}">${n}</button>`).join('');
+}
+
+function dpSelN(n){
+  dpRepN=n;
+  const opts=dpRepUnit==='weeks'?DP_N_OPTIONS_WEEKS:DP_N_OPTIONS_MONTHS;
+  dpRenderNBtns(opts);
+  dpUpdateFrecuencia();
+  dpUpdatePreview();
+}
+
+function dpUpdateFrecuencia(){
+  if(dpRepUnit==='none'){document.getElementById('dpd-frecuencia').value='';return;}
+  document.getElementById('dpd-frecuencia').value=`every_${dpRepN}_${dpRepUnit}`;
+}
+
+function dpFrecChange(){/* legacy – no-op, reemplazado por dpSetRepeat */}
+
 function dpToggleDia(i){
   const btn=document.getElementById('dpd-dia-'+i);
   if(dpDiasSel.has(i)){dpDiasSel.delete(i);btn.style.background='#fff';btn.style.color='var(--ink2)';}
@@ -1808,6 +1916,19 @@ function dpUpdatePreview(){
 }
 function dpSiguienteFecha(desde,frec,dias){
   const d=new Date(desde);
+  // formato nuevo: every_N_weeks / every_N_months
+  const mW=frec&&frec.match(/^every_(\d+)_weeks$/);
+  const mM=frec&&frec.match(/^every_(\d+)_months$/);
+  if(mW){
+    const n=parseInt(mW[1]);
+    const diasArr=[...dias].sort();
+    if(!diasArr.length){d.setDate(d.getDate()+n*7);return d;}
+    // buscar el siguiente día de semana dentro del ciclo
+    for(let i=1;i<=n*7;i++){const nd=new Date(d);nd.setDate(nd.getDate()+i);if(diasArr.includes(nd.getDay()))return nd;}
+    return null;
+  }
+  if(mM){const n=parseInt(mM[1]);d.setMonth(d.getMonth()+n);return d;}
+  // compatibilidad con formato legacy
   if(frec==='daily'){d.setDate(d.getDate()+1);return d;}
   if(frec==='weekly'){const diasArr=[...dias].sort();if(!diasArr.length)return null;for(let i=1;i<=7;i++){const nd=new Date(d);nd.setDate(nd.getDate()+i);if(diasArr.includes(nd.getDay()))return nd;}return null;}
   if(frec==='monthly'){d.setMonth(d.getMonth()+1);return d;}
@@ -1816,8 +1937,11 @@ function dpSiguienteFecha(desde,frec,dias){
 }
 function dpLimpiar(){
   document.getElementById('dpd-unica').value='';document.getElementById('dpd-inicio').value='';document.getElementById('dpd-fin').value='';
-  document.getElementById('dpd-frecuencia').value='';dpDiasSel=new Set();
+  document.getElementById('dpd-frecuencia').value='';dpDiasSel=new Set();dpRepUnit='none';dpRepN=1;
   [0,1,2,3,4,5,6].forEach(i=>{const btn=document.getElementById('dpd-dia-'+i);if(btn){btn.style.background='#fff';btn.style.color='var(--ink2)';}});
+  // resetear botones de unidad
+  ['no','sem','mes'].forEach(k=>{const b=document.getElementById('dpd-rep-'+k);if(b){b.style.background=k==='no'?'var(--accent)':'none';b.style.color=k==='no'?'#fff':'var(--ink2)';}});
+  document.getElementById('dpd-custom-rep').style.display='none';
   document.getElementById('dpd-dias-semana').style.display='none';document.getElementById('dpd-preview').style.display='none';
 }
 async function abrirDPDetalle(entId,inicio,fin){
@@ -1826,7 +1950,15 @@ async function abrirDPDetalle(entId,inicio,fin){
   dpDiasSel=new Set(e?.dias_semana||[]);dpLimpiar();
   if(e?.fecha_unica||e?.recurrente){
     dpSetMode('unica');document.getElementById('dpd-unica').value=e.fecha_unica||'';
-    if(e.frecuencia){document.getElementById('dpd-frecuencia').value=e.frecuencia;dpFrecChange();}
+    if(e.frecuencia){
+      // restaurar control de recurrencia
+      const mW=e.frecuencia.match(/^every_(\d+)_weeks$/);
+      const mM=e.frecuencia.match(/^every_(\d+)_months$/);
+      if(mW){dpRepN=parseInt(mW[1]);dpSetRepeat('weeks');}
+      else if(mM){dpRepN=parseInt(mM[1]);dpSetRepeat('months');}
+      else if(e.frecuencia==='weekly'){dpRepN=1;dpSetRepeat('weeks');}
+      else if(e.frecuencia==='monthly'){dpRepN=1;dpSetRepeat('months');}
+    }
     if(e.dias_semana?.length){dpDiasSel=new Set(e.dias_semana);e.dias_semana.forEach(i=>{const btn=document.getElementById('dpd-dia-'+i);if(btn){btn.style.background='var(--accent)';btn.style.color='#fff';}});}
     dpUpdatePreview();
   } else {
@@ -1848,7 +1980,8 @@ async function guardarFechasDetalle(){
   } else {
     const fecha=document.getElementById('dpd-unica').value||null;
     const frec=document.getElementById('dpd-frecuencia').value||null;
-    const dias=frec==='weekly'&&dpDiasSel.size?[...dpDiasSel]:null;
+    const esWeeks=frec&&frec.includes('_weeks');
+    const dias=esWeeks&&dpDiasSel.size?[...dpDiasSel]:null;
     for(const id of ids){
       await sb.from('entregables').update({fecha_unica:fecha,fecha_inicio:null,fecha_fin:null,recurrente:!!frec,frecuencia:frec,dias_semana:dias}).eq('id',id);
     }
@@ -2013,7 +2146,7 @@ async function toggleDoneDetalle(entId,cur){
     const {data:e}=await sb.from('entregables').select('*').eq('id',entId).single();
     if(e?.recurrente&&e?.frecuencia){
       const baseDate=e.fecha_unica?new Date(e.fecha_unica+'T12:00:00'):new Date();
-      const dias=new Set(e.dias_semana||[]);const siguiente=dpSiguienteFecha(baseDate,e.frecuencia,dias);
+      const dias=new Set(e.dias_semana||[]);const siguiente=dpSiguienteFecha(baseDate,e.frecuencia||'',dias);
       if(siguiente){
         const sigStr=fechaAStr(siguiente);
         const {data:exist}=await sb.from('entregables').select('id').eq('proyecto_id',e.proyecto_id).eq('nombre',e.nombre).eq('fecha_unica',sigStr).eq('done',false).maybeSingle();

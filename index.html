@@ -37,7 +37,7 @@ button{font-family:'DM Mono',monospace;cursor:pointer;}
 .inp{width:100%;font-family:'DM Mono',monospace;font-size:13px;color:var(--ink);background:var(--bg);border:1.5px solid var(--border);border-radius:8px;padding:11px 12px;outline:none;transition:border-color .15s;margin-bottom:12px;}
 .inp:focus{border-color:var(--accent);background:#fff;}
 .login-btn{width:100%;padding:14px;background:var(--accent);color:#fff;border:none;border-radius:9px;font-size:12px;letter-spacing:.08em;text-transform:uppercase;transition:background .15s;}
-.login-btn:hover{background:#1e1e9a;}
+.login-btn:hover{background:#f0f0f0;}
 .login-btn:disabled{opacity:.5;}
 .login-err{font-size:11px;color:var(--rose);text-align:center;margin-top:10px;min-height:16px;}
 
@@ -319,11 +319,10 @@ tr.comp-toggle-row:hover td{background:var(--bg2);}
   <div class="login-logo">hacer:</div>
   <div class="login-sub">Gestión de horas</div>
   <div class="login-card">
-    <label class="lbl">Email</label>
-    <input class="inp" type="email" id="lin-email" placeholder="tu@hacer.mx" autocomplete="email">
-    <label class="lbl">Contraseña</label>
-    <input class="inp" type="password" id="lin-pass" placeholder="••••••••" autocomplete="current-password" onkeydown="if(event.key==='Enter')login()">
-    <button class="login-btn" id="lin-btn" onclick="login()">Entrar</button>
+    <button class="login-btn" id="lin-btn" onclick="loginGoogle()" style="display:flex;align-items:center;justify-content:center;gap:10px;background:#fff;color:var(--ink);border:1.5px solid var(--border);">
+      <svg width="18" height="18" viewBox="0 0 48 48"><path fill="#4285F4" d="M44.5 20H24v8.5h11.8C34.7 33.9 30.1 37 24 37c-7.2 0-13-5.8-13-13s5.8-13 13-13c3.1 0 5.9 1.1 8.1 2.9l6.4-6.4C34.6 4.1 29.6 2 24 2 11.8 2 2 11.8 2 24s9.8 22 22 22c11 0 21-8 21-21 0-1.3-.2-2.7-.5-4z"/><path fill="#34A853" d="M6.3 14.7l7 5.1C15 16.1 19.1 13 24 13c3.1 0 5.9 1.1 8.1 2.9l6.4-6.4C34.6 4.1 29.6 2 24 2 16.3 2 9.6 6.4 6.3 14.7z"/><path fill="#FBBC05" d="M24 46c5.8 0 10.8-1.9 14.8-5.2l-6.8-5.6C29.8 36.7 27 37.5 24 37.5c-6 0-11.1-4-12.9-9.5l-7 5.4C7.6 41.4 15.3 46 24 46z"/><path fill="#EA4335" d="M44.5 20H24v8.5h11.8c-.9 2.6-2.6 4.8-4.9 6.3l6.8 5.6C41.9 37.3 45 31.1 45 24c0-1.3-.2-2.7-.5-4z"/></svg>
+      Entrar con Google
+    </button>
     <div class="login-err" id="lin-err"></div>
   </div>
 </div>
@@ -693,17 +692,15 @@ async function loadPerfil(){
   const {data}=await sb.from('colaboradores').select('*').eq('id',USER.id).single();
   PERFIL=data;
 }
-async function login(){
-  const email=document.getElementById('lin-email').value.trim();
-  const pass=document.getElementById('lin-pass').value;
-  const err=document.getElementById('lin-err');
+async function loginGoogle(){
   const btn=document.getElementById('lin-btn');
-  err.textContent='';
-  if(!email||!pass){err.textContent='Completa los campos';return;}
-  btn.disabled=true;btn.textContent='Entrando...';
-  const {data,error}=await sb.auth.signInWithPassword({email,password:pass});
-  if(error){err.textContent=error.message==='Invalid login credentials'?'Email o contraseña incorrectos':error.message;btn.disabled=false;btn.textContent='Entrar';return;}
-  USER=data.user;await loadPerfil();showApp();
+  const err=document.getElementById('lin-err');
+  btn.disabled=true;btn.textContent='Redirigiendo...';
+  const {error}=await sb.auth.signInWithOAuth({
+    provider:'google',
+    options:{redirectTo:window.location.href}
+  });
+  if(error){err.textContent=error.message;btn.disabled=false;btn.innerHTML=`<svg width="18" height="18" viewBox="0 0 48 48"><path fill="#4285F4" d="M44.5 20H24v8.5h11.8C34.7 33.9 30.1 37 24 37c-7.2 0-13-5.8-13-13s5.8-13 13-13c3.1 0 5.9 1.1 8.1 2.9l6.4-6.4C34.6 4.1 29.6 2 24 2 11.8 2 2 11.8 2 24s9.8 22 22 22c11 0 21-8 21-21 0-1.3-.2-2.7-.5-4z"/><path fill="#34A853" d="M6.3 14.7l7 5.1C15 16.1 19.1 13 24 13c3.1 0 5.9 1.1 8.1 2.9l6.4-6.4C34.6 4.1 29.6 2 24 2 16.3 2 9.6 6.4 6.3 14.7z"/><path fill="#FBBC05" d="M24 46c5.8 0 10.8-1.9 14.8-5.2l-6.8-5.6C29.8 36.7 27 37.5 24 37.5c-6 0-11.1-4-12.9-9.5l-7 5.4C7.6 41.4 15.3 46 24 46z"/><path fill="#EA4335" d="M44.5 20H24v8.5h11.8c-.9 2.6-2.6 4.8-4.9 6.3l6.8 5.6C41.9 37.3 45 31.1 45 24c0-1.3-.2-2.7-.5-4z"/></svg> Entrar con Google`;}
 }
 async function logout(){
   if(!confirm('¿Cerrar sesión?'))return;

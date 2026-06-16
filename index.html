@@ -306,6 +306,31 @@ tr.comp-toggle-row:hover td{background:var(--bg2);}
 
 /* ── REG PREVIO ── */
 #reg-previo{display:none;margin:0 0 10px;padding:8px 12px;background:var(--acc-lt);border-radius:8px;font-size:10px;color:var(--accent);}
+
+/* ── COLABORADORES PANE ── */
+.colabs-layout{padding:24px;max-width:900px;}
+.colab-card-btn{
+  display:flex;align-items:center;gap:14px;
+  padding:14px 16px;background:#fff;border-radius:var(--r);border:1.5px solid var(--border);
+  margin-bottom:10px;cursor:pointer;width:100%;text-align:left;
+  transition:border-color .18s,box-shadow .18s,transform .14s;
+}
+.colab-card-btn:hover{border-color:var(--accent);box-shadow:0 4px 20px rgba(40,40,184,.10);transform:translateY(-1px);}
+.colab-card-btn:active{transform:translateY(0);box-shadow:none;}
+
+/* Modal tareas de colaborador */
+#ov-colab-tareas{align-items:center;padding:20px;}
+#ov-colab-tareas .modal{max-width:640px;max-height:88vh;display:flex;flex-direction:column;padding:0;overflow:hidden;}
+.ct-header{padding:20px 22px 16px;border-bottom:1px solid var(--border);flex-shrink:0;}
+.ct-body{flex:1;overflow-y:auto;}
+.ct-proy-sec{border-bottom:1px solid var(--border);}
+.ct-proy-sec:last-child{border-bottom:none;}
+.ct-proy-hdr{display:flex;align-items:center;gap:8px;padding:10px 18px;background:var(--bg2);}
+.ct-tarea-row{display:flex;align-items:center;gap:10px;padding:9px 18px 9px 22px;border-bottom:1px dashed var(--border);}
+.ct-tarea-row:last-child{border-bottom:none;}
+.ct-done-circle{width:16px;height:16px;border-radius:50%;border:1.5px solid var(--border);display:flex;align-items:center;justify-content:center;font-size:8px;color:#fff;flex-shrink:0;}
+.ct-done-circle.done{background:var(--green);border-color:var(--green);}
+.ct-empty{padding:32px;text-align:center;color:var(--ink3);font-size:11px;}
 </style>
 </head>
 <body>
@@ -429,6 +454,23 @@ tr.comp-toggle-row:hover td{background:var(--bg2);}
         <button class="sel-bar-clr" onclick="limpiarSeleccion()" title="Cancelar selección">×</button>
       </div>
       <div class="det-modal-body" id="det-proy-body"></div>
+  </div>
+</div>
+
+<!-- TAREAS DE COLABORADOR -->
+<div class="ov" id="ov-colab-tareas" onclick="if(event.target.id==='ov-colab-tareas')document.getElementById('ov-colab-tareas').classList.remove('on')" style="z-index:400">
+  <div class="modal" style="position:relative;max-width:640px;max-height:88vh;display:flex;flex-direction:column;padding:0;overflow:hidden;">
+    <button class="modal-close" style="top:14px;right:14px" onclick="document.getElementById('ov-colab-tareas').classList.remove('on')">×</button>
+    <div class="ct-header">
+      <div style="display:flex;align-items:center;gap:12px">
+        <div id="ct-avatar" style="width:40px;height:40px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:600;color:#fff;flex-shrink:0"></div>
+        <div>
+          <div style="font-family:'Fraunces',serif;font-size:18px;font-weight:300" id="ct-nombre"></div>
+          <div style="font-size:10px;color:var(--ink3);margin-top:1px">Tareas asignadas por proyecto</div>
+        </div>
+      </div>
+    </div>
+    <div class="ct-body" id="ct-body"></div>
   </div>
 </div>
 
@@ -716,7 +758,7 @@ function setupApp(){
   updateCounter();reanudarTimer();
 
   const tabs=esAdmin
-    ?[{id:'dashboard',l:'Dashboard',ico:'◉'},{id:'registrar',l:'Mis tareas',ico:'☑'},{id:'proyectos',l:'Proyectos',ico:'▤'},{id:'semana',l:'Mi semana',ico:'◷'},{id:'reportes',l:'Reportes',ico:'↗'},{id:'gestion',l:'Gestión',ico:'⚙'}]
+    ?[{id:'dashboard',l:'Dashboard',ico:'◉'},{id:'registrar',l:'Mis tareas',ico:'☑'},{id:'proyectos',l:'Proyectos',ico:'▤'},{id:'colaboradores',l:'Colaboradores',ico:'◎'},{id:'semana',l:'Mi semana',ico:'◷'},{id:'reportes',l:'Reportes',ico:'↗'},{id:'gestion',l:'Gestión',ico:'⚙'}]
     :[{id:'registrar',l:'Mis tareas',ico:'☑'},{id:'proyectos',l:'Proyectos',ico:'▤'},{id:'semana',l:'Mi semana',ico:'◷'}];
 
   document.getElementById('sb-nav').innerHTML=tabs.map((t,i)=>`
@@ -730,7 +772,7 @@ function setupApp(){
 }
 
 function updateMainTitle(tab){
-  const titles={dashboard:'Dashboard',registrar:'Mis tareas',proyectos:'Proyectos',semana:'Mi semana',reportes:'Reportes',gestion:'Gestión'};
+  const titles={dashboard:'Dashboard',registrar:'Mis tareas',proyectos:'Proyectos',colaboradores:'Colaboradores',semana:'Mi semana',reportes:'Reportes',gestion:'Gestión'};
   document.getElementById('main-title').textContent=titles[tab]||tab;
 }
 
@@ -747,6 +789,7 @@ async function loadTab(tab){
   if(tab==='registrar')await renderReg();
   if(tab==='dashboard')await renderDashboard();
   if(tab==='proyectos')await renderProy();
+  if(tab==='colaboradores')await renderColabsPane();
   if(tab==='semana')await renderSemana();
   if(tab==='reportes')renderRepUI();
   if(tab==='gestion')await renderGestion();
@@ -2526,6 +2569,97 @@ async function genRep(){
     html+=`<div class="card" style="margin-bottom:12px"><div style="padding:12px 14px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:10px"><div style="width:30px;height:30px;border-radius:50%;background:${col?.color||'var(--accent)'};display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:500;color:#fff;flex-shrink:0">${ini(col?.nombre,col?.apellido)}</div><div><div style="font-size:12px;color:var(--ink)">${col?.nombre} ${col?.apellido||''}</div><div style="font-size:10px;color:var(--ink3)">${fF(desde)} — ${fF(hasta)}</div></div></div>${pH}<div style="display:flex;justify-content:space-between;padding:11px 14px;background:var(--ink)"><span style="font-size:10px;letter-spacing:.08em;text-transform:uppercase;color:var(--ink3)">Total período</span><span style="font-family:'Fraunces',serif;font-size:20px;font-weight:300;color:#fff">${hT(d.h)}</span></div></div>`;
   });
   cont.innerHTML=html;
+}
+
+// ── COLABORADORES PANE ──
+async function renderColabsPane(){
+  const cont=document.getElementById('pane-colaboradores');if(!cont)return;
+  cont.innerHTML=`<div class="colabs-layout"><div class="ldg">Cargando...</div></div>`;
+  const {data:cs}=await sb.from('colaboradores').select('id,nombre,apellido,color,rol,email').order('nombre');
+  if(!cs||!cs.length){
+    cont.innerHTML=`<div class="colabs-layout"><div class="empty"><div class="empty-i">👤</div><div>Sin colaboradores</div></div></div>`;
+    return;
+  }
+  const admins=cs.filter(c=>c.rol==='admin');
+  const colabs=cs.filter(c=>c.rol!=='admin');
+  function tarjetasHtml(lista){
+    return lista.map(c=>`
+      <button class="colab-card-btn" onclick="abrirTareasColab('${c.id}','${c.nombre} ${c.apellido||''}','${c.color}')">
+        <div style="width:40px;height:40px;border-radius:50%;background:${c.color};display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:600;color:#fff;flex-shrink:0">${ini(c.nombre,c.apellido)}</div>
+        <div style="flex:1;min-width:0">
+          <div style="font-size:13px;color:var(--ink);margin-bottom:2px">${c.nombre} ${c.apellido||''}</div>
+          <div style="font-size:10px;color:var(--ink3)">${c.email}</div>
+        </div>
+        <span style="font-size:9px;padding:2px 8px;border-radius:4px;background:${c.rol==='admin'?'var(--acc-lt)':'var(--bg2)'};color:${c.rol==='admin'?'var(--accent)':'var(--ink2)'};flex-shrink:0">${c.rol}</span>
+        <span style="font-size:14px;color:var(--ink3);flex-shrink:0">›</span>
+      </button>`).join('');
+  }
+  let html=`<div class="colabs-layout">`;
+  if(admins.length){html+=`<div class="sec">Admins</div>${tarjetasHtml(admins)}`;}
+  if(colabs.length){html+=`<div class="sec" style="margin-top:${admins.length?'20px':'0'}">Colaboradores</div>${tarjetasHtml(colabs)}`;}
+  html+=`</div>`;
+  cont.innerHTML=html;
+}
+
+async function abrirTareasColab(colabId,nombre,color){
+  const ov=document.getElementById('ov-colab-tareas');
+  document.getElementById('ct-avatar').style.background=color;
+  document.getElementById('ct-avatar').textContent=nombre.split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase();
+  document.getElementById('ct-nombre').textContent=nombre;
+  document.getElementById('ct-body').innerHTML=`<div class="ldg">Cargando tareas...</div>`;
+  ov.classList.add('on');
+
+  const {data:ents}=await sb.from('entregables')
+    .select('id,nombre,done,etapa_clave,fecha_unica,fecha_fin,proyectos(id,codigo,nombre)')
+    .eq('asignado_id',colabId)
+    .eq('eliminado',false)
+    .order('done',{ascending:true})
+    .order('fecha_unica',{ascending:true,nullsFirst:false})
+    .order('fecha_fin',{ascending:true,nullsFirst:false});
+
+  if(!ents||!ents.length){
+    document.getElementById('ct-body').innerHTML=`<div class="ct-empty">Sin tareas asignadas</div>`;
+    return;
+  }
+
+  // Agrupar por proyecto
+  const porProy={};
+  ents.forEach(e=>{
+    const pid=e.proyectos?.id||'_';
+    if(!porProy[pid])porProy[pid]={proy:e.proyectos,tareas:[]};
+    porProy[pid].tareas.push(e);
+  });
+
+  const hoyStr=hoy();
+  let html='';
+  Object.values(porProy).forEach(({proy,tareas})=>{
+    const pendientes=tareas.filter(t=>!t.done).length;
+    html+=`<div class="ct-proy-sec">
+      <div class="ct-proy-hdr">
+        <span class="cod" style="font-size:8px;padding:2px 5px">${proy?.codigo||'—'}</span>
+        <span style="font-size:11px;color:var(--ink);flex:1">${proy?.nombre||'Sin proyecto'}</span>
+        ${pendientes>0?`<span style="font-size:9px;color:var(--amber);background:var(--amb-lt);padding:2px 7px;border-radius:4px">${pendientes} pendiente${pendientes>1?'s':''}</span>`:'<span style="font-size:9px;color:var(--green);background:var(--grn-lt);padding:2px 7px;border-radius:4px">✓ completo</span>'}
+      </div>`;
+    tareas.forEach(t=>{
+      const clave=t.etapa_clave||'_';
+      const fechaRef=t.fecha_unica||t.fecha_fin;
+      let fechaHtml='';
+      if(fechaRef){
+        const d2=dH(fechaRef);
+        const fc=t.done?'ok':d2<0?'vencida':d2<=5?'pronto':'ok';
+        fechaHtml=`<span class="efecha ${fc}" style="pointer-events:none">${fF(fechaRef)}</span>`;
+      }
+      html+=`<div class="ct-tarea-row" style="${t.done?'opacity:.5':''}">
+        <div class="ct-done-circle ${t.done?'done':''}">${t.done?'✓':''}</div>
+        <span class="ec" style="font-size:8px">${clave==='_'?'—':clave}</span>
+        <span style="flex:1;font-size:11px;color:var(--ink);${t.done?'text-decoration:line-through':''}">${t.nombre}</span>
+        ${fechaHtml}
+      </div>`;
+    });
+    html+=`</div>`;
+  });
+
+  document.getElementById('ct-body').innerHTML=html;
 }
 
 // ── GESTIÓN ──

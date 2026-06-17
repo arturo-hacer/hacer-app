@@ -304,6 +304,33 @@ tr.comp-toggle-row:hover td{background:var(--bg2);}
 #ov-dpd{align-items:center;}
 #ov-dpd .modal{max-width:360px;}
 
+/* ── PROYECTOS TABLA ── */
+.proy-tabs{display:flex;gap:4px;padding:16px 16px 0;border-bottom:1px solid var(--border);}
+.proy-tab{padding:7px 16px;font-size:11px;border:none;background:none;color:var(--ink3);cursor:pointer;border-bottom:2px solid transparent;margin-bottom:-1px;transition:color .15s,border-color .15s;}
+.proy-tab.on{color:var(--accent);border-bottom-color:var(--accent);}
+.proy-tab:hover:not(.on){color:var(--ink2);}
+.proy-search{display:flex;align-items:center;gap:8px;padding:10px 16px;border-bottom:1px solid var(--border);}
+.proy-search input{flex:1;padding:7px 10px;border:1.5px solid var(--border);border-radius:8px;font-size:11px;font-family:inherit;color:var(--ink);background:#fff;outline:none;}
+.proy-search input:focus{border-color:var(--accent);}
+.proy-tabla{width:100%;border-collapse:collapse;}
+.proy-tabla th{font-size:9px;letter-spacing:.08em;text-transform:uppercase;color:var(--ink3);padding:8px 14px;text-align:left;border-bottom:1px solid var(--border);font-weight:500;background:var(--bg2);position:sticky;top:0;}
+.proy-tabla td{padding:11px 14px;border-bottom:1px solid var(--border);vertical-align:middle;}
+.proy-tabla tbody tr{cursor:pointer;transition:background .12s;}
+.proy-tabla tbody tr:hover{background:var(--acc-lt);}
+.proy-tabla tbody tr:last-child td{border-bottom:none;}
+.mini-bar{height:6px;background:var(--bg2);border-radius:3px;overflow:hidden;min-width:60px;}
+.mini-bar-fill{height:100%;border-radius:3px;}
+
+/* ── BUSCADOR GLOBAL ── */
+#ov-buscar{align-items:flex-start;padding-top:80px;}
+#ov-buscar .modal{max-width:600px;max-height:70vh;display:flex;flex-direction:column;padding:0;overflow:hidden;}
+.buscar-input-wrap{padding:14px 16px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:10px;}
+.buscar-input-wrap input{flex:1;border:none;font-size:14px;font-family:inherit;color:var(--ink);outline:none;background:transparent;}
+.buscar-results{flex:1;overflow-y:auto;}
+.buscar-row{display:flex;align-items:center;gap:10px;padding:10px 16px;border-bottom:1px solid var(--border);cursor:pointer;transition:background .12s;}
+.buscar-row:hover{background:var(--acc-lt);}
+.buscar-empty{padding:32px;text-align:center;color:var(--ink3);font-size:11px;}
+
 /* ── GESTIÓN TABS ── */
 .gestion-tabs{display:flex;gap:4px;padding:16px 24px 0;border-bottom:1px solid var(--border);margin-bottom:0;}
 .gestion-tab{padding:8px 16px;font-size:11px;border:none;background:none;color:var(--ink3);cursor:pointer;border-bottom:2px solid transparent;margin-bottom:-1px;transition:color .15s,border-color .15s;}
@@ -395,6 +422,7 @@ tr.comp-toggle-row:hover td{background:var(--bg2);}
         <button class="timer-bar-stop" onclick="stopTimer()">■</button>
       </div>
       <div class="sb-footer">
+        <button onclick="abrirBuscador()" style="width:100%;padding:8px 12px;border:none;background:rgba(255,255,255,.07);border-radius:8px;color:rgba(255,255,255,.5);font-size:10px;letter-spacing:.04em;cursor:pointer;text-align:left;margin-bottom:8px;transition:background .15s" onmouseover="this.style.background='rgba(255,255,255,.12)'" onmouseout="this.style.background='rgba(255,255,255,.07)'">🔍 Buscar tareas...</button>
         <div class="sb-user" id="hdr-nom" onclick="logout()" title="Cerrar sesión">—</div>
       </div>
     </aside>
@@ -479,6 +507,20 @@ tr.comp-toggle-row:hover td{background:var(--bg2);}
   </div>
 </div>
 
+<!-- BUSCADOR GLOBAL -->
+<div class="ov" id="ov-buscar" onclick="if(event.target.id==='ov-buscar')closeOv('ov-buscar')" style="z-index:600">
+  <div class="modal" style="position:relative;max-width:600px;max-height:70vh;display:flex;flex-direction:column;padding:0;overflow:hidden;">
+    <div class="buscar-input-wrap">
+      <span style="font-size:16px;color:var(--ink3)">🔍</span>
+      <input type="text" id="buscar-input" placeholder="Buscar tareas en toda la app..." oninput="onBuscarGlobal(this.value)" autocomplete="off">
+      <button onclick="closeOv('ov-buscar')" style="width:28px;height:28px;border-radius:6px;border:1.5px solid var(--border);background:none;font-size:16px;color:var(--ink3);cursor:pointer;flex-shrink:0">×</button>
+    </div>
+    <div class="buscar-results" id="buscar-results">
+      <div class="buscar-empty">Escribe para buscar tareas</div>
+    </div>
+  </div>
+</div>
+
 <!-- NUEVO TAG -->
 <div class="ov" id="ov-nuevo-tag" onclick="closeOv('ov-nuevo-tag',event)">
   <div class="modal" style="position:relative;max-width:360px">
@@ -495,13 +537,13 @@ tr.comp-toggle-row:hover td{background:var(--bg2);}
   <div class="modal" style="position:relative;max-width:820px;max-height:88vh;display:flex;flex-direction:column;padding:0;overflow:hidden;">
     <button class="modal-close" style="top:14px;right:14px" onclick="document.getElementById('ov-colab-tareas').classList.remove('on')">×</button>
     <div class="ct-header">
-      <div style="display:flex;align-items:center;gap:12px">
+      <div style="display:flex;align-items:center;gap:12px;padding-right:36px">
         <div id="ct-avatar" style="width:40px;height:40px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:600;color:#fff;flex-shrink:0"></div>
         <div style="flex:1">
           <div style="font-family:'Fraunces',serif;font-size:18px;font-weight:300" id="ct-nombre"></div>
           <div style="font-size:10px;color:var(--ink3);margin-top:1px">Tareas asignadas por proyecto</div>
         </div>
-        <div style="display:flex;gap:8px;align-items:center">
+        <div style="display:flex;gap:8px;align-items:center;flex-shrink:0">
           <button id="ct-toggle-done" onclick="toggleDoneVisibility()" style="display:none;font-size:10px;padding:6px 12px;border:1.5px solid var(--border);border-radius:8px;background:#fff;color:var(--ink2);cursor:pointer;white-space:nowrap"></button>
           <button onclick="abrirNuevoEntregableColab()" style="font-size:10px;padding:6px 12px;border:none;border-radius:8px;background:var(--accent);color:#fff;cursor:pointer;white-space:nowrap">+ Agregar tarea</button>
         </div>
@@ -1439,6 +1481,8 @@ async function renderDashboard(){
 }
 
 // ── PROYECTOS ──
+let proyTabActual='facturable', proyBusqTimer=null, _proyData=null;
+
 async function renderProy(){
   const cont=document.getElementById('pane-proyectos');
   cont.innerHTML=`<div class="ldg">Cargando...</div>`;
@@ -1453,62 +1497,96 @@ async function renderProy(){
   const {data:ps}=await q;
   if(!ps||!ps.length){cont.innerHTML=`<div style="padding:20px"><div class="empty"><div class="empty-i">📁</div><div>Sin proyectos aún</div></div></div>`;return;}
 
-  // Filtrar archivados: colaboradores no los ven
   const {data:ptags}=await sb.from('proyecto_tags').select('proyecto_id,tags(nombre)');
   const archivadosIds=new Set((ptags||[]).filter(pt=>pt.tags?.nombre==='archivado').map(pt=>pt.proyecto_id));
-  const tagsXProy2={};(ptags||[]).forEach(pt=>{if(!tagsXProy2[pt.proyecto_id])tagsXProy2[pt.proyecto_id]=[];if(pt.tags)tagsXProy2[pt.proyecto_id].push(pt.tags.nombre);});
+  const facturablesIds=new Set((ptags||[]).filter(pt=>pt.tags?.nombre==='facturable').map(pt=>pt.proyecto_id));
+  const noFacIds=new Set((ptags||[]).filter(pt=>pt.tags?.nombre==='no facturable').map(pt=>pt.proyecto_id));
 
   const psVisibles=esAdmin?ps:ps.filter(p=>!archivadosIds.has(p.id));
-  const psActivos=esAdmin?psVisibles.filter(p=>!archivadosIds.has(p.id)):psVisibles;
-  const psArchivados=esAdmin?psVisibles.filter(p=>archivadosIds.has(p.id)):[];
-
   const proyIds=psVisibles.map(p=>p.id);
+
   const {data:es}=await sb.from('entregables').select('proyecto_id,done,eliminado');
   const ep={};(es||[]).forEach(e=>{if(!ep[e.proyecto_id])ep[e.proyecto_id]={t:0,d:0};if(!e.eliminado){ep[e.proyecto_id].t++;if(e.done)ep[e.proyecto_id].d++;}});
 
   const {data:regs}=await sb.from('registros_horas').select('proyecto_id,horas,colaboradores(tarifa)').in('proyecto_id',proyIds.length?proyIds:['_']);
   const consumo={};(regs||[]).forEach(r=>{if(!consumo[r.proyecto_id])consumo[r.proyecto_id]=0;consumo[r.proyecto_id]+=(r.horas*(r.colaboradores?.tarifa||0));});
 
-  function cardHtml(p,archivado){
+  _proyData={ps:psVisibles,ep,consumo,archivadosIds,facturablesIds,noFacIds,esAdmin};
+  renderProyTabla();
+}
+
+function renderProyTabla(filtro=''){
+  const cont=document.getElementById('pane-proyectos');
+  const {ps,ep,consumo,archivadosIds,facturablesIds,noFacIds,esAdmin}=_proyData;
+
+  let lista=ps.filter(p=>{
+    if(archivadosIds.has(p.id))return false;
+    if(proyTabActual==='facturable')return facturablesIds.has(p.id);
+    if(proyTabActual==='nofacturable')return noFacIds.has(p.id);
+    return true;
+  });
+  if(filtro){
+    const q=filtro.toLowerCase();
+    lista=lista.filter(p=>p.nombre.toLowerCase().includes(q)||p.codigo.toLowerCase().includes(q)||(p.cliente||'').toLowerCase().includes(q));
+  }
+
+  const thStyle=`padding:8px 14px;text-align:left;font-size:9px;letter-spacing:.08em;text-transform:uppercase;color:var(--ink3);font-weight:500;border-bottom:1px solid var(--border);background:var(--bg2)`;
+  let filas=lista.map(p=>{
     const s=ep[p.id]||{t:0,d:0};
     const av=s.t>0?Math.round(s.d/s.t*100):0;
     const tienePresup=p.presupuesto_total>0&&p.tipo!=='en_blanco';
-    const pctConsumido=tienePresup?Math.min(100,Math.round((consumo[p.id]||0)/p.presupuesto_total*100)):null;
-    const colorConsumido=pctConsumido>=90?'var(--rose)':pctConsumido>=70?'var(--amber)':'var(--green)';
-    const tagsP=(tagsXProy2[p.id]||[]).filter(t=>t!=='archivado');
-    const tagsHtml=tagsP.length?`<div style="display:flex;flex-wrap:wrap;gap:4px;margin-top:6px">${tagsP.map(t=>`<span class="tag-pill custom">${t}</span>`).join('')}</div>`:'';
-    return `<div class="proy-card${archivado?' archivado-card':''}" onclick="abrirDetalleProy('${p.id}')" style="${archivado?'opacity:.6;border-style:dashed':''}">
-      <div style="display:flex;align-items:flex-start;gap:10px;margin-bottom:10px">
-        <span class="cod">${p.codigo}</span>
-        <div style="flex:1;min-width:0">
-          <div style="font-family:'Fraunces',serif;font-size:14px;font-weight:300;color:var(--ink)">${p.nombre}</div>
-          <div style="font-size:10px;color:var(--ink3);margin-top:2px">${p.cliente||''}${archivado?' · <span style="color:var(--rose)">archivado</span>':''}</div>
-          ${tagsHtml}
+    const pct=tienePresup?Math.min(100,Math.round((consumo[p.id]||0)/p.presupuesto_total*100)):null;
+    const colorPct=pct>=90?'var(--rose)':pct>=70?'var(--amber)':'var(--green)';
+    return `<tr onclick="abrirDetalleProy('${p.id}')">
+      <td><span class="cod" style="font-size:9px">${p.codigo}</span></td>
+      <td style="font-size:12px;color:var(--ink);font-family:'Fraunces',serif;font-weight:300">${p.nombre}</td>
+      <td style="font-size:10px;color:var(--ink3)">${p.cliente||'—'}</td>
+      <td style="min-width:100px">
+        <div style="display:flex;align-items:center;gap:6px">
+          <div class="mini-bar" style="flex:1"><div class="mini-bar-fill" style="width:${av}%;background:var(--accent)"></div></div>
+          <span style="font-size:9px;color:var(--accent);min-width:28px;text-align:right">${av}%</span>
         </div>
-      </div>
-      <div style="display:flex;align-items:center;gap:6px;margin-bottom:6px">
-        <div style="flex:1;height:4px;background:var(--bg2);border-radius:3px;overflow:hidden"><div style="height:100%;width:${av}%;background:var(--accent);border-radius:3px"></div></div>
-        <span style="font-size:10px;color:var(--accent);font-weight:500;min-width:28px;text-align:right">${av}%</span>
-        <span style="font-size:9px;color:var(--ink3);min-width:60px">entregables</span>
-      </div>
-      ${tienePresup?`<div style="display:flex;align-items:center;gap:6px">
-        <div style="flex:1;height:4px;background:var(--bg2);border-radius:3px;overflow:hidden"><div style="height:100%;width:${pctConsumido}%;background:${colorConsumido};border-radius:3px"></div></div>
-        <span style="font-size:10px;color:${colorConsumido};font-weight:500;min-width:28px;text-align:right">${pctConsumido}%</span>
-        <span style="font-size:9px;color:var(--ink3);min-width:60px">presupuesto</span>
-      </div>`:''}
-      <div style="font-size:10px;color:var(--ink3);margin-top:8px">${s.d}/${s.t} entregables completados</div>
-    </div>`;
-  }
+      </td>
+      <td style="min-width:100px">
+        ${tienePresup?`<div style="display:flex;align-items:center;gap:6px">
+          <div class="mini-bar" style="flex:1"><div class="mini-bar-fill" style="width:${pct}%;background:${colorPct}"></div></div>
+          <span style="font-size:9px;color:${colorPct};min-width:28px;text-align:right">${pct}%</span>
+        </div>`:`<span style="font-size:9px;color:var(--ink3)">—</span>`}
+      </td>
+    </tr>`;
+  }).join('');
 
-  let listHtml='<div style="padding:16px">';
-  if(psActivos.length){psActivos.forEach(p=>{listHtml+=cardHtml(p,false);});}
-  if(esAdmin&&psArchivados.length){
-    listHtml+=`<div class="sec" style="margin:20px 0 10px;opacity:.6">Archivados</div>`;
-    psArchivados.forEach(p=>{listHtml+=cardHtml(p,true);});
-  }
-  if(!psActivos.length&&!psArchivados.length){listHtml+=`<div class="empty"><div class="empty-i">📁</div><div>Sin proyectos aún</div></div>`;}
-  listHtml+=`</div>`;
-  cont.innerHTML=listHtml;
+  if(!filas)filas=`<tr><td colspan="5" style="padding:32px;text-align:center;color:var(--ink3);font-size:11px">Sin proyectos en esta categoría</td></tr>`;
+
+  cont.innerHTML=`
+    <div class="proy-tabs">
+      <button class="proy-tab ${proyTabActual==='todos'?'on':''}" onclick="switchProyTab('todos',this)">Todos</button>
+      <button class="proy-tab ${proyTabActual==='facturable'?'on':''}" onclick="switchProyTab('facturable',this)">Facturable</button>
+      <button class="proy-tab ${proyTabActual==='nofacturable'?'on':''}" onclick="switchProyTab('nofacturable',this)">No facturable</button>
+    </div>
+    <div class="proy-search">
+      <span style="font-size:14px;color:var(--ink3)">🔍</span>
+      <input type="text" placeholder="Buscar proyecto..." id="proy-search-input" oninput="onProySearch(this.value)" value="${filtro}">
+    </div>
+    <div style="overflow-y:auto;flex:1">
+      <table class="proy-tabla">
+        <thead><tr>
+          <th>Código</th><th>Nombre</th><th>Cliente</th>
+          <th>Entregables</th><th>Presupuesto</th>
+        </tr></thead>
+        <tbody>${filas}</tbody>
+      </table>
+    </div>`;
+}
+
+function switchProyTab(tab){
+  proyTabActual=tab;
+  const filtro=document.getElementById('proy-search-input')?.value||'';
+  renderProyTabla(filtro);
+}
+function onProySearch(val){
+  clearTimeout(proyBusqTimer);
+  proyBusqTimer=setTimeout(()=>renderProyTabla(val),200);
 }
 
 // ── DETALLE PROYECTO ──
@@ -2652,6 +2730,46 @@ async function genRep(){
     html+=`<div class="card" style="margin-bottom:12px"><div style="padding:12px 14px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:10px"><div style="width:30px;height:30px;border-radius:50%;background:${col?.color||'var(--accent)'};display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:500;color:#fff;flex-shrink:0">${ini(col?.nombre,col?.apellido)}</div><div><div style="font-size:12px;color:var(--ink)">${col?.nombre} ${col?.apellido||''}</div><div style="font-size:10px;color:var(--ink3)">${fF(desde)} — ${fF(hasta)}</div></div></div>${pH}<div style="display:flex;justify-content:space-between;padding:11px 14px;background:var(--ink)"><span style="font-size:10px;letter-spacing:.08em;text-transform:uppercase;color:var(--ink3)">Total período</span><span style="font-family:'Fraunces',serif;font-size:20px;font-weight:300;color:#fff">${hT(d.h)}</span></div></div>`;
   });
   cont.innerHTML=html;
+}
+
+// ── BUSCADOR GLOBAL ──
+let buscarTimer=null;
+function abrirBuscador(){
+  document.getElementById('ov-buscar').classList.add('on');
+  document.getElementById('buscar-results').innerHTML=`<div class="buscar-empty">Escribe para buscar tareas</div>`;
+  setTimeout(()=>document.getElementById('buscar-input').focus(),100);
+  document.getElementById('buscar-input').value='';
+}
+function onBuscarGlobal(val){
+  clearTimeout(buscarTimer);
+  if(!val.trim()){document.getElementById('buscar-results').innerHTML=`<div class="buscar-empty">Escribe para buscar tareas</div>`;return;}
+  buscarTimer=setTimeout(()=>ejecutarBusqueda(val.trim()),250);
+}
+async function ejecutarBusqueda(q){
+  const res=document.getElementById('buscar-results');
+  res.innerHTML=`<div class="buscar-empty">Buscando...</div>`;
+  const {data:ents}=await sb.from('entregables')
+    .select('id,nombre,done,etapa_clave,fecha_unica,fecha_fin,eliminado,proyectos(id,codigo,nombre),colaboradores(nombre,apellido)')
+    .eq('eliminado',false)
+    .ilike('nombre',`%${q}%`)
+    .order('done',{ascending:true})
+    .limit(40);
+  if(!ents||!ents.length){res.innerHTML=`<div class="buscar-empty">Sin resultados para "${q}"</div>`;return;}
+  res.innerHTML=ents.map(e=>{
+    const fechaRef=e.fecha_unica||e.fecha_fin;
+    const d2=fechaRef?dH(fechaRef):null;
+    const fc=e.done?'ok':d2!==null&&d2<0?'vencida':d2!==null&&d2<=5?'pronto':'ok';
+    const fechaHtml=fechaRef?`<span class="efecha ${fc}" style="pointer-events:none;font-size:9px">${fF(fechaRef)}</span>`:'';
+    return `<div class="buscar-row" onclick="closeOv('ov-buscar');abrirDetalleProy('${e.proyectos?.id}')">
+      <div style="width:16px;height:16px;border-radius:50%;border:1.5px solid ${e.done?'var(--green)':'var(--border)'};background:${e.done?'var(--green)':'transparent'};display:flex;align-items:center;justify-content:center;font-size:8px;color:#fff;flex-shrink:0">${e.done?'✓':''}</div>
+      <span class="ec" style="font-size:8px;flex-shrink:0">${e.etapa_clave==='_'||!e.etapa_clave?'—':e.etapa_clave}</span>
+      <div style="flex:1;min-width:0">
+        <div style="font-size:11px;color:var(--ink);${e.done?'text-decoration:line-through':''}">${e.nombre}</div>
+        <div style="font-size:9px;color:var(--ink3);margin-top:1px"><span class="cod" style="font-size:8px">${e.proyectos?.codigo||'—'}</span> ${e.proyectos?.nombre||''} ${e.colaboradores?'· '+e.colaboradores.nombre:''}</div>
+      </div>
+      ${fechaHtml}
+    </div>`;
+  }).join('');
 }
 
 // ── COLABORADORES PANE ──

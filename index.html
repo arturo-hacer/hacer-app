@@ -2119,9 +2119,22 @@ async function guardarNuevoEntDetalle(){
   const btn=document.getElementById('ned-save');btn.disabled=true;btn.textContent='Guardando...';
   const {data:last}=await sb.from('entregables').select('orden').eq('proyecto_id',proyDetalleId).eq('etapa_clave',nuevoEntEtapa).eq('grupo',grupo).order('orden',{ascending:false}).limit(1).maybeSingle();
   const orden=(last?.orden||0)+1;
-  await sb.from('entregables').insert({proyecto_id:proyDetalleId,etapa_clave:nuevoEntEtapa,grupo,nombre,done:false,eliminado:false,orden});
+  // Verificar si viene del contexto de colaborador
+  const ovColab=document.getElementById('ov-colab-tareas');
+  const preAsignadoId=ovColab?.dataset?.pendingReload==='1'?ovColab.dataset.colabId:null;
+  const insert={proyecto_id:proyDetalleId,etapa_clave:nuevoEntEtapa,grupo,nombre,done:false,eliminado:false,orden};
+  if(preAsignadoId)insert.asignado_id=preAsignadoId;
+  await sb.from('entregables').insert(insert);
   btn.disabled=false;btn.textContent='Agregar';
-  closeOv('ov-ned');await renderDetProyBody();toast('✓ Entregable agregado');
+  document.getElementById('ov-ned').style.zIndex='';
+  closeOv('ov-ned');
+  if(preAsignadoId&&ovColab){
+    ovColab.dataset.pendingReload='0';
+    await loadTareasColab(preAsignadoId,ovColab.dataset.showDone==='1');
+    toast('✓ Tarea agregada');
+  } else {
+    await renderDetProyBody();toast('✓ Entregable agregado');
+  }
 }
 
 let editEntId=null;
@@ -2296,9 +2309,19 @@ async function guardarFechasDetalle(){
     }
   }
   limpiarSeleccion();
+  const dpOv=document.getElementById('ov-dpd');
+  const fromColab=dpOv.dataset.fromColab==='1';
+  dpOv.dataset.fromColab='';
+  dpOv.style.zIndex='';
   document.getElementById('ov-dpd').classList.remove('on');
-  await renderDetProyBody();
-  toast(n>1?`✓ Fechas aplicadas a ${n} tareas`:'✓ Fechas guardadas');
+  if(fromColab){
+    const ovColab=document.getElementById('ov-colab-tareas');
+    await loadTareasColab(ovColab.dataset.colabId,ovColab.dataset.showDone==='1');
+    toast('✓ Fechas guardadas');
+  } else {
+    await renderDetProyBody();
+    toast(n>1?`✓ Fechas aplicadas a ${n} tareas`:'✓ Fechas guardadas');
+  }
 }
 // ── SELECCIÓN MÚLTIPLE ──
 function seleccionarFila(evt, entId, tr){
@@ -2676,7 +2699,7 @@ async function loadTareasColab(colabId,showDone){
   document.getElementById('ct-body').innerHTML=`<div class="ldg">Cargando tareas...</div>`;
   const {data:allColabs}=await sb.from('colaboradores').select('id,nombre,apellido').order('nombre');
   const {data:ents}=await sb.from('entregables')
-    .select('id,nombre,done,etapa_clave,fecha_inicio,fecha_unica,fecha_fin,asignado_id,proyectos(id,codigo,nombre)')
+    .select('id,nombre,done,etapa_clave,fecha_inicio,fecha_unica,fecha_fin,recurrente,asignado_id,proyectos(id,codigo,nombre)')
     .eq('asignado_id',colabId).eq('eliminado',false)
     .order('done',{ascending:true})
     .order('fecha_unica',{ascending:true,nullsFirst:false})
@@ -2728,6 +2751,9 @@ async function loadTareasColab(colabId,showDone){
       const fFin=t.fecha_unica||t.fecha_fin||'';
       const d2=fFin?dH(fFin):null;
       const vencida=!t.done&&d2!==null&&d2<0;
+      const esRecurrente=t.recurrente||false;
+      const fFinLabel=fFin?(esRecurrente?'↻ '+fF(fFin):fF(fFin)):'+ fecha';
+      const fIniLabel=fIni?fF(fIni):'+ inicio';
       html+=`<tr class="${t.done?'done-row':''}" id="ct-row-${t.id}">
         <td>
           <button onclick="toggleDoneColab('${t.id}')" style="width:18px;height:18px;border-radius:50%;border:1.5px solid ${t.done?'var(--green)':'var(--border)'};background:${t.done?'var(--green)':'transparent'};display:flex;align-items:center;justify-content:center;font-size:8px;color:#fff;cursor:pointer;">${t.done?'✓':''}</button>
@@ -2740,12 +2766,8 @@ async function loadTareasColab(colabId,showDone){
             ${(allColabs||[]).map(c=>`<option value="${c.id}" ${c.id===t.asignado_id?'selected':''}>${c.nombre}</option>`).join('')}
           </select>
         </td>
-        <td>
-          <input type="date" value="${fIni}" onchange="cambiarFechaColab('${t.id}',this.value,'fecha_inicio')" style="font-family:'DM Mono',monospace;font-size:10px;color:var(--ink2);border:1.5px solid var(--border);background:#fff;border-radius:6px;padding:3px 6px;cursor:pointer;width:100%">
-        </td>
-        <td>
-          <input type="date" value="${fFin}" onchange="cambiarFechaColab('${t.id}',this.value,'${t.fecha_unica?'fecha_unica':'fecha_fin'}')" style="font-family:'DM Mono',monospace;font-size:10px;color:${vencida?'var(--rose)':'var(--ink2)'};border:1.5px solid ${vencida?'var(--rose)':'var(--border)'};background:#fff;border-radius:6px;padding:3px 6px;cursor:pointer;width:100%">
-        </td>
+        <td>${esRecurrente?`<span style="font-size:9px;color:var(--ink3)">↻</span>`:`<span class="efecha ${fIni?'ok':'sin'}" style="cursor:pointer;font-size:10px" onclick="abrirDPColab('${t.id}','${fIni}','${fFin}')">${fIniLabel}</span>`}</td>
+        <td><span class="efecha ${fFin?(vencida?'vencida':'ok'):'sin'}" style="cursor:pointer;font-size:10px" onclick="abrirDPColab('${t.id}','${fIni}','${fFin}')">${fFinLabel}</span></td>
       </tr>`;
     });
     html+=`</tbody></table></div>`;
@@ -2754,14 +2776,16 @@ async function loadTareasColab(colabId,showDone){
 }
 async function abrirNuevoEntregableColab(){
   const ov=document.getElementById('ov-colab-tareas');
-  const colabId=ov.dataset.colabId;
-  closeOv('ov-colab-tareas');
-  await abrirNuevoEntregable(null, colabId);
-}
-async function abrirNuevoEntregable(proyId, preAsignadoId){
-  document.getElementById('nf-asig').value = preAsignadoId||PERFIL?.id||'';
-  if(proyId) document.getElementById('nf-proy').value = proyId;
-  document.getElementById('ov-nuevo').classList.add('on');
+  // Guardar colabId para pre-asignar y recargar al cerrar
+  ov.dataset.pendingReload='1';
+  nuevoEntEtapa='_';nuevoEntGrupo='';
+  document.getElementById('ned-etapa').textContent='';
+  document.getElementById('ned-nom').value='';
+  document.getElementById('ned-grupo').value='';
+  document.getElementById('ned-grupo-wrap').style.display='block';
+  // Subir z-index del modal de ned por encima del modal de colaborador
+  document.getElementById('ov-ned').style.zIndex='450';
+  document.getElementById('ov-ned').classList.add('on');
 }
 async function toggleDoneColab(entId){
   const {data:e}=await sb.from('entregables').select('done').eq('id',entId).single();
@@ -2785,6 +2809,12 @@ function toggleDoneVisibility(){
   const show=ov.dataset.showDone==='1';
   ov.dataset.showDone=show?'0':'1';
   loadTareasColab(ov.dataset.colabId,!show);
+}
+async function abrirDPColab(entId,inicio,fin){
+  // Abre el date picker pero guarda el contexto de colaborador para recargar al guardar
+  document.getElementById('ov-dpd').dataset.fromColab='1';
+  document.getElementById('ov-dpd').style.zIndex='450';
+  await abrirDPDetalle(entId,inicio,fin);
 }
 
 // ── GESTIÓN ──
@@ -2853,38 +2883,47 @@ async function loadGProys(mostrarArchivados=false){
   if(!ps||!ps.length){cont.innerHTML=`<div class="empty"><div class="empty-i">📁</div><div>Sin proyectos</div></div>`;return;}
   const tagsXProy={};(ptags||[]).forEach(pt=>{if(!tagsXProy[pt.proyecto_id])tagsXProy[pt.proyecto_id]=[];if(pt.tags)tagsXProy[pt.proyecto_id].push(pt.tags);});
   const archivadosIds=new Set((ptags||[]).filter(pt=>pt.tags?.nombre==='archivado').map(pt=>pt.proyecto_id));
-
   const psActivos=ps.filter(p=>!archivadosIds.has(p.id));
   const psArchivados=ps.filter(p=>archivadosIds.has(p.id));
 
-  function cardHtml(p){
+  function filaHtml(p){
     const tags=tagsXProy[p.id]||[];
-    const archivado=archivadosIds.has(p.id);
-    const tagsHtml=tags.length?`<div style="display:flex;flex-wrap:wrap;gap:4px;margin-top:6px">${tags.map(t=>`<span class="tag-pill ${t.nombre==='archivado'?'archivado':t.fijo?'fijo':'custom'}">${t.nombre}</span>`).join('')}</div>`:'';
-    return `<div class="card" style="padding:12px 14px;margin-bottom:8px;${archivado?'opacity:.6':''}">
-      <div style="display:flex;align-items:center;gap:10px">
-        <div style="flex:1;min-width:0">
-          <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px"><span class="cod">${p.codigo}</span><span style="font-size:12px;color:var(--ink)">${p.nombre}</span></div>
-          <div style="font-size:10px;color:var(--ink3)">${p.etapas_activas?.join(', ')||''} · $${Math.round(p.presupuesto_total).toLocaleString('es-MX')}</div>
-          ${tagsHtml}
-        </div>
-        <button style="width:28px;height:28px;border-radius:6px;border:1.5px solid var(--border);background:none;font-size:13px;color:var(--ink2);display:flex;align-items:center;justify-content:center;cursor:pointer;flex-shrink:0" onclick="abrirEditProy('${p.id}')">✏</button>
-      </div>
-    </div>`;
+    const tagsHtml=tags.map(t=>`<span class="tag-pill ${t.nombre==='archivado'?'archivado':t.fijo?'fijo':'custom'}" style="font-size:8px;padding:2px 6px">${t.nombre}</span>`).join('');
+    return `<tr style="border-bottom:1px solid var(--border)">
+      <td style="padding:9px 12px"><span class="cod" style="font-size:9px">${p.codigo}</span></td>
+      <td style="padding:9px 12px;font-size:11px;color:var(--ink)">${p.nombre}</td>
+      <td style="padding:9px 12px;font-size:10px;color:var(--ink2);white-space:nowrap">$${Math.round(p.presupuesto_total||0).toLocaleString('es-MX')}</td>
+      <td style="padding:9px 12px"><div style="display:flex;flex-wrap:wrap;gap:3px">${tagsHtml||'—'}</div></td>
+      <td style="padding:9px 12px;font-size:9px;color:var(--ink3)">${(p.etapas_activas||[]).join(' · ')||'—'}</td>
+      <td style="padding:9px 12px"><button style="width:26px;height:26px;border-radius:6px;border:1.5px solid var(--border);background:none;font-size:12px;color:var(--ink2);cursor:pointer" onclick="abrirEditProy('${p.id}')">✏</button></td>
+    </tr>`;
   }
 
-  let html=psActivos.map(p=>cardHtml(p)).join('');
+  const thStyle=`padding:8px 12px;text-align:left;font-size:9px;letter-spacing:.08em;text-transform:uppercase;color:var(--ink3);font-weight:500;white-space:nowrap;border-bottom:1px solid var(--border)`;
+  let html=`<table style="width:100%;border-collapse:collapse;background:#fff;border:1.5px solid var(--border);border-radius:var(--r);overflow:hidden">
+    <thead><tr style="background:var(--bg2)">
+      <th style="${thStyle}">Código</th>
+      <th style="${thStyle}">Nombre</th>
+      <th style="${thStyle}">Presupuesto</th>
+      <th style="${thStyle}">Tags</th>
+      <th style="${thStyle}">Etapas</th>
+      <th style="width:36px"></th>
+    </tr></thead>
+    <tbody>${psActivos.map(filaHtml).join('')}</tbody>
+  </table>`;
 
   if(psArchivados.length){
     if(mostrarArchivados){
       html+=`<div class="sec" style="margin:16px 0 8px;opacity:.6">Archivados</div>`;
-      html+=psArchivados.map(p=>cardHtml(p)).join('');
+      html+=`<table style="width:100%;border-collapse:collapse;background:#fff;border:1.5px dashed var(--border);border-radius:var(--r);overflow:hidden;opacity:.7">
+        <tbody>${psArchivados.map(filaHtml).join('')}</tbody>
+      </table>`;
       html+=`<button onclick="loadGProys(false)" style="width:100%;margin-top:8px;padding:8px;border:1.5px dashed var(--border);border-radius:8px;background:none;font-size:10px;color:var(--ink3);cursor:pointer">Ocultar archivados</button>`;
     } else {
       html+=`<button onclick="loadGProys(true)" style="width:100%;margin-top:8px;padding:8px;border:1.5px dashed var(--border);border-radius:8px;background:none;font-size:10px;color:var(--ink3);cursor:pointer">Mostrar archivados (${psArchivados.length})</button>`;
     }
   }
-  cont.innerHTML=html||`<div class="empty"><div class="empty-i">📁</div><div>Sin proyectos</div></div>`;
+  cont.innerHTML=html;
 }
 
 // ── COLABORADOR FORM ──

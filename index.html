@@ -304,8 +304,45 @@ tr.comp-toggle-row:hover td{background:var(--bg2);}
 #ov-dpd{align-items:center;}
 #ov-dpd .modal{max-width:360px;}
 
+/* ── TAGS ── */
+.tag-pill{display:inline-flex;align-items:center;gap:5px;padding:3px 9px;border-radius:20px;font-size:9px;letter-spacing:.04em;border:1.5px solid var(--border);background:#fff;color:var(--ink2);cursor:default;}
+.tag-pill.fijo{background:var(--bg2);color:var(--ink2);}
+.tag-pill.archivado{background:var(--rose-lt);color:var(--rose);border-color:var(--rose);}
+.tag-pill.custom{background:var(--acc-lt);color:var(--accent);border-color:var(--accent);}
+.tag-pill .tag-x{cursor:pointer;opacity:.5;font-size:11px;line-height:1;}
+.tag-pill .tag-x:hover{opacity:1;}
+.tag-row{display:flex;align-items:center;justify-content:space-between;padding:10px 14px;background:#fff;border-radius:var(--r);border:1.5px solid var(--border);margin-bottom:8px;}
+.tag-btn-sel{padding:5px 12px;border-radius:20px;font-size:10px;border:1.5px solid var(--border);background:#fff;color:var(--ink2);cursor:pointer;transition:all .15s;}
+.tag-btn-sel.on{background:var(--accent);color:#fff;border-color:var(--accent);}
+.tag-btn-sel.archivado-btn.on{background:var(--rose);border-color:var(--rose);}
+
 /* ── REG PREVIO ── */
 #reg-previo{display:none;margin:0 0 10px;padding:8px 12px;background:var(--acc-lt);border-radius:8px;font-size:10px;color:var(--accent);}
+
+/* ── COLABORADORES PANE ── */
+.colabs-layout{padding:24px;max-width:900px;}
+.colab-card-btn{
+  display:flex;align-items:center;gap:14px;
+  padding:14px 16px;background:#fff;border-radius:var(--r);border:1.5px solid var(--border);
+  margin-bottom:10px;cursor:pointer;width:100%;text-align:left;
+  transition:border-color .18s,box-shadow .18s,transform .14s;
+}
+.colab-card-btn:hover{border-color:var(--accent);box-shadow:0 4px 20px rgba(40,40,184,.10);transform:translateY(-1px);}
+.colab-card-btn:active{transform:translateY(0);box-shadow:none;}
+
+/* Modal tareas de colaborador */
+#ov-colab-tareas{align-items:center;padding:20px;}
+#ov-colab-tareas .modal{max-width:640px;max-height:88vh;display:flex;flex-direction:column;padding:0;overflow:hidden;}
+.ct-header{padding:20px 22px 16px;border-bottom:1px solid var(--border);flex-shrink:0;}
+.ct-body{flex:1;overflow-y:auto;}
+.ct-proy-sec{border-bottom:1px solid var(--border);}
+.ct-proy-sec:last-child{border-bottom:none;}
+.ct-proy-hdr{display:flex;align-items:center;gap:8px;padding:10px 18px;background:var(--bg2);}
+.ct-tarea-row{display:flex;align-items:center;gap:10px;padding:9px 18px 9px 22px;border-bottom:1px dashed var(--border);}
+.ct-tarea-row:last-child{border-bottom:none;}
+.ct-done-circle{width:16px;height:16px;border-radius:50%;border:1.5px solid var(--border);display:flex;align-items:center;justify-content:center;font-size:8px;color:#fff;flex-shrink:0;}
+.ct-done-circle.done{background:var(--green);border-color:var(--green);}
+.ct-empty{padding:32px;text-align:center;color:var(--ink3);font-size:11px;}
 </style>
 </head>
 <body>
@@ -429,6 +466,34 @@ tr.comp-toggle-row:hover td{background:var(--bg2);}
         <button class="sel-bar-clr" onclick="limpiarSeleccion()" title="Cancelar selección">×</button>
       </div>
       <div class="det-modal-body" id="det-proy-body"></div>
+  </div>
+</div>
+
+<!-- NUEVO TAG -->
+<div class="ov" id="ov-nuevo-tag" onclick="closeOv('ov-nuevo-tag',event)">
+  <div class="modal" style="position:relative;max-width:360px">
+    <button class="modal-close" onclick="closeOv('ov-nuevo-tag')">×</button>
+    <div class="stitle">Nuevo tag</div>
+    <div class="ssub">El nombre del tag irá en minúsculas</div>
+    <div class="fl"><label>Nombre *</label><input type="text" id="ntag-nom" placeholder="ej: torre-reforma" oninput="this.value=this.value.toLowerCase()"></div>
+    <button class="bsave" id="ntag-save" onclick="guardarNuevoTag()">Crear tag</button>
+  </div>
+</div>
+
+<!-- TAREAS DE COLABORADOR -->
+<div class="ov" id="ov-colab-tareas" onclick="if(event.target.id==='ov-colab-tareas')document.getElementById('ov-colab-tareas').classList.remove('on')" style="z-index:400">
+  <div class="modal" style="position:relative;max-width:640px;max-height:88vh;display:flex;flex-direction:column;padding:0;overflow:hidden;">
+    <button class="modal-close" style="top:14px;right:14px" onclick="document.getElementById('ov-colab-tareas').classList.remove('on')">×</button>
+    <div class="ct-header">
+      <div style="display:flex;align-items:center;gap:12px">
+        <div id="ct-avatar" style="width:40px;height:40px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:600;color:#fff;flex-shrink:0"></div>
+        <div>
+          <div style="font-family:'Fraunces',serif;font-size:18px;font-weight:300" id="ct-nombre"></div>
+          <div style="font-size:10px;color:var(--ink3);margin-top:1px">Tareas asignadas por proyecto</div>
+        </div>
+      </div>
+    </div>
+    <div class="ct-body" id="ct-body"></div>
   </div>
 </div>
 
@@ -632,6 +697,11 @@ tr.comp-toggle-row:hover td{background:var(--bg2);}
       <div id="pf-colabs" style="display:flex;flex-wrap:wrap;gap:8px;margin-top:2px"></div>
       <div style="font-size:9px;color:var(--ink3);margin-top:6px">El admin siempre tiene acceso a todos los proyectos.</div>
     </div>
+    <div class="fl">
+      <label>Tags del proyecto</label>
+      <div id="pf-tags-sel" style="display:flex;flex-wrap:wrap;gap:8px;margin-top:2px"></div>
+      <div style="font-size:9px;color:var(--ink3);margin-top:6px">Los proyectos con tag <b>archivado</b> solo son visibles para admins.</div>
+    </div>
     <button class="bsave" id="pf-save" onclick="guardarProy2()">Guardar proyecto</button>
     <button class="bdanger" id="pf-del" style="display:none" onclick="eliminarProy2()">Eliminar proyecto</button>
   </div>
@@ -698,7 +768,7 @@ async function loginGoogle(){
   btn.disabled=true;btn.textContent='Redirigiendo...';
   const {error}=await sb.auth.signInWithOAuth({
     provider:'google',
-    options:{redirectTo:'https://hacer-app.vercel.app/'}
+    options:{redirectTo:'https://hacer-ieon1wm8q-hacer-app.vercel.app/'}
   });
   if(error){err.textContent=error.message;btn.disabled=false;btn.innerHTML=`<svg width="18" height="18" viewBox="0 0 48 48"><path fill="#4285F4" d="M44.5 20H24v8.5h11.8C34.7 33.9 30.1 37 24 37c-7.2 0-13-5.8-13-13s5.8-13 13-13c3.1 0 5.9 1.1 8.1 2.9l6.4-6.4C34.6 4.1 29.6 2 24 2 11.8 2 2 11.8 2 24s9.8 22 22 22c11 0 21-8 21-21 0-1.3-.2-2.7-.5-4z"/><path fill="#34A853" d="M6.3 14.7l7 5.1C15 16.1 19.1 13 24 13c3.1 0 5.9 1.1 8.1 2.9l6.4-6.4C34.6 4.1 29.6 2 24 2 16.3 2 9.6 6.4 6.3 14.7z"/><path fill="#FBBC05" d="M24 46c5.8 0 10.8-1.9 14.8-5.2l-6.8-5.6C29.8 36.7 27 37.5 24 37.5c-6 0-11.1-4-12.9-9.5l-7 5.4C7.6 41.4 15.3 46 24 46z"/><path fill="#EA4335" d="M44.5 20H24v8.5h11.8c-.9 2.6-2.6 4.8-4.9 6.3l6.8 5.6C41.9 37.3 45 31.1 45 24c0-1.3-.2-2.7-.5-4z"/></svg> Entrar con Google`;}
 }
@@ -716,7 +786,7 @@ function setupApp(){
   updateCounter();reanudarTimer();
 
   const tabs=esAdmin
-    ?[{id:'dashboard',l:'Dashboard',ico:'◉'},{id:'registrar',l:'Mis tareas',ico:'☑'},{id:'proyectos',l:'Proyectos',ico:'▤'},{id:'semana',l:'Mi semana',ico:'◷'},{id:'reportes',l:'Reportes',ico:'↗'},{id:'gestion',l:'Gestión',ico:'⚙'}]
+    ?[{id:'dashboard',l:'Dashboard',ico:'◉'},{id:'registrar',l:'Mis tareas',ico:'☑'},{id:'proyectos',l:'Proyectos',ico:'▤'},{id:'colaboradores',l:'Colaboradores',ico:'◎'},{id:'semana',l:'Mi semana',ico:'◷'},{id:'reportes',l:'Reportes',ico:'↗'},{id:'gestion',l:'Gestión',ico:'⚙'}]
     :[{id:'registrar',l:'Mis tareas',ico:'☑'},{id:'proyectos',l:'Proyectos',ico:'▤'},{id:'semana',l:'Mi semana',ico:'◷'}];
 
   document.getElementById('sb-nav').innerHTML=tabs.map((t,i)=>`
@@ -730,7 +800,7 @@ function setupApp(){
 }
 
 function updateMainTitle(tab){
-  const titles={dashboard:'Dashboard',registrar:'Mis tareas',proyectos:'Proyectos',semana:'Mi semana',reportes:'Reportes',gestion:'Gestión'};
+  const titles={dashboard:'Dashboard',registrar:'Mis tareas',proyectos:'Proyectos',colaboradores:'Colaboradores',semana:'Mi semana',reportes:'Reportes',gestion:'Gestión'};
   document.getElementById('main-title').textContent=titles[tab]||tab;
 }
 
@@ -747,6 +817,7 @@ async function loadTab(tab){
   if(tab==='registrar')await renderReg();
   if(tab==='dashboard')await renderDashboard();
   if(tab==='proyectos')await renderProy();
+  if(tab==='colaboradores')await renderColabsPane();
   if(tab==='semana')await renderSemana();
   if(tab==='reportes')renderRepUI();
   if(tab==='gestion')await renderGestion();
@@ -1368,26 +1439,37 @@ async function renderProy(){
   const {data:ps}=await q;
   if(!ps||!ps.length){cont.innerHTML=`<div style="padding:20px"><div class="empty"><div class="empty-i">📁</div><div>Sin proyectos aún</div></div></div>`;return;}
 
+  // Filtrar archivados: colaboradores no los ven
+  const {data:ptags}=await sb.from('proyecto_tags').select('proyecto_id,tags(nombre)');
+  const archivadosIds=new Set((ptags||[]).filter(pt=>pt.tags?.nombre==='archivado').map(pt=>pt.proyecto_id));
+  const tagsXProy2={};(ptags||[]).forEach(pt=>{if(!tagsXProy2[pt.proyecto_id])tagsXProy2[pt.proyecto_id]=[];if(pt.tags)tagsXProy2[pt.proyecto_id].push(pt.tags.nombre);});
+
+  const psVisibles=esAdmin?ps:ps.filter(p=>!archivadosIds.has(p.id));
+  const psActivos=esAdmin?psVisibles.filter(p=>!archivadosIds.has(p.id)):psVisibles;
+  const psArchivados=esAdmin?psVisibles.filter(p=>archivadosIds.has(p.id)):[];
+
+  const proyIds=psVisibles.map(p=>p.id);
   const {data:es}=await sb.from('entregables').select('proyecto_id,done,eliminado');
   const ep={};(es||[]).forEach(e=>{if(!ep[e.proyecto_id])ep[e.proyecto_id]={t:0,d:0};if(!e.eliminado){ep[e.proyecto_id].t++;if(e.done)ep[e.proyecto_id].d++;}});
 
-  const proyIds=ps.map(p=>p.id);
-  const {data:regs}=await sb.from('registros_horas').select('proyecto_id,horas,colaboradores(tarifa)').in('proyecto_id',proyIds);
+  const {data:regs}=await sb.from('registros_horas').select('proyecto_id,horas,colaboradores(tarifa)').in('proyecto_id',proyIds.length?proyIds:['_']);
   const consumo={};(regs||[]).forEach(r=>{if(!consumo[r.proyecto_id])consumo[r.proyecto_id]=0;consumo[r.proyecto_id]+=(r.horas*(r.colaboradores?.tarifa||0));});
 
-  let listHtml='<div style="padding:16px">';
-  ps.forEach(p=>{
+  function cardHtml(p,archivado){
     const s=ep[p.id]||{t:0,d:0};
     const av=s.t>0?Math.round(s.d/s.t*100):0;
     const tienePresup=p.presupuesto_total>0&&p.tipo!=='en_blanco';
     const pctConsumido=tienePresup?Math.min(100,Math.round((consumo[p.id]||0)/p.presupuesto_total*100)):null;
     const colorConsumido=pctConsumido>=90?'var(--rose)':pctConsumido>=70?'var(--amber)':'var(--green)';
-    listHtml+=`<div class="proy-card" onclick="abrirDetalleProy('${p.id}')">
+    const tagsP=(tagsXProy2[p.id]||[]).filter(t=>t!=='archivado');
+    const tagsHtml=tagsP.length?`<div style="display:flex;flex-wrap:wrap;gap:4px;margin-top:6px">${tagsP.map(t=>`<span class="tag-pill custom">${t}</span>`).join('')}</div>`:'';
+    return `<div class="proy-card${archivado?' archivado-card':''}" onclick="abrirDetalleProy('${p.id}')" style="${archivado?'opacity:.6;border-style:dashed':''}">
       <div style="display:flex;align-items:flex-start;gap:10px;margin-bottom:10px">
         <span class="cod">${p.codigo}</span>
         <div style="flex:1;min-width:0">
           <div style="font-family:'Fraunces',serif;font-size:14px;font-weight:300;color:var(--ink)">${p.nombre}</div>
-          <div style="font-size:10px;color:var(--ink3);margin-top:2px">${p.cliente||''}</div>
+          <div style="font-size:10px;color:var(--ink3);margin-top:2px">${p.cliente||''}${archivado?' · <span style="color:var(--rose)">archivado</span>':''}</div>
+          ${tagsHtml}
         </div>
       </div>
       <div style="display:flex;align-items:center;gap:6px;margin-bottom:6px">
@@ -1402,9 +1484,16 @@ async function renderProy(){
       </div>`:''}
       <div style="font-size:10px;color:var(--ink3);margin-top:8px">${s.d}/${s.t} entregables completados</div>
     </div>`;
-  });
-  listHtml+=`</div>`;
+  }
 
+  let listHtml='<div style="padding:16px">';
+  if(psActivos.length){psActivos.forEach(p=>{listHtml+=cardHtml(p,false);});}
+  if(esAdmin&&psArchivados.length){
+    listHtml+=`<div class="sec" style="margin:20px 0 10px;opacity:.6">Archivados</div>`;
+    psArchivados.forEach(p=>{listHtml+=cardHtml(p,true);});
+  }
+  if(!psActivos.length&&!psArchivados.length){listHtml+=`<div class="empty"><div class="empty-i">📁</div><div>Sin proyectos aún</div></div>`;}
+  listHtml+=`</div>`;
   cont.innerHTML=listHtml;
 }
 
@@ -2528,6 +2617,97 @@ async function genRep(){
   cont.innerHTML=html;
 }
 
+// ── COLABORADORES PANE ──
+async function renderColabsPane(){
+  const cont=document.getElementById('pane-colaboradores');if(!cont)return;
+  cont.innerHTML=`<div class="colabs-layout"><div class="ldg">Cargando...</div></div>`;
+  const {data:cs}=await sb.from('colaboradores').select('id,nombre,apellido,color,rol,email').order('nombre');
+  if(!cs||!cs.length){
+    cont.innerHTML=`<div class="colabs-layout"><div class="empty"><div class="empty-i">👤</div><div>Sin colaboradores</div></div></div>`;
+    return;
+  }
+  const admins=cs.filter(c=>c.rol==='admin');
+  const colabs=cs.filter(c=>c.rol!=='admin');
+  function tarjetasHtml(lista){
+    return lista.map(c=>`
+      <button class="colab-card-btn" onclick="abrirTareasColab('${c.id}','${c.nombre} ${c.apellido||''}','${c.color}')">
+        <div style="width:40px;height:40px;border-radius:50%;background:${c.color};display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:600;color:#fff;flex-shrink:0">${ini(c.nombre,c.apellido)}</div>
+        <div style="flex:1;min-width:0">
+          <div style="font-size:13px;color:var(--ink);margin-bottom:2px">${c.nombre} ${c.apellido||''}</div>
+          <div style="font-size:10px;color:var(--ink3)">${c.email}</div>
+        </div>
+        <span style="font-size:9px;padding:2px 8px;border-radius:4px;background:${c.rol==='admin'?'var(--acc-lt)':'var(--bg2)'};color:${c.rol==='admin'?'var(--accent)':'var(--ink2)'};flex-shrink:0">${c.rol}</span>
+        <span style="font-size:14px;color:var(--ink3);flex-shrink:0">›</span>
+      </button>`).join('');
+  }
+  let html=`<div class="colabs-layout">`;
+  if(admins.length){html+=`<div class="sec">Admins</div>${tarjetasHtml(admins)}`;}
+  if(colabs.length){html+=`<div class="sec" style="margin-top:${admins.length?'20px':'0'}">Colaboradores</div>${tarjetasHtml(colabs)}`;}
+  html+=`</div>`;
+  cont.innerHTML=html;
+}
+
+async function abrirTareasColab(colabId,nombre,color){
+  const ov=document.getElementById('ov-colab-tareas');
+  document.getElementById('ct-avatar').style.background=color;
+  document.getElementById('ct-avatar').textContent=nombre.split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase();
+  document.getElementById('ct-nombre').textContent=nombre;
+  document.getElementById('ct-body').innerHTML=`<div class="ldg">Cargando tareas...</div>`;
+  ov.classList.add('on');
+
+  const {data:ents}=await sb.from('entregables')
+    .select('id,nombre,done,etapa_clave,fecha_unica,fecha_fin,proyectos(id,codigo,nombre)')
+    .eq('asignado_id',colabId)
+    .eq('eliminado',false)
+    .order('done',{ascending:true})
+    .order('fecha_unica',{ascending:true,nullsFirst:false})
+    .order('fecha_fin',{ascending:true,nullsFirst:false});
+
+  if(!ents||!ents.length){
+    document.getElementById('ct-body').innerHTML=`<div class="ct-empty">Sin tareas asignadas</div>`;
+    return;
+  }
+
+  // Agrupar por proyecto
+  const porProy={};
+  ents.forEach(e=>{
+    const pid=e.proyectos?.id||'_';
+    if(!porProy[pid])porProy[pid]={proy:e.proyectos,tareas:[]};
+    porProy[pid].tareas.push(e);
+  });
+
+  const hoyStr=hoy();
+  let html='';
+  Object.values(porProy).forEach(({proy,tareas})=>{
+    const pendientes=tareas.filter(t=>!t.done).length;
+    html+=`<div class="ct-proy-sec">
+      <div class="ct-proy-hdr">
+        <span class="cod" style="font-size:8px;padding:2px 5px">${proy?.codigo||'—'}</span>
+        <span style="font-size:11px;color:var(--ink);flex:1">${proy?.nombre||'Sin proyecto'}</span>
+        ${pendientes>0?`<span style="font-size:9px;color:var(--amber);background:var(--amb-lt);padding:2px 7px;border-radius:4px">${pendientes} pendiente${pendientes>1?'s':''}</span>`:'<span style="font-size:9px;color:var(--green);background:var(--grn-lt);padding:2px 7px;border-radius:4px">✓ completo</span>'}
+      </div>`;
+    tareas.forEach(t=>{
+      const clave=t.etapa_clave||'_';
+      const fechaRef=t.fecha_unica||t.fecha_fin;
+      let fechaHtml='';
+      if(fechaRef){
+        const d2=dH(fechaRef);
+        const fc=t.done?'ok':d2<0?'vencida':d2<=5?'pronto':'ok';
+        fechaHtml=`<span class="efecha ${fc}" style="pointer-events:none">${fF(fechaRef)}</span>`;
+      }
+      html+=`<div class="ct-tarea-row" style="${t.done?'opacity:.5':''}">
+        <div class="ct-done-circle ${t.done?'done':''}">${t.done?'✓':''}</div>
+        <span class="ec" style="font-size:8px">${clave==='_'?'—':clave}</span>
+        <span style="flex:1;font-size:11px;color:var(--ink);${t.done?'text-decoration:line-through':''}">${t.nombre}</span>
+        ${fechaHtml}
+      </div>`;
+    });
+    html+=`</div>`;
+  });
+
+  document.getElementById('ct-body').innerHTML=html;
+}
+
 // ── GESTIÓN ──
 async function renderGestion(){
   const cont=document.getElementById('pane-gestion');if(!cont)return;
@@ -2543,6 +2723,11 @@ async function renderGestion(){
         <button class="btn-nuevo" onclick="abrirNuevoProy()">+ Nuevo</button>
       </div>
       <div id="g-proys"><div class="ldg">Cargando...</div></div>
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;margin-top:24px">
+        <div class="sec" style="margin:0">Tags</div>
+        <button class="btn-nuevo" onclick="abrirNuevoTag()">+ Crear</button>
+      </div>
+      <div id="g-tags"><div class="ldg">Cargando...</div></div>
     </div>
     <div class="gestion-col">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
@@ -2551,7 +2736,7 @@ async function renderGestion(){
       <div id="g-tpls"><div class="ldg">Cargando...</div></div>
     </div>
   </div>`;
-  await loadGColabs();await loadGProys();await loadGTemplates();
+  await loadGColabs();await loadGProys();await loadGTags();await loadGTemplates();
 }
 async function loadGColabs(){
   const cont=document.getElementById('g-colabs');if(!cont)return;
@@ -2570,14 +2755,25 @@ async function loadGColabs(){
 async function loadGProys(){
   const cont=document.getElementById('g-proys');if(!cont)return;
   const {data:ps}=await sb.from('proyectos').select('*').order('codigo');
+  const {data:ptags}=await sb.from('proyecto_tags').select('proyecto_id,tags(id,nombre,fijo)');
   if(!ps||!ps.length){cont.innerHTML=`<div class="empty"><div class="empty-i">📁</div><div>Sin proyectos</div></div>`;return;}
-  cont.innerHTML=ps.map(p=>`<div class="card" style="padding:12px 14px;margin-bottom:8px;display:flex;align-items:center;gap:10px">
-    <div style="flex:1;min-width:0">
-      <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px"><span class="cod">${p.codigo}</span><span style="font-size:12px;color:var(--ink)">${p.nombre}</span></div>
-      <div style="font-size:10px;color:var(--ink3)">${p.etapas_activas?.join(', ')||''} · $${Math.round(p.presupuesto_total).toLocaleString('es-MX')}</div>
-    </div>
-    <button style="width:28px;height:28px;border-radius:6px;border:1.5px solid var(--border);background:none;font-size:13px;color:var(--ink2);display:flex;align-items:center;justify-content:center;cursor:pointer" onclick="abrirEditProy('${p.id}')">✏</button>
-  </div>`).join('');
+  // Mapear tags por proyecto
+  const tagsXProy={};(ptags||[]).forEach(pt=>{if(!tagsXProy[pt.proyecto_id])tagsXProy[pt.proyecto_id]=[];if(pt.tags)tagsXProy[pt.proyecto_id].push(pt.tags);});
+  cont.innerHTML=ps.map(p=>{
+    const tags=tagsXProy[p.id]||[];
+    const archivado=tags.some(t=>t.nombre==='archivado');
+    const tagsHtml=tags.length?`<div style="display:flex;flex-wrap:wrap;gap:4px;margin-top:6px">${tags.map(t=>`<span class="tag-pill ${t.nombre==='archivado'?'archivado':t.fijo?'fijo':'custom'}">${t.nombre}</span>`).join('')}</div>`:'';
+    return `<div class="card" style="padding:12px 14px;margin-bottom:8px;${archivado?'opacity:.6':''}">
+      <div style="display:flex;align-items:center;gap:10px">
+        <div style="flex:1;min-width:0">
+          <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px"><span class="cod">${p.codigo}</span><span style="font-size:12px;color:var(--ink)">${p.nombre}</span></div>
+          <div style="font-size:10px;color:var(--ink3)">${p.etapas_activas?.join(', ')||''} · $${Math.round(p.presupuesto_total).toLocaleString('es-MX')}</div>
+          ${tagsHtml}
+        </div>
+        <button style="width:28px;height:28px;border-radius:6px;border:1.5px solid var(--border);background:none;font-size:13px;color:var(--ink2);display:flex;align-items:center;justify-content:center;cursor:pointer;flex-shrink:0" onclick="abrirEditProy('${p.id}')">✏</button>
+      </div>
+    </div>`;
+  }).join('');
 }
 
 // ── COLABORADOR FORM ──
@@ -2619,6 +2815,50 @@ async function eliminarColab2(){
   closeOv('ov-colab2');await loadGColabs();toast('Colaborador eliminado');
 }
 
+// ── TAGS ──
+let tagsSel=new Set();
+async function loadGTags(){
+  const cont=document.getElementById('g-tags');if(!cont)return;
+  const {data:tags}=await sb.from('tags').select('*').order('fijo',{ascending:false}).order('nombre');
+  if(!tags||!tags.length){cont.innerHTML=`<div class="empty"><div class="empty-i">🏷</div><div>Sin tags</div></div>`;return;}
+  cont.innerHTML=tags.map(t=>`
+    <div class="tag-row">
+      <span class="tag-pill ${t.nombre==='archivado'?'archivado':t.fijo?'fijo':'custom'}">${t.nombre}</span>
+      <div style="display:flex;align-items:center;gap:8px">
+        <span style="font-size:9px;color:var(--ink3)">${t.fijo?'fijo':'personalizado'}</span>
+        ${!t.fijo?`<button onclick="eliminarTag('${t.id}')" style="width:24px;height:24px;border-radius:6px;border:1.5px solid var(--border);background:none;font-size:12px;color:var(--rose);cursor:pointer">×</button>`:''}
+      </div>
+    </div>`).join('');
+}
+async function eliminarTag(id){
+  if(!confirm('¿Eliminar este tag? Se quitará de todos los proyectos.'))return;
+  await sb.from('tags').delete().eq('id',id);
+  await loadGTags();toast('Tag eliminado');
+}
+function abrirNuevoTag(){document.getElementById('ov-nuevo-tag').classList.add('on');document.getElementById('ntag-nom').value='';}
+async function guardarNuevoTag(){
+  const nom=document.getElementById('ntag-nom').value.trim().toLowerCase();
+  if(!nom){toast('Escribe un nombre para el tag');return;}
+  const btn=document.getElementById('ntag-save');btn.disabled=true;
+  const {error}=await sb.from('tags').insert({nombre:nom,fijo:false});
+  btn.disabled=false;
+  if(error){toast('Ya existe un tag con ese nombre');return;}
+  closeOv('ov-nuevo-tag');await loadGTags();toast('✓ Tag creado');
+}
+async function renderTagsSel(proyId){
+  tagsSel=new Set();
+  const {data:allTags}=await sb.from('tags').select('*').order('fijo',{ascending:false}).order('nombre');
+  if(proyId){const {data:pt}=await sb.from('proyecto_tags').select('tag_id').eq('proyecto_id',proyId);(pt||[]).forEach(x=>tagsSel.add(x.tag_id));}
+  const cont=document.getElementById('pf-tags-sel');if(!cont)return;
+  cont.innerHTML=(allTags||[]).map(t=>`
+    <button type="button" class="tag-btn-sel ${tagsSel.has(t.id)?'on':''} ${t.nombre==='archivado'?'archivado-btn':''}" id="tag-btn-${t.id}" onclick="toggleTagProy('${t.id}')">${t.nombre}</button>
+  `).join('');
+}
+function toggleTagProy(id){
+  if(tagsSel.has(id)){tagsSel.delete(id);document.getElementById('tag-btn-'+id).classList.remove('on');}
+  else{tagsSel.add(id);document.getElementById('tag-btn-'+id).classList.add('on');}
+}
+
 // ── PROYECTO FORM ──
 let proyEditId2=null,etapasSel2=new Set(),tipoProy='productivo',colabsSel=new Set();
 async function renderColabsCheck(proyId){
@@ -2642,7 +2882,7 @@ async function abrirNuevoProy(){
   document.getElementById('pf-title2').textContent='Nuevo proyecto';
   ['pf-cod','pf-nom2','pf-cli','pf-presup2','pf-gasto','pf-inicio'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
   document.getElementById('pf-del').style.display='none';
-  selTipoProy('productivo');renderEtapasCheck2();actualizarDist2();await renderColabsCheck(null);
+  selTipoProy('productivo');renderEtapasCheck2();actualizarDist2();await renderColabsCheck(null);await renderTagsSel(null);
   document.getElementById('ov-proy2').classList.add('on');
 }
 async function abrirEditProy(id){
@@ -2662,7 +2902,7 @@ async function abrirEditProy(id){
   document.getElementById('pf-cod').value=p.codigo;document.getElementById('pf-nom2').value=p.nombre;
   document.getElementById('pf-cli').value=p.cliente||'';document.getElementById('pf-presup2').value=presupTotal||'';
   document.getElementById('pf-gasto').value=p.gasto_previo||0;document.getElementById('pf-del').style.display='block';
-  selTipoProy(p.tipo||'productivo');renderEtapasCheck2();actualizarDist2(pctGuardados);await renderColabsCheck(id);
+  selTipoProy(p.tipo||'productivo');renderEtapasCheck2();actualizarDist2(pctGuardados);await renderColabsCheck(id);await renderTagsSel(id);
   document.getElementById('ov-proy2').classList.add('on');
 }
 function renderEtapasCheck2(){
@@ -2732,7 +2972,12 @@ async function guardarProy2(){
       const inserts=Object.entries(presupEtapas).map(([k,m])=>({proyecto_id:np.id,etapa_clave:k,monto:m}));if(inserts.length)await sb.from('presupuesto_etapas').insert(inserts);
     }
   }
-  if(npId){await sb.from('proyecto_colaboradores').delete().eq('proyecto_id',npId);if(colabsSel.size){const insColabs=[...colabsSel].map(cid=>({proyecto_id:npId,colaborador_id:cid}));await sb.from('proyecto_colaboradores').insert(insColabs);}}
+  if(npId){
+    await sb.from('proyecto_colaboradores').delete().eq('proyecto_id',npId);
+    if(colabsSel.size){const insColabs=[...colabsSel].map(cid=>({proyecto_id:npId,colaborador_id:cid}));await sb.from('proyecto_colaboradores').insert(insColabs);}
+    await sb.from('proyecto_tags').delete().eq('proyecto_id',npId);
+    if(tagsSel.size){const insTags=[...tagsSel].map(tid=>({proyecto_id:npId,tag_id:tid}));await sb.from('proyecto_tags').insert(insTags);}
+  }
   closeOv('ov-proy2');btn.disabled=false;btn.textContent='Guardar';await loadGProys();toast('✓ Proyecto guardado');
 }
 async function eliminarProy2(){

@@ -304,6 +304,14 @@ tr.comp-toggle-row:hover td{background:var(--bg2);}
 #ov-dpd{align-items:center;}
 #ov-dpd .modal{max-width:360px;}
 
+/* ── GESTIÓN TABS ── */
+.gestion-tabs{display:flex;gap:4px;padding:16px 24px 0;border-bottom:1px solid var(--border);margin-bottom:0;}
+.gestion-tab{padding:8px 16px;font-size:11px;border:none;background:none;color:var(--ink3);cursor:pointer;border-bottom:2px solid transparent;margin-bottom:-1px;transition:color .15s,border-color .15s;}
+.gestion-tab.on{color:var(--accent);border-bottom-color:var(--accent);}
+.gestion-tab:hover:not(.on){color:var(--ink2);}
+.gestion-panel{display:none;padding:24px;max-width:700px;}
+.gestion-panel.on{display:block;}
+
 /* ── TAGS ── */
 .tag-pill{display:inline-flex;align-items:center;gap:5px;padding:3px 9px;border-radius:20px;font-size:9px;letter-spacing:.04em;border:1.5px solid var(--border);background:#fff;color:var(--ink2);cursor:default;}
 .tag-pill.fijo{background:var(--bg2);color:var(--ink2);}
@@ -487,10 +495,11 @@ tr.comp-toggle-row:hover td{background:var(--bg2);}
     <div class="ct-header">
       <div style="display:flex;align-items:center;gap:12px">
         <div id="ct-avatar" style="width:40px;height:40px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:600;color:#fff;flex-shrink:0"></div>
-        <div>
+        <div style="flex:1">
           <div style="font-family:'Fraunces',serif;font-size:18px;font-weight:300" id="ct-nombre"></div>
           <div style="font-size:10px;color:var(--ink3);margin-top:1px">Tareas asignadas por proyecto</div>
         </div>
+        <button id="ct-toggle-done" onclick="toggleDoneVisibility()" style="display:none;font-size:10px;padding:6px 12px;border:1.5px solid var(--border);border-radius:8px;background:#fff;color:var(--ink2);cursor:pointer;white-space:nowrap"></button>
       </div>
     </div>
     <div class="ct-body" id="ct-body"></div>
@@ -2652,73 +2661,117 @@ async function abrirTareasColab(colabId,nombre,color){
   document.getElementById('ct-avatar').style.background=color;
   document.getElementById('ct-avatar').textContent=nombre.split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase();
   document.getElementById('ct-nombre').textContent=nombre;
-  document.getElementById('ct-body').innerHTML=`<div class="ldg">Cargando tareas...</div>`;
+  ov.dataset.colabId=colabId;
+  ov.dataset.showDone='0';
+  document.getElementById('ct-toggle-done').textContent='Mostrar completadas';
+  await loadTareasColab(colabId,false);
   ov.classList.add('on');
-
+}
+async function loadTareasColab(colabId,showDone){
+  document.getElementById('ct-body').innerHTML=`<div class="ldg">Cargando tareas...</div>`;
+  const {data:allColabs}=await sb.from('colaboradores').select('id,nombre,apellido').order('nombre');
   const {data:ents}=await sb.from('entregables')
-    .select('id,nombre,done,etapa_clave,fecha_unica,fecha_fin,proyectos(id,codigo,nombre)')
-    .eq('asignado_id',colabId)
-    .eq('eliminado',false)
+    .select('id,nombre,done,etapa_clave,fecha_unica,fecha_fin,asignado_id,proyectos(id,codigo,nombre)')
+    .eq('asignado_id',colabId).eq('eliminado',false)
     .order('done',{ascending:true})
     .order('fecha_unica',{ascending:true,nullsFirst:false})
     .order('fecha_fin',{ascending:true,nullsFirst:false});
 
-  if(!ents||!ents.length){
-    document.getElementById('ct-body').innerHTML=`<div class="ct-empty">Sin tareas asignadas</div>`;
+  const visibles=showDone?ents:(ents||[]).filter(e=>!e.done);
+  const pendientes=(ents||[]).filter(e=>!e.done).length;
+  const completadas=(ents||[]).filter(e=>e.done).length;
+
+  // Actualizar botón toggle
+  const btn=document.getElementById('ct-toggle-done');
+  btn.textContent=showDone?'Ocultar completadas':`Mostrar completadas (${completadas})`;
+  btn.style.display=completadas>0?'block':'none';
+
+  if(!visibles||!visibles.length){
+    document.getElementById('ct-body').innerHTML=`<div class="ct-empty">${showDone?'Sin tareas asignadas':'Sin tareas pendientes'}</div>`;
     return;
   }
 
   // Agrupar por proyecto
   const porProy={};
-  ents.forEach(e=>{
+  visibles.forEach(e=>{
     const pid=e.proyectos?.id||'_';
     if(!porProy[pid])porProy[pid]={proy:e.proyectos,tareas:[]};
     porProy[pid].tareas.push(e);
   });
 
-  const hoyStr=hoy();
+  const colabsOpts=(allColabs||[]).map(c=>`<option value="${c.id}">${c.nombre} ${c.apellido||''}</option>`).join('');
+
   let html='';
   Object.values(porProy).forEach(({proy,tareas})=>{
-    const pendientes=tareas.filter(t=>!t.done).length;
+    const pend=tareas.filter(t=>!t.done).length;
     html+=`<div class="ct-proy-sec">
       <div class="ct-proy-hdr">
         <span class="cod" style="font-size:8px;padding:2px 5px">${proy?.codigo||'—'}</span>
         <span style="font-size:11px;color:var(--ink);flex:1">${proy?.nombre||'Sin proyecto'}</span>
-        ${pendientes>0?`<span style="font-size:9px;color:var(--amber);background:var(--amb-lt);padding:2px 7px;border-radius:4px">${pendientes} pendiente${pendientes>1?'s':''}</span>`:'<span style="font-size:9px;color:var(--green);background:var(--grn-lt);padding:2px 7px;border-radius:4px">✓ completo</span>'}
+        ${pend>0?`<span style="font-size:9px;color:var(--amber);background:var(--amb-lt);padding:2px 7px;border-radius:4px">${pend} pendiente${pend>1?'s':''}</span>`:`<span style="font-size:9px;color:var(--green);background:var(--grn-lt);padding:2px 7px;border-radius:4px">✓ completo</span>`}
       </div>`;
     tareas.forEach(t=>{
       const clave=t.etapa_clave||'_';
-      const fechaRef=t.fecha_unica||t.fecha_fin;
-      let fechaHtml='';
-      if(fechaRef){
-        const d2=dH(fechaRef);
-        const fc=t.done?'ok':d2<0?'vencida':d2<=5?'pronto':'ok';
-        fechaHtml=`<span class="efecha ${fc}" style="pointer-events:none">${fF(fechaRef)}</span>`;
-      }
-      html+=`<div class="ct-tarea-row" style="${t.done?'opacity:.5':''}">
-        <div class="ct-done-circle ${t.done?'done':''}">${t.done?'✓':''}</div>
-        <span class="ec" style="font-size:8px">${clave==='_'?'—':clave}</span>
+      const fechaVal=t.fecha_unica||t.fecha_fin||'';
+      const fechaDisplay=fechaVal?fF(fechaVal):'—';
+      const d2=fechaVal?dH(fechaVal):null;
+      const fc=t.done?'ok':d2<0?'vencida':d2<=5?'pronto':'ok';
+      html+=`<div class="ct-tarea-row" id="ct-row-${t.id}" style="${t.done?'opacity:.5':''}">
+        <button onclick="toggleDoneColab('${t.id}')" style="width:18px;height:18px;border-radius:50%;border:1.5px solid ${t.done?'var(--green)':'var(--border)'};background:${t.done?'var(--green)':'transparent'};display:flex;align-items:center;justify-content:center;font-size:8px;color:#fff;cursor:pointer;flex-shrink:0">${t.done?'✓':''}</button>
+        <span class="ec" style="font-size:8px;flex-shrink:0">${clave==='_'?'—':clave}</span>
         <span style="flex:1;font-size:11px;color:var(--ink);${t.done?'text-decoration:line-through':''}">${t.nombre}</span>
-        ${fechaHtml}
+        <input type="date" value="${fechaVal}" onchange="cambiarFechaColab('${t.id}',this.value,'${t.fecha_unica?'fecha_unica':'fecha_fin'}')" style="font-family:'DM Mono',monospace;font-size:9px;color:var(--ink2);border:none;background:transparent;cursor:pointer;width:100px;text-align:right" title="Cambiar fecha">
+        <select onchange="reasignarColab('${t.id}',this.value)" style="font-family:'DM Mono',monospace;font-size:9px;color:var(--ink3);border:none;background:transparent;cursor:pointer;max-width:90px" title="Reasignar">
+          ${(allColabs||[]).map(c=>`<option value="${c.id}" ${c.id===t.asignado_id?'selected':''}>${c.nombre}</option>`).join('')}
+        </select>
       </div>`;
     });
     html+=`</div>`;
   });
-
   document.getElementById('ct-body').innerHTML=html;
+}
+async function toggleDoneColab(entId){
+  const {data:e}=await sb.from('entregables').select('done').eq('id',entId).single();
+  if(!e)return;
+  await sb.from('entregables').update({done:!e.done}).eq('id',entId);
+  const ov=document.getElementById('ov-colab-tareas');
+  await loadTareasColab(ov.dataset.colabId,ov.dataset.showDone==='1');
+}
+async function cambiarFechaColab(entId,fecha,campo){
+  await sb.from('entregables').update({[campo]:fecha||null}).eq('id',entId);
+  toast('✓ Fecha actualizada');
+}
+async function reasignarColab(entId,nuevoColabId){
+  await sb.from('entregables').update({asignado_id:nuevoColabId}).eq('id',entId);
+  const ov=document.getElementById('ov-colab-tareas');
+  await loadTareasColab(ov.dataset.colabId,ov.dataset.showDone==='1');
+  toast('✓ Tarea reasignada');
+}
+function toggleDoneVisibility(){
+  const ov=document.getElementById('ov-colab-tareas');
+  const show=ov.dataset.showDone==='1';
+  ov.dataset.showDone=show?'0':'1';
+  loadTareasColab(ov.dataset.colabId,!show);
 }
 
 // ── GESTIÓN ──
 async function renderGestion(){
   const cont=document.getElementById('pane-gestion');if(!cont)return;
-  cont.innerHTML=`<div class="gestion-layout">
-    <div class="gestion-col">
+  cont.innerHTML=`
+    <div class="gestion-tabs">
+      <button class="gestion-tab on" onclick="switchGestionTab('colabs',this)">Colaboradores</button>
+      <button class="gestion-tab" onclick="switchGestionTab('proyectos',this)">Proyectos</button>
+      <button class="gestion-tab" onclick="switchGestionTab('templates',this)">Templates</button>
+    </div>
+    <div class="gestion-panel on" id="gp-colabs">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
         <div class="sec" style="margin:0">Colaboradores</div>
         <button class="btn-nuevo" onclick="abrirNuevoColab()">+ Agregar</button>
       </div>
       <div id="g-colabs"><div class="ldg">Cargando...</div></div>
-      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;margin-top:24px">
+    </div>
+    <div class="gestion-panel" id="gp-proyectos">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
         <div class="sec" style="margin:0">Proyectos</div>
         <button class="btn-nuevo" onclick="abrirNuevoProy()">+ Nuevo</button>
       </div>
@@ -2729,14 +2782,22 @@ async function renderGestion(){
       </div>
       <div id="g-tags"><div class="ldg">Cargando...</div></div>
     </div>
-    <div class="gestion-col">
+    <div class="gestion-panel" id="gp-templates">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
         <div class="sec" style="margin:0">Templates de entregables</div>
       </div>
       <div id="g-tpls"><div class="ldg">Cargando...</div></div>
-    </div>
-  </div>`;
-  await loadGColabs();await loadGProys();await loadGTags();await loadGTemplates();
+    </div>`;
+  await loadGColabs();
+}
+function switchGestionTab(tab,btn){
+  document.querySelectorAll('.gestion-tab').forEach(t=>t.classList.remove('on'));
+  document.querySelectorAll('.gestion-panel').forEach(p=>p.classList.remove('on'));
+  btn.classList.add('on');
+  document.getElementById('gp-'+tab).classList.add('on');
+  if(tab==='colabs'&&!document.getElementById('g-colabs').children.length)loadGColabs();
+  if(tab==='proyectos'){loadGProys();loadGTags();}
+  if(tab==='templates')loadGTemplates();
 }
 async function loadGColabs(){
   const cont=document.getElementById('g-colabs');if(!cont)return;

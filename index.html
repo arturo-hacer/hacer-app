@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>hacer:</title>
+<title>hacer: v37</title>
 <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><text x='1' y='26' font-family='Arial,Helvetica,sans-serif' font-size='26' font-weight='700' fill='%231c1b17'>h:</text></svg>">
 <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Fraunces:ital,opsz,wght@0,9..144,300;0,9..144,400;1,9..144,300&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
@@ -208,9 +208,27 @@ button{font-family:'DM Mono',monospace;cursor:pointer;}
 .semana-left{border-right:1px solid var(--border);}
 
 /* ── DASHBOARD ── */
-.dashboard-layout{padding:24px;max-width:1100px;}
-.dash-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:20px;}
-.dash-col{display:flex;flex-direction:column;gap:10px;}
+.dashboard-layout{padding:0;}
+.dash-tab-bar{display:flex;gap:0;padding:0 24px;border-bottom:1px solid var(--border);}
+.dash-tab{padding:14px 18px;font-size:11px;border:none;background:none;color:var(--ink3);cursor:pointer;border-bottom:2px solid transparent;margin-bottom:-1px;transition:color .15s,border-color .15s;letter-spacing:.04em;font-family:'DM Mono',monospace;}
+.dash-tab.on{color:var(--accent);border-bottom-color:var(--accent);}
+.dash-tab:hover:not(.on){color:var(--ink2);}
+.dash-panel{display:none;padding:20px 24px;max-width:920px;}
+.dash-panel.on{display:block;}
+/* Colaborador card dashboard */
+.dcol-card{background:#fff;border-radius:var(--r);border:1.5px solid var(--border);margin-bottom:10px;overflow:hidden;transition:border-color .18s;}
+.dcol-card.expanded{border-color:var(--accent);}
+.dcol-head{display:flex;align-items:center;gap:12px;padding:14px 16px;cursor:pointer;user-select:none;transition:background .1s;}
+.dcol-head:hover{background:var(--bg);}
+.dcol-body{display:none;border-top:1px solid var(--border);}
+.dcol-body.open{display:block;}
+/* Proyecto card dashboard */
+.dproy-card{background:#fff;border-radius:var(--r);border:1.5px solid var(--border);margin-bottom:10px;overflow:hidden;transition:border-color .18s;}
+.dproy-card.expanded{border-color:var(--accent);}
+.dproy-head{padding:14px 16px;cursor:pointer;user-select:none;transition:background .1s;}
+.dproy-head:hover{background:var(--bg);}
+.dproy-body{display:none;border-top:1px solid var(--border);}
+.dproy-body.open{display:block;}
 
 /* ── REPORTES ── */
 .rep-layout{padding:24px;max-width:800px;}
@@ -301,7 +319,7 @@ tr.comp-toggle-row:hover td{background:var(--bg2);}
 .sel-bar-clr:hover{color:#fff;}
 
 /* ── DATE PICKER ── */
-#ov-dpd{align-items:center;}
+#ov-dpd{align-items:center;z-index:500;}
 #ov-dpd .modal{max-width:360px;}
 
 /* ── PROYECTOS TABLA ── */
@@ -772,7 +790,7 @@ tr.comp-toggle-row:hover td{background:var(--bg2);}
 const SURL='https://yqggaamyiblqenjwcggw.supabase.co';
 const SKEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InlxZ2dhYW15aWJscWVuandjZ2d3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODAzNDM3NTAsImV4cCI6MjA5NTkxOTc1MH0._ZpHlZz5sIfeUKuS9zMw7U3Jv3PPzNWRtJbG9QTkUdw';
 const sb=supabase.createClient(SURL,SKEY);
-let USER=null,PERFIL=null,diaAct=hoy(),rH=2,timerInt=null,timerSecs=0,timerEnt=null,showDone={};
+let USER=null,PERFIL=null,diaAct=hoy(),rH=2,timerInt=null,timerSecs=0,timerEnt=null,showDone={},_dashData=null;
 let seleccionadas=new Set(),ultimaFilaSel=null;
 const COLS=['#2828b8','#ed254e','#3a7a4a','#c28a10','#7b6fa0','#2a7a8a','#8a5a2a'];
 const ETAPAS_C=[{k:'PC',n:'Procesos'},{k:'DE',n:'Definición'},{k:'SD',n:'Diseño Esquemático'},{k:'DD',n:'Desarrollo de Diseño'},{k:'CD',n:'Documentos Constructivos'}];
@@ -1387,97 +1405,263 @@ async function saveReg(){
 // ── DASHBOARD ──
 async function renderDashboard(){
   const cont=document.getElementById('pane-dashboard');if(!cont)return;
-  cont.innerHTML=`<div class="ldg">Cargando dashboard...</div>`;
-  const hoyStr=diaAct,diasSem=semana();
-  const [{data:ents},{data:colabs},{data:regs},{data:proys}]=await Promise.all([
-    sb.from('entregables').select('id,nombre,done,eliminado,fecha_fin,fecha_unica,asignado_id,etapa_clave,proyecto_id,proyectos(codigo)').eq('eliminado',false).eq('done',false),
+  cont.innerHTML='<div class="ldg">Cargando dashboard...</div>';
+  const esAdmin=PERFIL?.rol==='admin';
+  const hoyStr=diaAct,diasSem=semana(),finSem=diasSem[diasSem.length-1];
+
+  const regsPresupQ=esAdmin
+    ?sb.from('registros_horas').select('proyecto_id,horas,colaboradores(tarifa)')
+    :Promise.resolve({data:[]});
+
+  const[{data:colabs},{data:regsSem},{data:entsAll},{data:proys},{data:regsPresup},{data:ptags}]=await Promise.all([
     sb.from('colaboradores').select('*').order('nombre'),
-    sb.from('registros_horas').select('colaborador_id,horas,fecha').in('fecha',diasSem),
-    sb.from('proyectos').select('id,codigo,nombre').order('codigo')
+    sb.from('registros_horas').select('colaborador_id,horas,fecha,proyecto_id,entregables(nombre)').in('fecha',diasSem),
+    sb.from('entregables').select('id,nombre,done,eliminado,fecha_unica,fecha_fin,proyecto_id,asignado_id,etapa_clave').eq('eliminado',false),
+    sb.from('proyectos').select('id,codigo,nombre,cliente,tipo,presupuesto_total').order('codigo'),
+    regsPresupQ,
+    sb.from('proyecto_tags').select('proyecto_id,tags(nombre)')
   ]);
 
-  const alertas=[];
-  (ents||[]).forEach(e=>{
-    const fechaRef=e.fecha_unica||e.fecha_fin;if(!fechaRef)return;
-    const d=dH(fechaRef);const colab=(colabs||[]).find(c=>c.id===e.asignado_id);
-    const resp=colab?colab.nombre+' '+(colab.apellido||''):'Sin asignar';
-    if(d<0)alertas.push({tipo:'vencida',ico:'🔴',nombre:e.nombre,proyecto:e.proyectos?.codigo||'',etapa:e.etapa_clave||'',resp,dias:Math.abs(d)});
-    else if(d===0)alertas.push({tipo:'hoy',ico:'🟡',nombre:e.nombre,proyecto:e.proyectos?.codigo||'',etapa:e.etapa_clave||'',resp,dias:0});
+  // Tags
+  const archivadosIds=new Set((ptags||[]).filter(pt=>pt.tags?.nombre==='archivado').map(pt=>pt.proyecto_id));
+
+  // Datos colabs
+  const hrsSemColab={},hrsTodayColab={},regsPorColabDia={};
+  (regsSem||[]).forEach(r=>{
+    const cid=r.colaborador_id;
+    if(!hrsSemColab[cid])hrsSemColab[cid]=0;hrsSemColab[cid]+=r.horas;
+    if(r.fecha===hoyStr){if(!hrsTodayColab[cid])hrsTodayColab[cid]=0;hrsTodayColab[cid]+=r.horas;}
+    if(!regsPorColabDia[cid])regsPorColabDia[cid]={};
+    if(!regsPorColabDia[cid][r.fecha])regsPorColabDia[cid][r.fecha]=[];
+    regsPorColabDia[cid][r.fecha].push({nombre:r.entregables?.nombre||'(sin nombre)',horas:r.horas});
   });
 
-  const estaSemana=(ents||[]).filter(e=>{const f=e.fecha_unica||e.fecha_fin;return f&&f>=hoyStr&&f<=diasSem[diasSem.length-1];}).sort((a,b)=>(a.fecha_unica||a.fecha_fin||'').localeCompare(b.fecha_unica||b.fecha_fin||''));
+  // Datos proyectos
+  const epMap={},entsRetrasadas={},entsSemMap={},entsSemPendientes={};
+  (entsAll||[]).forEach(e=>{
+    if(!epMap[e.proyecto_id])epMap[e.proyecto_id]={t:0,d:0};
+    epMap[e.proyecto_id].t++;if(e.done)epMap[e.proyecto_id].d++;
+    const fr=e.fecha_unica||e.fecha_fin;if(!fr)return;
+    if(fr<hoyStr&&!e.done){if(!entsRetrasadas[e.proyecto_id])entsRetrasadas[e.proyecto_id]=[];entsRetrasadas[e.proyecto_id].push(e);}
+    if(fr>=hoyStr&&fr<=finSem){
+      if(!entsSemMap[e.proyecto_id])entsSemMap[e.proyecto_id]={total:0,done:0};
+      entsSemMap[e.proyecto_id].total++;if(e.done)entsSemMap[e.proyecto_id].done++;
+      if(!e.done){if(!entsSemPendientes[e.proyecto_id])entsSemPendientes[e.proyecto_id]=[];entsSemPendientes[e.proyecto_id].push(e);}
+    }
+  });
+  const hrsSemProy={};(regsSem||[]).forEach(r=>{if(!hrsSemProy[r.proyecto_id])hrsSemProy[r.proyecto_id]=0;hrsSemProy[r.proyecto_id]+=r.horas;});
+  const consumoProy={};(regsPresup||[]).forEach(r=>{if(!consumoProy[r.proyecto_id])consumoProy[r.proyecto_id]=0;consumoProy[r.proyecto_id]+=(r.horas*(r.colaboradores?.tarifa||0));});
 
-  const hrsColab={};(regs||[]).forEach(r=>{if(!hrsColab[r.colaborador_id])hrsColab[r.colaborador_id]=0;hrsColab[r.colaborador_id]+=r.horas;});
+  // Cache para toggles
+  _dashData={diasSem,hoyStr,colabs,regsPorColabDia,hrsSemColab,hrsTodayColab,proys,epMap,consumoProy,hrsSemProy,entsRetrasadas,entsSemMap,entsSemPendientes,archivadosIds,esAdmin};
+
+  // ── Panel Colaboradores ──
   const diasTransc=Math.max(1,diasSem.indexOf(hoyStr)+1);
   const metaHastaHoy=diasTransc*8;
+  let colabsHtml='';
 
-  // ── Alertas ──
-  let alertasHtml='';
-  if(!alertas.length){
-    alertasHtml=`<div class="card" style="padding:12px 14px;display:flex;align-items:center;gap:10px"><span style="font-size:18px">✅</span><div><div style="font-size:11px;color:var(--ink);font-weight:500">Sin atrasos</div><div style="font-size:10px;color:var(--ink3)">Todos los entregables van a tiempo</div></div></div>`;
-  } else {
-    alertas.sort((a,b)=>b.dias-a.dias).forEach(a=>{
-      alertasHtml+=`<div class="card" style="padding:12px 14px;margin-bottom:8px;display:flex;align-items:center;gap:10px;border-left:3px solid ${a.tipo==='vencida'?'var(--rose)':'var(--amber)'}">
-        <span style="font-size:16px">${a.ico}</span>
-        <div style="flex:1;min-width:0"><div style="font-size:11px;color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${a.nombre}</div>
-        <div style="font-size:9px;color:var(--ink3);margin-top:2px">${a.proyecto}${a.etapa?' · '+a.etapa:''} · ${a.resp}</div></div>
-        <span style="font-size:10px;font-weight:600;color:${a.tipo==='vencida'?'var(--rose)':'var(--amber)'};white-space:nowrap;flex-shrink:0">${a.dias>0?a.dias+'d tarde':'Hoy'}</span>
-      </div>`;
-    });
-  }
+  (colabs||[]).forEach(c=>{
+    const hrsSem=hrsSemColab[c.id]||0,hrsHoy=hrsTodayColab[c.id]||0;
+    const pctSem=Math.min(100,Math.round(hrsSem/40*100));
+    const pctHoy=Math.min(100,Math.round(hrsHoy/8*100));
+    const ok=hrsSem>=metaHastaHoy;
+    const col=ok?'var(--green)':hrsSem>=metaHastaHoy*.75?'var(--amber)':'var(--rose)';
+    const falt=Math.max(0,metaHastaHoy-hrsSem);
+    const ini2=(c.nombre[0]||'')+(c.apellido?c.apellido[0]:'');
 
-  // ── Esta semana ──
-  let semHtml='';
-  if(!estaSemana.length){
-    semHtml=`<div class="card" style="padding:12px 14px;font-size:11px;color:var(--ink3);text-align:center">Sin entregables esta semana</div>`;
-  } else {
-    estaSemana.forEach(e=>{
-      const colab=(colabs||[]).find(c=>c.id===e.asignado_id);
-      const fechaRef=e.fecha_unica||e.fecha_fin;const d2=dH(fechaRef);
-      const cls2=d2===0?'hoy':d2<=2?'pronto':'ok';
-      semHtml+=`<div class="card" style="padding:10px 14px;margin-bottom:8px;display:flex;align-items:center;gap:10px">`;
-      if(colab)semHtml+=`<div style="width:28px;height:28px;border-radius:50%;background:${colab.color||'var(--accent)'};display:flex;align-items:center;justify-content:center;font-size:9px;color:#fff;font-weight:600;flex-shrink:0">${(colab.nombre[0]||'')+(colab.apellido?colab.apellido[0]:'')}</div>`;
-      else semHtml+=`<div style="width:28px;height:28px;border-radius:50%;background:var(--bg2);display:flex;align-items:center;justify-content:center;font-size:10px;color:var(--ink3);flex-shrink:0">?</div>`;
-      semHtml+=`<div style="flex:1;min-width:0"><div style="font-size:11px;color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${e.nombre}</div>
-        <div style="font-size:9px;color:var(--ink3);margin-top:2px">${e.proyectos?.codigo||''}${colab?' · '+colab.nombre:''}</div></div>
-      <span class="efecha ${cls2}">${d2===0?'Hoy':fF(fechaRef)}</span></div>`;
-    });
-  }
-
-  // ── Equipo ──
-  let equipoHtml='';
-  (colabs||[]).filter(c=>c.rol!=='admin').forEach(c=>{
-    const hrs=hrsColab[c.id]||0;const pct=Math.min(100,Math.round(hrs/40*100));
-    const pctMeta=Math.min(100,Math.round(metaHastaHoy/40*100));
-    const ok=hrs>=metaHastaHoy;
-    const color=ok?'var(--green)':hrs>=metaHastaHoy*.75?'var(--amber)':'var(--rose)';
-    const faltante=Math.max(0,metaHastaHoy-hrs);
-    equipoHtml+=`<div class="card" style="padding:12px 14px;margin-bottom:8px">
-      <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px">
-        <div style="width:30px;height:30px;border-radius:50%;background:${c.color||'var(--accent)'};display:flex;align-items:center;justify-content:center;font-size:10px;color:#fff;font-weight:600;flex-shrink:0">${(c.nombre[0]||'')+(c.apellido?c.apellido[0]:'')}</div>
-        <div style="flex:1"><div style="font-size:11px;color:var(--ink);font-weight:500">${c.nombre} ${c.apellido||''}</div></div>
-        <div style="text-align:right"><div style="font-size:13px;font-weight:600;color:${color}">${hT(hrs)}</div>
-        <div style="font-size:9px;color:var(--ink3)">${faltante>0?'−'+hT(faltante)+' por registrar':'✓ Al día'}</div></div>
-      </div>
-      <div style="position:relative;height:5px;background:var(--bg2);border-radius:3px;overflow:hidden">
-        <div style="position:absolute;height:100%;width:${pct}%;background:${color};border-radius:3px"></div>
-        <div style="position:absolute;height:100%;width:2px;background:var(--ink3);opacity:.3;left:${pctMeta}%"></div>
-      </div>
-      <div style="font-size:9px;color:var(--ink3);margin-top:4px;text-align:right">${hT(hrs)} / 40h semana</div>
-    </div>`;
+    colabsHtml+='<div class="dcol-card" id="dcol-'+c.id+'">';
+    colabsHtml+='<div class="dcol-head" onclick="toggleDashColab(\''+c.id+'\')">';
+    colabsHtml+='<div style="width:34px;height:34px;border-radius:50%;background:'+(c.color||'var(--accent)')+';display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:600;color:#fff;flex-shrink:0">'+ini2+'</div>';
+    colabsHtml+='<div style="flex:1;min-width:0">';
+    colabsHtml+='<div style="font-size:12px;color:var(--ink);font-weight:500;margin-bottom:8px">'+c.nombre+' '+(c.apellido||'')+'</div>';
+    // barra semana
+    colabsHtml+='<div style="display:flex;align-items:center;gap:8px;margin-bottom:5px">';
+    colabsHtml+='<span style="font-size:9px;color:var(--ink3);width:40px;flex-shrink:0">Semana</span>';
+    colabsHtml+='<div style="flex:1;height:6px;background:var(--bg2);border-radius:3px;overflow:hidden"><div style="height:100%;width:'+pctSem+'%;background:'+col+';border-radius:3px"></div></div>';
+    colabsHtml+='<span style="font-size:10px;color:'+col+';font-weight:600;min-width:32px;text-align:right">'+hT(hrsSem)+'</span>';
+    colabsHtml+='</div>';
+    // barra hoy
+    colabsHtml+='<div style="display:flex;align-items:center;gap:8px">';
+    colabsHtml+='<span style="font-size:9px;color:var(--ink3);width:40px;flex-shrink:0">Hoy</span>';
+    colabsHtml+='<div style="flex:1;height:4px;background:var(--bg2);border-radius:2px;overflow:hidden"><div style="height:100%;width:'+pctHoy+'%;background:var(--accent);border-radius:2px"></div></div>';
+    colabsHtml+='<span style="font-size:10px;color:var(--ink2);min-width:32px;text-align:right">'+hT(hrsHoy)+'</span>';
+    colabsHtml+='</div>';
+    colabsHtml+='</div>'; // flex:1
+    colabsHtml+='<div style="text-align:right;flex-shrink:0;padding-left:10px">';
+    colabsHtml+='<div style="font-size:14px;font-weight:600;color:'+col+'">'+pctSem+'%</div>';
+    colabsHtml+='<div style="font-size:9px;color:'+(falt>0?'var(--rose)':'var(--green)')+';margin-top:2px">'+(falt>0?'−'+hT(falt):'✓ Al día')+'</div>';
+    colabsHtml+='<div style="font-size:9px;color:var(--ink3);margin-top:1px">de 40h</div>';
+    colabsHtml+='</div>';
+    colabsHtml+='<span style="font-size:12px;color:var(--ink3);margin-left:6px;flex-shrink:0" id="dcol-chev-'+c.id+'">›</span>';
+    colabsHtml+='</div>'; // dcol-head
+    colabsHtml+='<div class="dcol-body" id="dcol-body-'+c.id+'"></div>';
+    colabsHtml+='</div>'; // dcol-card
   });
 
-  cont.innerHTML=`<div class="dashboard-layout">
-    <div class="dash-grid">
-      <div class="dash-col">
-        <div class="sec">Entregables atrasados</div>${alertasHtml}
-        <div class="sec" style="margin-top:16px">Esta semana</div>${semHtml}
-      </div>
-      <div class="dash-col">
-        <div class="sec">Registro semanal del equipo</div>${equipoHtml}
-      </div>
-    </div>
-  </div>`;
+  if(!colabsHtml) colabsHtml='<div class="empty"><div class="empty-i">👥</div><div>Sin colaboradores</div></div>';
+
+  // ── Panel Proyectos ──
+  const proysVisibles=(proys||[]).filter(p=>!archivadosIds.has(p.id));
+  let proyHtml='';
+
+  proysVisibles.forEach(p=>{
+    const ep=epMap[p.id]||{t:0,d:0};
+    const av=ep.t>0?Math.round(ep.d/ep.t*100):0;
+    const tienePresup=esAdmin&&p.presupuesto_total>0&&p.tipo!=='en_blanco';
+    const pct=tienePresup?Math.min(100,Math.round((consumoProy[p.id]||0)/p.presupuesto_total*100)):null;
+    const colPct=pct>=90?'var(--rose)':pct>=70?'var(--amber)':'var(--green)';
+    const semD=entsSemMap[p.id]||{total:0,done:0};
+    const hrsP=hrsSemProy[p.id]||0;
+    const nRet=(entsRetrasadas[p.id]||[]).length;
+
+    proyHtml+='<div class="dproy-card" id="dproy-'+p.id+'">';
+    proyHtml+='<div class="dproy-head" onclick="toggleDashProy(\''+p.id+'\')">';
+    // fila 1: código + nombre + cliente
+    proyHtml+='<div style="display:flex;align-items:center;gap:8px;margin-bottom:10px">';
+    proyHtml+='<span class="cod" style="font-size:9px">'+p.codigo+'</span>';
+    proyHtml+='<span style="font-family:\'Fraunces\',serif;font-size:14px;font-weight:300;color:var(--ink);flex:1">'+p.nombre+'</span>';
+    if(p.cliente) proyHtml+='<span style="font-size:10px;color:var(--ink3)">'+p.cliente+'</span>';
+    proyHtml+='</div>';
+    // fila 2: barras
+    proyHtml+='<div style="display:grid;grid-template-columns:1fr'+(tienePresup?' 1fr':'')+';gap:14px;margin-bottom:10px">';
+    // entregables
+    proyHtml+='<div>';
+    proyHtml+='<div style="display:flex;justify-content:space-between;margin-bottom:3px"><span style="font-size:9px;color:var(--ink3)">Entregables</span><span style="font-size:9px;color:var(--accent);font-weight:600">'+av+'%</span></div>';
+    proyHtml+='<div style="height:6px;background:var(--bg2);border-radius:3px;overflow:hidden"><div style="height:100%;width:'+av+'%;background:var(--accent);border-radius:3px"></div></div>';
+    proyHtml+='<div style="font-size:9px;color:var(--ink3);margin-top:2px">'+ep.d+'/'+ep.t+' completados</div>';
+    proyHtml+='</div>';
+    // presupuesto (admin)
+    if(tienePresup){
+      proyHtml+='<div>';
+      proyHtml+='<div style="display:flex;justify-content:space-between;margin-bottom:3px"><span style="font-size:9px;color:var(--ink3)">Presupuesto</span><span style="font-size:9px;color:'+colPct+';font-weight:600">'+pct+'%</span></div>';
+      proyHtml+='<div style="height:6px;background:var(--bg2);border-radius:3px;overflow:hidden"><div style="height:100%;width:'+pct+'%;background:'+colPct+';border-radius:3px"></div></div>';
+      proyHtml+='<div style="font-size:9px;color:var(--ink3);margin-top:2px">$'+Math.round(consumoProy[p.id]||0).toLocaleString('es-MX')+' / $'+p.presupuesto_total.toLocaleString('es-MX')+'</div>';
+      proyHtml+='</div>';
+    }
+    proyHtml+='</div>'; // grid
+    // fila 3: semana + badge
+    proyHtml+='<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">';
+    if(semD.total>0){
+      proyHtml+='<span style="font-size:10px;color:var(--ink2)">Esta semana: <b>'+semD.done+'/'+semD.total+'</b> tareas</span>';
+    }else{
+      proyHtml+='<span style="font-size:10px;color:var(--ink3)">Sin tareas esta semana</span>';
+    }
+    if(hrsP>0) proyHtml+='<span style="font-size:10px;color:var(--ink3)">·</span><span style="font-size:10px;color:var(--accent)">'+hT(hrsP)+' invertidas</span>';
+    if(nRet>0) proyHtml+='<span style="margin-left:auto;font-size:9px;background:var(--rose-lt);color:var(--rose);padding:2px 8px;border-radius:10px;font-weight:600">'+nRet+' retrasada'+(nRet>1?'s':'')+'</span>';
+    proyHtml+='</div>';
+    proyHtml+='</div>'; // dproy-head
+    proyHtml+='<div class="dproy-body" id="dproy-body-'+p.id+'"></div>';
+    proyHtml+='</div>'; // dproy-card
+  });
+
+  if(!proyHtml) proyHtml='<div class="empty"><div class="empty-i">📁</div><div>Sin proyectos activos</div></div>';
+
+  cont.innerHTML=
+    '<div style="border-bottom:1px solid var(--border);padding:0 24px">'+
+    '<div class="dash-tab-bar">'+
+    '<button class="dash-tab on" id="dash-tab-colabs" onclick="switchDashTab(\'colabs\',this)">Colaboradores</button>'+
+    '<button class="dash-tab" id="dash-tab-proyectos" onclick="switchDashTab(\'proyectos\',this)">Proyectos</button>'+
+    '</div></div>'+
+    '<div id="dash-panel-colabs" class="dash-panel on">'+colabsHtml+'</div>'+
+    '<div id="dash-panel-proyectos" class="dash-panel">'+proyHtml+'</div>';
+}
+
+function switchDashTab(tab,btn){
+  document.querySelectorAll('.dash-tab').forEach(t=>t.classList.remove('on'));btn.classList.add('on');
+  document.querySelectorAll('.dash-panel').forEach(p=>p.classList.remove('on'));
+  document.getElementById('dash-panel-'+tab).classList.add('on');
+}
+
+function toggleDashColab(colabId){
+  const body=document.getElementById('dcol-body-'+colabId);
+  const card=document.getElementById('dcol-'+colabId);
+  const chev=document.getElementById('dcol-chev-'+colabId);
+  if(!body||!_dashData)return;
+  const isOpen=body.classList.contains('open');
+  // cerrar todos
+  document.querySelectorAll('.dcol-body.open').forEach(b=>{b.classList.remove('open');});
+  document.querySelectorAll('.dcol-card.expanded').forEach(c=>c.classList.remove('expanded'));
+  document.querySelectorAll('[id^="dcol-chev-"]').forEach(ch=>{ch.textContent='›';});
+  if(isOpen)return;
+
+  const{diasSem,hoyStr,regsPorColabDia}=_dashData;
+  const regsColab=regsPorColabDia[colabId]||{};
+  const diasConAct=diasSem.filter(d=>regsColab[d]&&regsColab[d].length>0);
+  const DNLocal=['Dom','Lun','Mar','Mié','Jue','Vie','Sáb'];
+
+  let html='<div style="padding:14px 16px">';
+  if(!diasConAct.length){
+    html+='<div style="text-align:center;padding:14px;color:var(--ink3);font-size:11px">Sin horas registradas esta semana</div>';
+  }else{
+    html+='<div style="display:grid;grid-template-columns:repeat('+diasConAct.length+',1fr);gap:12px">';
+    diasConAct.forEach(fecha=>{
+      const d=new Date(fecha+' 12:00');
+      const dayName=DNLocal[d.getDay()],dayNum=d.getDate();
+      const regsD=regsColab[fecha]||[];
+      const totD=regsD.reduce((s,r)=>s+r.horas,0);
+      const esH=fecha===hoyStr;
+      html+='<div>';
+      html+='<div style="font-size:9px;letter-spacing:.06em;text-transform:uppercase;color:'+(esH?'var(--accent)':'var(--ink3)')+';margin-bottom:6px;padding-bottom:4px;border-bottom:1.5px solid '+(esH?'var(--accent)':'var(--border)')+'">'+dayName+' '+dayNum+' <span style="font-weight:600;color:'+(esH?'var(--accent)':'var(--ink)')+'">'+hT(totD)+'</span></div>';
+      regsD.forEach(r=>{
+        html+='<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:4px;padding:4px 0;border-bottom:1px dashed var(--border)">';
+        html+='<span style="font-size:10px;color:var(--ink2);line-height:1.3;overflow:hidden;text-overflow:ellipsis">'+r.nombre+'</span>';
+        html+='<span style="font-size:10px;color:var(--accent);font-weight:500;white-space:nowrap;flex-shrink:0">'+hT(r.horas)+'</span>';
+        html+='</div>';
+      });
+      html+='</div>';
+    });
+    html+='</div>';
+  }
+  html+='</div>';
+
+  body.innerHTML=html;body.classList.add('open');card.classList.add('expanded');
+  if(chev)chev.textContent='⌄';
+}
+
+function toggleDashProy(proyId){
+  const body=document.getElementById('dproy-body-'+proyId);
+  const card=document.getElementById('dproy-'+proyId);
+  if(!body||!_dashData)return;
+  const isOpen=body.classList.contains('open');
+  document.querySelectorAll('.dproy-body.open').forEach(b=>b.classList.remove('open'));
+  document.querySelectorAll('.dproy-card.expanded').forEach(c=>c.classList.remove('expanded'));
+  if(isOpen)return;
+
+  const{entsRetrasadas,entsSemPendientes,hoyStr}=_dashData;
+  const retrasadas=entsRetrasadas[proyId]||[];
+  const pendSem=entsSemPendientes[proyId]||[];
+
+  let html='<div style="padding:12px 16px">';
+  if(!retrasadas.length&&!pendSem.length){
+    html+='<div style="text-align:center;padding:12px;color:var(--ink3);font-size:11px">✅ Sin tareas retrasadas ni pendientes esta semana</div>';
+  }else{
+    if(retrasadas.length){
+      html+='<div style="font-size:9px;letter-spacing:.1em;text-transform:uppercase;color:var(--rose);margin-bottom:6px;padding-bottom:4px;border-bottom:1px solid var(--rose-lt)">🔴 Retrasadas · '+retrasadas.length+'</div>';
+      retrasadas.sort((a,b)=>(a.fecha_unica||a.fecha_fin||'').localeCompare(b.fecha_unica||b.fecha_fin||'')).forEach(e=>{
+        const fr=e.fecha_unica||e.fecha_fin;
+        const dias=Math.abs(dH(fr));
+        html+='<div style="display:flex;align-items:center;gap:8px;padding:5px 0;border-bottom:1px dashed var(--border)">';
+        html+='<span style="font-size:10px;color:var(--ink);flex:1">'+e.nombre+(e.etapa_clave&&e.etapa_clave!=='_'?' <span style="font-size:9px;color:var(--ink3)">· '+e.etapa_clave+'</span>':'')+'</span>';
+        html+='<span style="font-size:10px;font-weight:600;color:var(--rose);flex-shrink:0">'+dias+'d tarde</span>';
+        html+='</div>';
+      });
+    }
+    if(pendSem.length){
+      if(retrasadas.length) html+='<div style="height:10px"></div>';
+      html+='<div style="font-size:9px;letter-spacing:.1em;text-transform:uppercase;color:var(--amber);margin-bottom:6px;padding-bottom:4px;border-bottom:1px solid var(--amb-lt)">🟡 Por entregar esta semana · '+pendSem.length+'</div>';
+      pendSem.sort((a,b)=>(a.fecha_unica||a.fecha_fin||'').localeCompare(b.fecha_unica||b.fecha_fin||'')).forEach(e=>{
+        const fr=e.fecha_unica||e.fecha_fin;const d2=dH(fr);
+        const cls2=d2===0?'hoy':d2<=2?'pronto':'ok';
+        html+='<div style="display:flex;align-items:center;gap:8px;padding:5px 0;border-bottom:1px dashed var(--border)">';
+        html+='<span style="font-size:10px;color:var(--ink);flex:1">'+e.nombre+(e.etapa_clave&&e.etapa_clave!=='_'?' <span style="font-size:9px;color:var(--ink3)">· '+e.etapa_clave+'</span>':'')+'</span>';
+        html+='<span class="efecha '+cls2+'">'+(d2===0?'Hoy':fF(fr))+'</span>';
+        html+='</div>';
+      });
+    }
+  }
+  html+='</div>';
+
+  body.innerHTML=html;body.classList.add('open');card.classList.add('expanded');
 }
 
 // ── PROYECTOS ──

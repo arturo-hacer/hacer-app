@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>hacer: v40</title>
+<title>hacer: v41</title>
 <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><text x='1' y='26' font-family='Arial,Helvetica,sans-serif' font-size='26' font-weight='700' fill='%231c1b17'>h:</text></svg>">
 <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Fraunces:ital,opsz,wght@0,9..144,300;0,9..144,400;1,9..144,300&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
@@ -3622,10 +3622,10 @@ async function eliminarTemplate(id){await sb.from('templates').delete().eq('id',
 // ── VACACIONES ──
 let _vacData=null,_vacAnio=new Date().getFullYear(),_vacFestivosSet=null,_vacEditId=null,_vacProyId=null,_vacEntId=null;
 
-function diasLFT(anios){
-  if(anios<1)return 0;
-  if(anios<5)return 12+(anios-1)*2;
-  return 20+Math.ceil((anios-5)/5)*2;
+function diasLFT(anioCiclo){
+  if(anioCiclo<1)return 0;
+  if(anioCiclo<=4)return 12+(anioCiclo-1)*2;
+  return 20+Math.ceil((anioCiclo-5)/5)*2;
 }
 
 function calcCiclo(fechaEntradaStr){
@@ -3639,7 +3639,7 @@ function calcCiclo(fechaEntradaStr){
   const cicloInicio=new Date(entrada.getFullYear()+anios,entrada.getMonth(),entrada.getDate());
   const cicloFin=new Date(cicloInicio.getFullYear()+1,cicloInicio.getMonth(),cicloInicio.getDate());
   const toISO=d=>d.toISOString().split('T')[0];
-  return{cicloInicio:toISO(cicloInicio),cicloFin:toISO(cicloFin),aniosCompletados:anios,diasCorresponden:diasLFT(anios)};
+  return{cicloInicio:toISO(cicloInicio),cicloFin:toISO(cicloFin),aniosCompletados:anios,diasCorresponden:diasLFT(anios+1)};
 }
 
 function diasHabilesRango(iniStr,finStr,festivosSet){
@@ -3713,7 +3713,7 @@ function renderVacDash(){
     const ini2=(c.nombre[0]||'')+(c.apellido?c.apellido[0]:'');
     html+='<tr>';
     html+='<td><div style="display:flex;align-items:center;gap:8px"><div style="width:26px;height:26px;border-radius:50%;background:'+(c.color||'var(--accent)')+';display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:600;color:#fff">'+ini2+'</div>'+c.nombre+' '+(c.apellido||'')+'</div></td>';
-    html+='<td style="font-size:10px;color:var(--ink3)">'+ciclo.aniosCompletados+'°</td>';
+    html+='<td style="font-size:10px;color:var(--ink3)">'+(ciclo.aniosCompletados+1)+'°</td>';
     html+='<td style="font-weight:600">'+ciclo.diasCorresponden+'</td>';
     html+='<td>'+usados+'</td>';
     html+='<td style="color:var(--amber)">'+programados+'</td>';
@@ -3842,9 +3842,8 @@ function renderVacColabView(){
     html+='<div class="empty"><div class="empty-i">📅</div><div>Sin fecha de entrada</div><div style="font-size:10px;color:var(--ink3);margin-top:6px">Pide al admin que actualice tu perfil</div></div></div>';
     cont.innerHTML=html;return;
   }
-  if(!ciclo||ciclo.aniosCompletados<1){
-    html+='<div class="vac-resumen-card"><div style="font-size:12px;font-weight:500;color:var(--ink);margin-bottom:6px">Todavía no tienes días de vacaciones disponibles</div>';
-    html+='<div style="font-size:11px;color:var(--ink3)">Completarás tu primer año el <b>'+fF(ciclo?.cicloFin||'')+'</b>.</div></div></div>';
+  if(!ciclo){
+    html+='<div class="empty"><div class="empty-i">📅</div><div>No se pudo calcular tu ciclo</div></div></div>';
     cont.innerHTML=html;return;
   }
   const vacsC=(vacs||[]).filter(v=>v.fecha_inicio>=ciclo.cicloInicio&&v.fecha_inicio<ciclo.cicloFin);
@@ -3855,7 +3854,7 @@ function renderVacColabView(){
   const colD=disponibles<=0?'var(--rose)':disponibles<=3?'var(--amber)':'var(--green)';
   html+='<div class="vac-resumen-card">';
   html+='<div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:12px">';
-  html+='<div><div style="font-size:10px;color:var(--ink3);margin-bottom:3px">Ciclo actual · '+ciclo.aniosCompletados+'° año · LFT</div>';
+  html+='<div><div style="font-size:10px;color:var(--ink3);margin-bottom:3px">Ciclo actual · '+(ciclo.aniosCompletados+1)+'° año · LFT</div>';
   html+='<div style="font-size:11px;color:var(--ink2)">'+fF(ciclo.cicloInicio)+' — '+fF(ciclo.cicloFin)+'</div></div>';
   html+='<div style="text-align:right"><div style="font-size:28px;font-weight:600;line-height:1;color:'+colD+'">'+disponibles+'</div><div style="font-size:9px;color:var(--ink3)">días disponibles</div></div>';
   html+='</div>';
@@ -3917,16 +3916,13 @@ function vacRecalc(){
   const dias=diasHabilesRango(ini,fin,_vacFestivosSet);
   let texto='<b>'+dias+'</b> día'+(dias!==1?'s':'')+' hábil'+(dias!==1?'es':'');
   const ciclo=colab?calcCiclo(colab.fecha_entrada):null;
-  if(ciclo&&ciclo.aniosCompletados>=1){
+  if(ciclo){
     const vacsC=(vacs||[]).filter(v=>v.colaborador_id===colabId&&v.fecha_inicio>=ciclo.cicloInicio&&v.fecha_inicio<ciclo.cicloFin&&v.id!==_vacEditId);
     const yaUsados=vacsC.reduce((s,v)=>s+v.dias_habiles,0);
     const disponibles=Math.max(0,ciclo.diasCorresponden-yaUsados);
     texto+=' · disponibles en ciclo: <b>'+disponibles+'</b>';
     if(dias>disponibles){texto+=' <span style="color:var(--rose)">⚠ Excede los días disponibles</span>';info.style.background='var(--rose-lt)';}
     else info.style.background='var(--grn-lt)';
-  } else if(ciclo&&ciclo.aniosCompletados<1){
-    texto+=' <span style="color:var(--rose)">⚠ Este colaborador aún no completa su primer año</span>';
-    info.style.background='var(--rose-lt)';
   } else info.style.background='var(--bg)';
   info.innerHTML=texto;info.style.display='block';
 }

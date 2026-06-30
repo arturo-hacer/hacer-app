@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>hacer: v37</title>
+<title>hacer: v38</title>
 <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><text x='1' y='26' font-family='Arial,Helvetica,sans-serif' font-size='26' font-weight='700' fill='%231c1b17'>h:</text></svg>">
 <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Fraunces:ital,opsz,wght@0,9..144,300;0,9..144,400;1,9..144,300&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
@@ -1501,7 +1501,7 @@ async function renderDashboard(){
   if(!colabsHtml) colabsHtml='<div class="empty"><div class="empty-i">👥</div><div>Sin colaboradores</div></div>';
 
   // ── Panel Proyectos ──
-  const proysVisibles=(proys||[]).filter(p=>!archivadosIds.has(p.id));
+  const proysVisibles=(proys||[]).filter(p=>!archivadosIds.has(p.id)&&p.tipo!=='en_blanco');
   let proyHtml='';
 
   proysVisibles.forEach(p=>{

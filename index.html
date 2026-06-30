@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>hacer: v38</title>
+<title>hacer: v39</title>
 <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><text x='1' y='26' font-family='Arial,Helvetica,sans-serif' font-size='26' font-weight='700' fill='%231c1b17'>h:</text></svg>">
 <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Fraunces:ital,opsz,wght@0,9..144,300;0,9..144,400;1,9..144,300&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
@@ -229,6 +229,33 @@ button{font-family:'DM Mono',monospace;cursor:pointer;}
 .dproy-head:hover{background:var(--bg);}
 .dproy-body{display:none;border-top:1px solid var(--border);}
 .dproy-body.open{display:block;}
+/* ── VACACIONES ── */
+.vac-sub-tabs{display:flex;gap:0;padding:0 24px;}
+.vac-sub-tab{padding:12px 16px;font-size:11px;border:none;background:none;color:var(--ink3);cursor:pointer;border-bottom:2px solid transparent;margin-bottom:-1px;transition:color .15s,border-color .15s;font-family:'DM Mono',monospace;letter-spacing:.04em;}
+.vac-sub-tab.on{color:var(--accent);border-bottom-color:var(--accent);}
+.vac-sub-tab:hover:not(.on){color:var(--ink2);}
+.vac-panel{display:none;padding:20px 24px;max-width:960px;}
+.vac-panel.on{display:block;}
+.vac-cal-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;}
+.vac-month-card{background:#fff;border-radius:8px;border:1px solid var(--border);padding:8px 10px;}
+.vac-month-name{font-size:9px;letter-spacing:.1em;text-transform:uppercase;color:var(--ink2);margin-bottom:6px;font-family:'DM Mono',monospace;font-weight:500;}
+.vac-cal{display:grid;grid-template-columns:repeat(7,1fr);gap:1px;}
+.vac-ch{font-size:7px;color:var(--ink3);text-align:center;padding:2px 0;font-family:'DM Mono',monospace;}
+.vac-cd{min-height:24px;border-radius:3px;display:flex;flex-direction:column;align-items:center;padding:2px 1px;}
+.vac-cd .dn{font-size:8px;color:var(--ink2);line-height:1.3;}
+.vac-cd.we{background:var(--bg);}
+.vac-cd.we .dn{color:var(--ink3);}
+.vac-cd.hoy{background:var(--acc-lt);}
+.vac-cd.hoy .dn{color:var(--accent);font-weight:700;}
+.vac-cd.festivo .dn{color:var(--amber);}
+.vac-dots{display:flex;gap:2px;flex-wrap:wrap;justify-content:center;margin-top:1px;}
+.vac-dot{width:5px;height:5px;border-radius:50%;display:inline-block;flex-shrink:0;}
+.vac-table{width:100%;border-collapse:collapse;font-size:11px;}
+.vac-table th{text-align:left;font-size:9px;letter-spacing:.08em;text-transform:uppercase;color:var(--ink3);padding:6px 10px;border-bottom:1px solid var(--border);}
+.vac-table td{padding:9px 10px;border-bottom:1px solid var(--border);color:var(--ink2);vertical-align:middle;}
+.vac-table tr:hover td{background:var(--bg);}
+.vac-resumen-card{background:#fff;border:1.5px solid var(--border);border-radius:var(--r);padding:18px;margin-bottom:16px;}
+.vac-bloque{display:flex;align-items:center;gap:10px;padding:10px 14px;background:#fff;border:1px solid var(--border);border-radius:8px;margin-bottom:6px;}
 
 /* ── REPORTES ── */
 .rep-layout{padding:24px;max-width:800px;}
@@ -720,6 +747,7 @@ tr.comp-toggle-row:hover td{background:var(--bg2);}
     </div>
     <div class="fl"><label>Email *</label><input type="email" id="cf-email2" placeholder="val@hacer.mx"></div>
     <div class="fl"><label>Tarifa ($/hr) *</label><input type="number" id="cf-tarifa2" placeholder="350"></div>
+    <div class="fl"><label>Fecha de entrada</label><input type="date" id="cf-entrada"></div>
     <div class="fl"><label>Tipo de perfil</label>
       <div style="display:flex;gap:8px">
         <button type="button" class="rol-b2 on2" data-rol="colaborador" onclick="selRol2('colaborador')">Colaborador</button>
@@ -729,6 +757,36 @@ tr.comp-toggle-row:hover td{background:var(--bg2);}
     <div class="fl"><label>Color</label><div style="display:flex;gap:8px;flex-wrap:wrap" id="cp2"></div></div>
     <button class="bsave" id="cf-save" onclick="guardarColab2()">Guardar colaborador</button>
     <button class="bdanger" id="cf-del" style="display:none" onclick="eliminarColab2()">Eliminar colaborador</button>
+  </div>
+</div>
+
+<!-- VACACIONES -->
+<div class="ov" id="ov-vac" onclick="closeOv('ov-vac',event)" style="z-index:500">
+  <div class="modal" style="position:relative">
+    <button class="modal-close" onclick="closeOv('ov-vac')">×</button>
+    <div class="stitle" id="ov-vac-title">Registrar vacaciones</div>
+    <div class="fl"><label>Colaborador *</label>
+      <select id="vac-colab-sel" onchange="vacRecalc()" style="width:100%;padding:9px 10px;border:1.5px solid var(--border);border-radius:9px;font-size:12px;background:#fff"><option value="">— seleccionar —</option></select>
+    </div>
+    <div style="display:flex;gap:10px">
+      <div class="fl" style="flex:1"><label>Fecha inicio *</label><input type="date" id="vac-ini" onchange="vacRecalc()"></div>
+      <div class="fl" style="flex:1"><label>Fecha fin *</label><input type="date" id="vac-fin" onchange="vacRecalc()"></div>
+    </div>
+    <div id="vac-calc-info" style="font-size:11px;color:var(--ink2);background:var(--bg);border-radius:8px;padding:10px 12px;margin-bottom:12px;display:none;line-height:1.6"></div>
+    <div class="fl"><label>Notas</label><input type="text" id="vac-notas" placeholder="Opcional"></div>
+    <button class="bsave" id="vac-save-btn" onclick="guardarVac()">Guardar</button>
+    <button class="bdanger" id="vac-del-btn" style="display:none" onclick="eliminarVac()">Eliminar registro</button>
+  </div>
+</div>
+
+<!-- FESTIVO -->
+<div class="ov" id="ov-festivo" onclick="closeOv('ov-festivo',event)" style="z-index:510">
+  <div class="modal" style="position:relative;max-width:340px">
+    <button class="modal-close" onclick="closeOv('ov-festivo')">×</button>
+    <div class="stitle">Agregar día de asueto</div>
+    <div class="fl"><label>Fecha *</label><input type="date" id="fest-fecha"></div>
+    <div class="fl"><label>Nombre *</label><input type="text" id="fest-nombre" placeholder="Ej. Día de la empresa"></div>
+    <button class="bsave" onclick="guardarFestivo()">Guardar</button>
   </div>
 </div>
 
@@ -860,8 +918,8 @@ function setupApp(){
   updateCounter();reanudarTimer();
 
   const tabs=esAdmin
-    ?[{id:'dashboard',l:'Dashboard',ico:'◉'},{id:'registrar',l:'Mis tareas',ico:'☑'},{id:'proyectos',l:'Proyectos',ico:'▤'},{id:'colaboradores',l:'Colaboradores',ico:'◎'},{id:'semana',l:'Mi semana',ico:'◷'},{id:'reportes',l:'Reportes',ico:'↗'},{id:'gestion',l:'Gestión',ico:'⚙'}]
-    :[{id:'registrar',l:'Mis tareas',ico:'☑'},{id:'proyectos',l:'Proyectos',ico:'▤'},{id:'semana',l:'Mi semana',ico:'◷'}];
+    ?[{id:'dashboard',l:'Dashboard',ico:'◉'},{id:'registrar',l:'Mis tareas',ico:'☑'},{id:'proyectos',l:'Proyectos',ico:'▤'},{id:'colaboradores',l:'Colaboradores',ico:'◎'},{id:'semana',l:'Mi semana',ico:'◷'},{id:'reportes',l:'Reportes',ico:'↗'},{id:'vacaciones',l:'Vacaciones',ico:'◌'},{id:'gestion',l:'Gestión',ico:'⚙'}]
+    :[{id:'registrar',l:'Mis tareas',ico:'☑'},{id:'proyectos',l:'Proyectos',ico:'▤'},{id:'semana',l:'Mi semana',ico:'◷'},{id:'vacaciones',l:'Vacaciones',ico:'◌'}];
 
   document.getElementById('sb-nav').innerHTML=tabs.map((t,i)=>`
     <button class="sb-nav-item ${i===0?'on':''}" onclick="switchTab('${t.id}',this)" id="nav-${t.id}">
@@ -874,7 +932,7 @@ function setupApp(){
 }
 
 function updateMainTitle(tab){
-  const titles={dashboard:'Dashboard',registrar:'Mis tareas',proyectos:'Proyectos',colaboradores:'Colaboradores',semana:'Mi semana',reportes:'Reportes',gestion:'Gestión'};
+  const titles={dashboard:'Dashboard',registrar:'Mis tareas',proyectos:'Proyectos',colaboradores:'Colaboradores',semana:'Mi semana',reportes:'Reportes',gestion:'Gestión',vacaciones:'Vacaciones'};
   document.getElementById('main-title').textContent=titles[tab]||tab;
 }
 
@@ -895,6 +953,7 @@ async function loadTab(tab){
   if(tab==='semana')await renderSemana();
   if(tab==='reportes')renderRepUI();
   if(tab==='gestion')await renderGestion();
+  if(tab==='vacaciones')await renderVacaciones();
 }
 
 // ── COUNTER ──
@@ -1501,8 +1560,7 @@ async function renderDashboard(){
   if(!colabsHtml) colabsHtml='<div class="empty"><div class="empty-i">👥</div><div>Sin colaboradores</div></div>';
 
   // ── Panel Proyectos ──
-  const proysVisibles=(proys||[]).filter(p=>!archivadosIds.has(p.id)&&p.tipo!=='en_blanco');
-  let proyHtml='';
+  const proysVisibles=(proys||[]).filter(p=>!archivadosIds.has(p.id)&&p.tipo!=='en_blanco');  let proyHtml='';
 
   proysVisibles.forEach(p=>{
     const ep=epMap[p.id]||{t:0,d:0};
@@ -1686,7 +1744,7 @@ async function renderProy(){
   const facturablesIds=new Set((ptags||[]).filter(pt=>pt.tags?.nombre==='facturable').map(pt=>pt.proyecto_id));
   const noFacIds=new Set((ptags||[]).filter(pt=>pt.tags?.nombre==='no facturable').map(pt=>pt.proyecto_id));
 
-  const psVisibles=esAdmin?ps:ps.filter(p=>!archivadosIds.has(p.id));
+  const psVisibles=(esAdmin?ps:ps.filter(p=>!archivadosIds.has(p.id))).filter(p=>p.codigo!=='VAC');
   const proyIds=psVisibles.map(p=>p.id);
 
   const {data:es}=await sb.from('entregables').select('proyecto_id,done,eliminado');
@@ -3233,7 +3291,7 @@ let colabEditId=null,colSel='#2828b8',rolSel2='colaborador';
 function abrirNuevoColab(){
   colabEditId=null;rolSel2='colaborador';colSel=COLS[0];
   document.getElementById('cf-title2').textContent='Nuevo colaborador';
-  ['cf-nom','cf-ape','cf-email2','cf-tarifa2'].forEach(id=>document.getElementById(id).value='');
+  ['cf-nom','cf-ape','cf-email2','cf-tarifa2','cf-entrada'].forEach(id=>document.getElementById(id).value='');
   document.getElementById('cf-del').style.display='none';
   renderRoles2();renderColPicker2(colSel);document.getElementById('ov-colab2').classList.add('on');
 }
@@ -3243,6 +3301,7 @@ async function abrirEditColab(id){
   document.getElementById('cf-title2').textContent='Editar colaborador';
   document.getElementById('cf-nom').value=c.nombre;document.getElementById('cf-ape').value=c.apellido||'';
   document.getElementById('cf-email2').value=c.email;document.getElementById('cf-tarifa2').value=c.tarifa;
+  document.getElementById('cf-entrada').value=c.fecha_entrada||'';
   document.getElementById('cf-del').style.display='block';
   renderRoles2();renderColPicker2(colSel);document.getElementById('ov-colab2').classList.add('on');
 }
@@ -3256,7 +3315,7 @@ async function guardarColab2(){
   const nom=document.getElementById('cf-nom').value.trim(),email=document.getElementById('cf-email2').value.trim(),tarifa=parseFloat(document.getElementById('cf-tarifa2').value)||0;
   if(!nom||!email||!tarifa){toast('Completa los campos obligatorios');return;}
   const btn=document.getElementById('cf-save');btn.disabled=true;btn.textContent='Guardando...';
-  const datos={nombre:nom,apellido:document.getElementById('cf-ape').value.trim(),email,tarifa,color:colSel,rol:rolSel2};
+  const datos={nombre:nom,apellido:document.getElementById('cf-ape').value.trim(),email,tarifa,color:colSel,rol:rolSel2,fecha_entrada:document.getElementById('cf-entrada').value||null};
   if(colabEditId){await sb.from('colaboradores').update(datos).eq('id',colabEditId);}
   else{const tempId=crypto.randomUUID();await sb.from('colaboradores').insert({id:tempId,...datos});toast('Colaborador agregado. Recuerda crear su usuario en Supabase Auth.');closeOv('ov-colab2');btn.disabled=false;btn.textContent='Guardar';await loadGColabs();return;}
   closeOv('ov-colab2');btn.disabled=false;btn.textContent='Guardar';await loadGColabs();toast('✓ Colaborador guardado');
@@ -3559,6 +3618,395 @@ async function guardarTemplate(){
   btn.disabled=false;btn.textContent='Agregar';closeOv('ov-tpl');await loadGTemplates();toast('✓ Entregable agregado al template');
 }
 async function eliminarTemplate(id){await sb.from('templates').delete().eq('id',id);await loadGTemplates();toast('Entregable eliminado del template');}
+
+// ── VACACIONES ──
+let _vacData=null,_vacAnio=new Date().getFullYear(),_vacFestivosSet=null,_vacEditId=null,_vacProyId=null,_vacEntId=null;
+
+function diasLFT(anios){
+  if(anios<1)return 0;
+  if(anios<5)return 12+(anios-1)*2;
+  return 20+Math.floor((anios-5)/5)*2;
+}
+
+function calcCiclo(fechaEntradaStr){
+  if(!fechaEntradaStr)return null;
+  const hoyD=new Date();hoyD.setHours(0,0,0,0);
+  const entrada=new Date(fechaEntradaStr+' 12:00');
+  let anios=hoyD.getFullYear()-entrada.getFullYear();
+  const anivEsteAnio=new Date(hoyD.getFullYear(),entrada.getMonth(),entrada.getDate());
+  if(anivEsteAnio>hoyD)anios--;
+  anios=Math.max(0,anios);
+  const cicloInicio=new Date(entrada.getFullYear()+anios,entrada.getMonth(),entrada.getDate());
+  const cicloFin=new Date(cicloInicio.getFullYear()+1,cicloInicio.getMonth(),cicloInicio.getDate());
+  const toISO=d=>d.toISOString().split('T')[0];
+  return{cicloInicio:toISO(cicloInicio),cicloFin:toISO(cicloFin),aniosCompletados:anios,diasCorresponden:diasLFT(anios)};
+}
+
+function diasHabilesRango(iniStr,finStr,festivosSet){
+  let count=0,d=new Date(iniStr+' 12:00');
+  const fin=new Date(finStr+' 12:00');
+  while(d<=fin){const dow=d.getDay(),iso=d.toISOString().split('T')[0];if(dow!==0&&dow!==6&&!festivosSet.has(iso))count++;d.setDate(d.getDate()+1);}
+  return count;
+}
+
+async function renderVacaciones(){
+  const cont=document.getElementById('pane-vacaciones');if(!cont)return;
+  cont.innerHTML='<div class="ldg">Cargando vacaciones...</div>';
+  const esAdmin=PERFIL?.rol==='admin';
+
+  const[{data:colabs},{data:vacs},{data:festivos}]=await Promise.all([
+    sb.from('colaboradores').select('*').order('nombre'),
+    esAdmin
+      ?sb.from('vacaciones').select('*,colaboradores(id,nombre,apellido,color)').order('fecha_inicio')
+      :sb.from('vacaciones').select('*').eq('colaborador_id',USER.id).order('fecha_inicio'),
+    sb.from('festivos').select('*').order('fecha')
+  ]);
+
+  _vacFestivosSet=new Set((festivos||[]).map(f=>f.fecha));
+  _vacData={colabs,vacs,festivos,hoyStr:diaAct,esAdmin};
+
+  if(esAdmin){
+    const sel=document.getElementById('vac-colab-sel');
+    if(sel){sel.innerHTML='<option value="">— seleccionar —</option>';(colabs||[]).forEach(c=>{const o=document.createElement('option');o.value=c.id;o.textContent=c.nombre+' '+(c.apellido||'');sel.appendChild(o);});}
+
+    cont.innerHTML=
+      '<div style="border-bottom:1px solid var(--border);padding:0 24px">'+
+      '<div class="vac-sub-tabs">'+
+      '<button class="vac-sub-tab on" onclick="switchVacTab(\'dash\',this)">Dashboard</button>'+
+      '<button class="vac-sub-tab" onclick="switchVacTab(\'cal\',this)">Calendario</button>'+
+      '<button class="vac-sub-tab" onclick="switchVacTab(\'regs\',this)">Registros</button>'+
+      '</div></div>'+
+      '<div id="vac-panel-dash" class="vac-panel on"></div>'+
+      '<div id="vac-panel-cal" class="vac-panel"></div>'+
+      '<div id="vac-panel-regs" class="vac-panel"></div>';
+    renderVacDash();
+  } else {
+    renderVacColabView();
+  }
+}
+
+function switchVacTab(tab,btn){
+  document.querySelectorAll('.vac-sub-tab').forEach(t=>t.classList.remove('on'));btn.classList.add('on');
+  document.querySelectorAll('.vac-panel').forEach(p=>p.classList.remove('on'));
+  document.getElementById('vac-panel-'+tab).classList.add('on');
+  if(tab==='dash')renderVacDash();
+  if(tab==='cal')renderVacCal();
+  if(tab==='regs')renderVacRegs();
+}
+
+function renderVacDash(){
+  const cont=document.getElementById('vac-panel-dash');if(!cont||!_vacData)return;
+  const{colabs,vacs,hoyStr}=_vacData;
+  let html='<div style="overflow-x:auto"><table class="vac-table"><thead><tr>'+
+    '<th>Colaborador</th><th>Año</th><th>Días ciclo</th><th>Usados</th><th>Programados</th><th>Disponibles</th><th>Reinicio</th>'+
+    '</tr></thead><tbody>';
+  (colabs||[]).forEach(c=>{
+    const ciclo=calcCiclo(c.fecha_entrada);
+    if(!ciclo){
+      html+='<tr><td style="font-size:11px">'+c.nombre+' '+(c.apellido||'')+'</td><td colspan="6" style="font-size:10px;color:var(--rose)">Sin fecha de entrada</td></tr>';return;
+    }
+    const vacsC=(vacs||[]).filter(v=>v.colaborador_id===c.id&&v.fecha_inicio>=ciclo.cicloInicio&&v.fecha_inicio<ciclo.cicloFin);
+    const usados=vacsC.filter(v=>v.fecha_fin<hoyStr).reduce((s,v)=>s+v.dias_habiles,0);
+    const programados=vacsC.filter(v=>v.fecha_fin>=hoyStr).reduce((s,v)=>s+v.dias_habiles,0);
+    const disponibles=Math.max(0,ciclo.diasCorresponden-usados-programados);
+    const colD=disponibles<=0?'var(--rose)':disponibles<=3?'var(--amber)':'var(--green)';
+    const ini2=(c.nombre[0]||'')+(c.apellido?c.apellido[0]:'');
+    html+='<tr>';
+    html+='<td><div style="display:flex;align-items:center;gap:8px"><div style="width:26px;height:26px;border-radius:50%;background:'+(c.color||'var(--accent)')+';display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:600;color:#fff">'+ini2+'</div>'+c.nombre+' '+(c.apellido||'')+'</div></td>';
+    html+='<td style="font-size:10px;color:var(--ink3)">'+ciclo.aniosCompletados+'°</td>';
+    html+='<td style="font-weight:600">'+ciclo.diasCorresponden+'</td>';
+    html+='<td>'+usados+'</td>';
+    html+='<td style="color:var(--amber)">'+programados+'</td>';
+    html+='<td style="font-weight:600;color:'+colD+'">'+disponibles+'</td>';
+    html+='<td style="font-size:10px;color:var(--ink3)">'+fF(ciclo.cicloFin)+'</td>';
+    html+='</tr>';
+  });
+  html+='</tbody></table></div>';
+  cont.innerHTML=html;
+}
+
+function renderVacMes(anio,mes,vacDaysMap,festSet,hoyStr){
+  const MESES=['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
+  const DIAS=['L','M','X','J','V','S','D'];
+  const daysInMonth=new Date(anio,mes,0).getDate();
+  const firstDow=new Date(anio,mes-1,1).getDay();
+  const offset=(firstDow+6)%7;
+  let html='<div class="vac-month-card"><div class="vac-month-name">'+MESES[mes-1]+'</div><div class="vac-cal">';
+  DIAS.forEach((d,i)=>{html+='<div class="vac-ch'+(i>=5?' we':'')+'">'+d+'</div>';});
+  for(let i=0;i<offset;i++)html+='<div class="vac-cd"></div>';
+  for(let d=1;d<=daysInMonth;d++){
+    const m2=String(mes).padStart(2,'0'),d2=String(d).padStart(2,'0');
+    const iso=anio+'-'+m2+'-'+d2;
+    const dow=new Date(iso+' 12:00').getDay();
+    const isWE=dow===0||dow===6,isFest=festSet.has(iso),isHoy=iso===hoyStr;
+    const vacsHoy=vacDaysMap[iso]||[];
+    let cls='vac-cd';
+    if(isWE)cls+=' we';
+    if(isHoy)cls+=' hoy';
+    if(isFest&&!isHoy)cls+=' festivo';
+    html+='<div class="'+cls+'"><span class="dn">'+d+'</span>';
+    if(vacsHoy.length){
+      html+='<div class="vac-dots">';
+      vacsHoy.slice(0,4).forEach(v=>{html+='<span class="vac-dot" style="background:'+(v.color||'var(--accent)')+'"></span>';});
+      html+='</div>';
+    } else if(isFest&&!isWE){
+      html+='<div style="width:4px;height:4px;border-radius:50%;background:var(--amber);margin-top:1px"></div>';
+    }
+    html+='</div>';
+  }
+  html+='</div></div>';
+  return html;
+}
+
+function renderVacCal(){
+  const cont=document.getElementById('vac-panel-cal');if(!cont||!_vacData)return;
+  const{vacs,festivos,colabs,hoyStr}=_vacData;
+  const vacDaysMap={};
+  (vacs||[]).forEach(v=>{
+    const col=v.colaboradores?.color||'var(--accent)';
+    let d=new Date(v.fecha_inicio+' 12:00'),fin=new Date(v.fecha_fin+' 12:00');
+    while(d<=fin){const iso=d.toISOString().split('T')[0];if(!vacDaysMap[iso])vacDaysMap[iso]=[];vacDaysMap[iso].push({color:col});d.setDate(d.getDate()+1);}
+  });
+  const festSet=new Set((festivos||[]).map(f=>f.fecha));
+  let leyenda='<div style="display:flex;gap:12px;flex-wrap:wrap;margin-bottom:12px;align-items:center">';
+  (colabs||[]).forEach(c=>{leyenda+='<div style="display:flex;align-items:center;gap:5px"><span class="vac-dot" style="background:'+(c.color||'var(--accent)')+'"></span><span style="font-size:10px;color:var(--ink2)">'+c.nombre+'</span></div>';});
+  leyenda+='<div style="display:flex;align-items:center;gap:5px"><span style="width:7px;height:7px;border-radius:50%;background:var(--amber);display:inline-block"></span><span style="font-size:10px;color:var(--ink3)">Festivo</span></div>';
+  leyenda+='<div style="display:flex;align-items:center;gap:5px"><span style="width:7px;height:7px;border-radius:3px;background:var(--bg);border:1px solid var(--border);display:inline-block"></span><span style="font-size:10px;color:var(--ink3)">Fin de semana</span></div>';
+  leyenda+='</div>';
+  const navHtml='<div style="display:flex;align-items:center;gap:10px;margin-bottom:14px">'+
+    '<button onclick="cambiarAnioVac(-1)" style="padding:4px 12px;border:1px solid var(--border);background:#fff;border-radius:6px;cursor:pointer;font-size:13px">‹</button>'+
+    '<span style="font-size:14px;font-weight:500;color:var(--ink)">'+_vacAnio+'</span>'+
+    '<button onclick="cambiarAnioVac(1)" style="padding:4px 12px;border:1px solid var(--border);background:#fff;border-radius:6px;cursor:pointer;font-size:13px">›</button>'+
+    '<button onclick="abrirModalFestivo()" style="margin-left:auto;padding:6px 12px;border:1.5px solid var(--border);background:#fff;border-radius:7px;font-size:10px;cursor:pointer;color:var(--ink2)">+ Día de asueto</button>'+
+    '</div>';
+  const festThisYear=(festivos||[]).filter(f=>f.fecha.startsWith(String(_vacAnio)));
+  let festHtml='';
+  if(festThisYear.length){
+    festHtml='<div style="background:#fff;border-radius:8px;border:1px solid var(--border);padding:10px 14px;margin-bottom:14px">';
+    festHtml+='<div style="font-size:9px;letter-spacing:.08em;text-transform:uppercase;color:var(--ink3);margin-bottom:8px">Asuetos '+_vacAnio+'</div>';
+    festHtml+='<div style="display:flex;flex-wrap:wrap;gap:6px">';
+    festThisYear.forEach(f=>{
+      festHtml+='<div style="display:flex;align-items:center;gap:5px;background:var(--amb-lt);border-radius:5px;padding:3px 8px">';
+      festHtml+='<span style="font-size:10px;color:var(--amber)">'+fF(f.fecha)+'</span>';
+      festHtml+='<span style="font-size:10px;color:var(--ink2)">'+f.nombre+'</span>';
+      if(f.tipo==='custom')festHtml+='<button onclick="eliminarFestivo(\''+f.id+'\')" style="border:none;background:none;color:var(--ink3);cursor:pointer;font-size:12px;padding:0 2px;line-height:1">×</button>';
+      festHtml+='</div>';
+    });
+    festHtml+='</div></div>';
+  }
+  let calHtml='<div class="vac-cal-grid">';
+  for(let m=1;m<=12;m++)calHtml+=renderVacMes(_vacAnio,m,vacDaysMap,festSet,hoyStr);
+  calHtml+='</div>';
+  cont.innerHTML=navHtml+leyenda+festHtml+calHtml;
+}
+
+function cambiarAnioVac(delta){_vacAnio+=delta;renderVacCal();}
+
+function renderVacRegs(){
+  const cont=document.getElementById('vac-panel-regs');if(!cont||!_vacData)return;
+  const{vacs,colabs,hoyStr}=_vacData;
+  let html='<div style="margin-bottom:16px"><button onclick="abrirModalVac(null)" style="padding:8px 16px;background:var(--accent);color:#fff;border:none;border-radius:8px;font-size:11px;cursor:pointer;letter-spacing:.04em">+ Registrar vacaciones</button></div>';
+  if(!(vacs||[]).length){html+='<div class="empty"><div class="empty-i">🌴</div><div>Sin registros de vacaciones</div></div>';cont.innerHTML=html;return;}
+  const upcoming=(vacs||[]).filter(v=>v.fecha_fin>=hoyStr).sort((a,b)=>a.fecha_inicio.localeCompare(b.fecha_inicio));
+  const past=(vacs||[]).filter(v=>v.fecha_fin<hoyStr).sort((a,b)=>b.fecha_inicio.localeCompare(a.fecha_inicio));
+  const buildTable=(list,titulo)=>{
+    if(!list.length)return'';
+    let t='<div style="font-size:9px;letter-spacing:.1em;text-transform:uppercase;color:var(--ink3);margin:14px 0 6px">'+titulo+'</div>';
+    t+='<table class="vac-table"><thead><tr><th>Colaborador</th><th>Inicio</th><th>Fin</th><th>Días hábiles</th><th>Notas</th><th></th></tr></thead><tbody>';
+    list.forEach(v=>{
+      const c=(colabs||[]).find(x=>x.id===v.colaborador_id)||v.colaboradores||{};
+      const ini2=((c.nombre||'?')[0]+(c.apellido?c.apellido[0]:''));
+      t+='<tr>';
+      t+='<td><div style="display:flex;align-items:center;gap:7px"><div style="width:22px;height:22px;border-radius:50%;background:'+(c.color||'var(--accent)')+';display:flex;align-items:center;justify-content:center;font-size:8px;font-weight:600;color:#fff">'+ini2+'</div>'+(c.nombre||'?')+' '+(c.apellido||'')+'</div></td>';
+      t+='<td>'+fF(v.fecha_inicio)+'</td>';
+      t+='<td>'+fF(v.fecha_fin)+'</td>';
+      t+='<td style="text-align:center;font-weight:600">'+v.dias_habiles+'d</td>';
+      t+='<td style="color:var(--ink3)">'+(v.notas||'—')+'</td>';
+      t+='<td><button onclick="abrirModalVac(\''+v.id+'\')" style="border:none;background:none;color:var(--accent);cursor:pointer;font-size:11px;padding:3px 6px">Editar</button></td>';
+      t+='</tr>';
+    });
+    t+='</tbody></table>';
+    return t;
+  };
+  html+=buildTable(upcoming,'🟡 Programados');
+  html+=buildTable(past,'✅ Histórico');
+  cont.innerHTML=html;
+}
+
+function renderVacColabView(){
+  const cont=document.getElementById('pane-vacaciones');if(!cont||!_vacData)return;
+  const{vacs,hoyStr}=_vacData;
+  const ciclo=calcCiclo(PERFIL?.fecha_entrada);
+  let html='<div style="padding:20px 24px;max-width:560px">';
+  if(!PERFIL?.fecha_entrada){
+    html+='<div class="empty"><div class="empty-i">📅</div><div>Sin fecha de entrada</div><div style="font-size:10px;color:var(--ink3);margin-top:6px">Pide al admin que actualice tu perfil</div></div></div>';
+    cont.innerHTML=html;return;
+  }
+  if(!ciclo||ciclo.aniosCompletados<1){
+    html+='<div class="vac-resumen-card"><div style="font-size:12px;font-weight:500;color:var(--ink);margin-bottom:6px">Todavía no tienes días de vacaciones disponibles</div>';
+    html+='<div style="font-size:11px;color:var(--ink3)">Completarás tu primer año el <b>'+fF(ciclo?.cicloFin||'')+'</b>.</div></div></div>';
+    cont.innerHTML=html;return;
+  }
+  const vacsC=(vacs||[]).filter(v=>v.fecha_inicio>=ciclo.cicloInicio&&v.fecha_inicio<ciclo.cicloFin);
+  const usados=vacsC.filter(v=>v.fecha_fin<hoyStr).reduce((s,v)=>s+v.dias_habiles,0);
+  const programados=vacsC.filter(v=>v.fecha_fin>=hoyStr).reduce((s,v)=>s+v.dias_habiles,0);
+  const disponibles=Math.max(0,ciclo.diasCorresponden-usados-programados);
+  const pct=ciclo.diasCorresponden>0?Math.min(100,Math.round((usados+programados)/ciclo.diasCorresponden*100)):0;
+  const colD=disponibles<=0?'var(--rose)':disponibles<=3?'var(--amber)':'var(--green)';
+  html+='<div class="vac-resumen-card">';
+  html+='<div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:12px">';
+  html+='<div><div style="font-size:10px;color:var(--ink3);margin-bottom:3px">Ciclo actual · '+ciclo.aniosCompletados+'° año · LFT</div>';
+  html+='<div style="font-size:11px;color:var(--ink2)">'+fF(ciclo.cicloInicio)+' — '+fF(ciclo.cicloFin)+'</div></div>';
+  html+='<div style="text-align:right"><div style="font-size:28px;font-weight:600;line-height:1;color:'+colD+'">'+disponibles+'</div><div style="font-size:9px;color:var(--ink3)">días disponibles</div></div>';
+  html+='</div>';
+  html+='<div style="display:flex;align-items:center;gap:8px;margin-bottom:12px">';
+  html+='<div style="flex:1;height:8px;background:var(--bg2);border-radius:4px;overflow:hidden"><div style="height:100%;width:'+pct+'%;background:var(--accent);border-radius:4px"></div></div>';
+  html+='<span style="font-size:10px;color:var(--ink3);white-space:nowrap">'+pct+'% de '+ciclo.diasCorresponden+'d</span>';
+  html+='</div>';
+  html+='<div style="display:flex;gap:20px;flex-wrap:wrap">';
+  [{v:ciclo.diasCorresponden,l:'Total ciclo',c:'var(--ink)'},{v:usados,l:'Usados',c:'var(--ink2)'},{v:programados,l:'Programados',c:'var(--amber)'},{v:disponibles,l:'Disponibles',c:colD}].forEach(s=>{
+    html+='<div><div style="font-size:20px;font-weight:600;color:'+s.c+'">'+s.v+'</div><div style="font-size:9px;color:var(--ink3)">'+s.l+'</div></div>';
+  });
+  html+='</div>';
+  html+='<div style="margin-top:10px;font-size:10px;color:var(--ink3)">⟳ Reinicio del ciclo: '+fF(ciclo.cicloFin)+'</div>';
+  html+='</div>';
+  const upcoming=vacsC.filter(v=>v.fecha_fin>=hoyStr).sort((a,b)=>a.fecha_inicio.localeCompare(b.fecha_inicio));
+  const past=vacsC.filter(v=>v.fecha_fin<hoyStr).sort((a,b)=>b.fecha_inicio.localeCompare(a.fecha_inicio));
+  const buildList=(list,titulo,col,ico)=>{
+    if(!list.length)return'';
+    let s='<div style="font-size:9px;letter-spacing:.1em;text-transform:uppercase;color:'+col+';margin:14px 0 8px">'+ico+' '+titulo+'</div>';
+    list.forEach(v=>{
+      s+='<div class="vac-bloque">';
+      s+='<div style="font-size:18px">'+ico+'</div>';
+      s+='<div style="flex:1"><div style="font-size:11px;color:var(--ink);font-weight:500">'+fF(v.fecha_inicio)+' — '+fF(v.fecha_fin)+'</div>';
+      if(v.notas)s+='<div style="font-size:10px;color:var(--ink3);margin-top:2px">'+v.notas+'</div>';
+      s+='</div>';
+      s+='<span style="font-size:14px;font-weight:600;color:'+col+'">'+v.dias_habiles+'d</span>';
+      s+='</div>';
+    });
+    return s;
+  };
+  html+=buildList(upcoming,'Programadas','var(--amber)','🟡');
+  html+=buildList(past,'Usadas','var(--ink3)','✅');
+  if(!upcoming.length&&!past.length)html+='<div class="empty" style="margin-top:16px"><div class="empty-i">🌴</div><div>Sin vacaciones registradas</div></div>';
+  html+='</div>';
+  cont.innerHTML=html;
+}
+
+async function abrirModalVac(id){
+  _vacEditId=id;
+  document.getElementById('vac-ini').value='';document.getElementById('vac-fin').value='';
+  document.getElementById('vac-notas').value='';document.getElementById('vac-calc-info').style.display='none';
+  document.getElementById('vac-del-btn').style.display=id?'block':'none';
+  document.getElementById('vac-colab-sel').value='';
+  document.getElementById('ov-vac-title').textContent=id?'Editar vacaciones':'Registrar vacaciones';
+  if(id){
+    const v=(_vacData?.vacs||[]).find(x=>x.id===id);
+    if(v){document.getElementById('vac-colab-sel').value=v.colaborador_id;document.getElementById('vac-ini').value=v.fecha_inicio;document.getElementById('vac-fin').value=v.fecha_fin;document.getElementById('vac-notas').value=v.notas||'';vacRecalc();}
+  }
+  document.getElementById('ov-vac').classList.add('on');
+}
+
+function vacRecalc(){
+  const colabId=document.getElementById('vac-colab-sel').value;
+  const ini=document.getElementById('vac-ini').value,fin=document.getElementById('vac-fin').value;
+  const info=document.getElementById('vac-calc-info');
+  if(!colabId||!ini||!fin||fin<ini){info.style.display='none';return;}
+  const{colabs,vacs}=_vacData||{};
+  const colab=(colabs||[]).find(c=>c.id===colabId);
+  const dias=diasHabilesRango(ini,fin,_vacFestivosSet);
+  let texto='<b>'+dias+'</b> día'+(dias!==1?'s':'')+' hábil'+(dias!==1?'es':'');
+  const ciclo=colab?calcCiclo(colab.fecha_entrada):null;
+  if(ciclo&&ciclo.aniosCompletados>=1){
+    const vacsC=(vacs||[]).filter(v=>v.colaborador_id===colabId&&v.fecha_inicio>=ciclo.cicloInicio&&v.fecha_inicio<ciclo.cicloFin&&v.id!==_vacEditId);
+    const yaUsados=vacsC.reduce((s,v)=>s+v.dias_habiles,0);
+    const disponibles=Math.max(0,ciclo.diasCorresponden-yaUsados);
+    texto+=' · disponibles en ciclo: <b>'+disponibles+'</b>';
+    if(dias>disponibles){texto+=' <span style="color:var(--rose)">⚠ Excede los días disponibles</span>';info.style.background='var(--rose-lt)';}
+    else info.style.background='var(--grn-lt)';
+  } else if(ciclo&&ciclo.aniosCompletados<1){
+    texto+=' <span style="color:var(--rose)">⚠ Este colaborador aún no completa su primer año</span>';
+    info.style.background='var(--rose-lt)';
+  } else info.style.background='var(--bg)';
+  info.innerHTML=texto;info.style.display='block';
+}
+
+async function guardarVac(){
+  const btn=document.getElementById('vac-save-btn');btn.disabled=true;btn.textContent='Guardando...';
+  const colabId=document.getElementById('vac-colab-sel').value;
+  const ini=document.getElementById('vac-ini').value,fin=document.getElementById('vac-fin').value;
+  const notas=document.getElementById('vac-notas').value.trim();
+  if(!colabId||!ini||!fin){toast('Completa todos los campos');btn.disabled=false;btn.textContent='Guardar';return;}
+  if(fin<ini){toast('La fecha fin debe ser después del inicio');btn.disabled=false;btn.textContent='Guardar';return;}
+  const dias=diasHabilesRango(ini,fin,_vacFestivosSet);
+  try{
+    const{proyId,entId}=await getVacIds();
+    if(_vacEditId){
+      const oldV=(_vacData?.vacs||[]).find(v=>v.id===_vacEditId);
+      if(oldV)await borrarRegsVac(oldV.colaborador_id,oldV.fecha_inicio,oldV.fecha_fin,proyId);
+      await sb.from('vacaciones').update({colaborador_id:colabId,fecha_inicio:ini,fecha_fin:fin,dias_habiles:dias,notas:notas||null}).eq('id',_vacEditId);
+    }else{
+      await sb.from('vacaciones').insert({colaborador_id:colabId,fecha_inicio:ini,fecha_fin:fin,dias_habiles:dias,notas:notas||null});
+    }
+    await insertarRegsVac(colabId,ini,fin,proyId,entId);
+    closeOv('ov-vac');toast('✓ Vacaciones guardadas');await renderVacaciones();
+  }catch(err){toast('Error al guardar: '+err.message);}
+  btn.disabled=false;btn.textContent='Guardar';
+}
+
+async function eliminarVac(){
+  if(!_vacEditId||!confirm('¿Eliminar este registro de vacaciones?'))return;
+  try{
+    const v=(_vacData?.vacs||[]).find(x=>x.id===_vacEditId);
+    const{proyId}=await getVacIds();
+    if(v)await borrarRegsVac(v.colaborador_id,v.fecha_inicio,v.fecha_fin,proyId);
+    await sb.from('vacaciones').delete().eq('id',_vacEditId);
+    closeOv('ov-vac');toast('Registro eliminado');await renderVacaciones();
+  }catch(err){toast('Error: '+err.message);}
+}
+
+async function getVacIds(){
+  if(_vacProyId&&_vacEntId)return{proyId:_vacProyId,entId:_vacEntId};
+  const{data:proy}=await sb.from('proyectos').select('id').eq('codigo','VAC').single();
+  if(!proy)throw new Error('Proyecto VAC no encontrado en Supabase');
+  _vacProyId=proy.id;
+  const{data:ent}=await sb.from('entregables').select('id').eq('proyecto_id',_vacProyId).eq('etapa_clave','_').maybeSingle();
+  if(ent){_vacEntId=ent.id;}
+  else{const{data:ne}=await sb.from('entregables').insert({nombre:'Vacaciones',proyecto_id:_vacProyId,etapa_clave:'_',done:false,eliminado:false}).select('id').single();_vacEntId=ne.id;}
+  return{proyId:_vacProyId,entId:_vacEntId};
+}
+
+async function insertarRegsVac(colabId,iniStr,finStr,proyId,entId){
+  const regs=[];
+  let d=new Date(iniStr+' 12:00'),fin=new Date(finStr+' 12:00');
+  while(d<=fin){
+    const dow=d.getDay(),iso=d.toISOString().split('T')[0];
+    if(dow!==0&&dow!==6&&!_vacFestivosSet.has(iso))regs.push({colaborador_id:colabId,proyecto_id:proyId,entregable_id:entId,etapa_clave:'_',horas:8,fecha:iso,nota:'Vacaciones'});
+    d.setDate(d.getDate()+1);
+  }
+  if(regs.length)await sb.from('registros_horas').insert(regs);
+}
+
+async function borrarRegsVac(colabId,iniStr,finStr,proyId){
+  const fechas=[];
+  let d=new Date(iniStr+' 12:00'),fin=new Date(finStr+' 12:00');
+  while(d<=fin){fechas.push(d.toISOString().split('T')[0]);d.setDate(d.getDate()+1);}
+  if(fechas.length)await sb.from('registros_horas').delete().eq('colaborador_id',colabId).eq('proyecto_id',proyId).in('fecha',fechas);
+}
+
+function abrirModalFestivo(){
+  document.getElementById('fest-fecha').value='';document.getElementById('fest-nombre').value='';
+  document.getElementById('ov-festivo').classList.add('on');
+}
+
+async function guardarFestivo(){
+  const fecha=document.getElementById('fest-fecha').value,nombre=document.getElementById('fest-nombre').value.trim();
+  if(!fecha||!nombre){toast('Completa los campos');return;}
+  const{error}=await sb.from('festivos').upsert({fecha,nombre,tipo:'custom'},{onConflict:'fecha'});
+  if(error){toast('Error: '+error.message);return;}
+  closeOv('ov-festivo');toast('✓ Día de asueto guardado');
+  _vacData=null;await renderVacaciones();
+}
 
 // ── UTILS ──
 function closeOv(id,e){if(!e||e.target.id===id)document.getElementById(id).classList.remove('on');}

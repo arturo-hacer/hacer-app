@@ -8,6 +8,9 @@
 <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Fraunces:ital,opsz,wght@0,9..144,300;0,9..144,400;1,9..144,300&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.2/Sortable.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/jspdf-autotable@3.8.2/dist/jspdf.plugin.autotable.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <style>
 :root{
   --bg:#f4f2ec;--bg2:#eae7de;--ink:#1c1b17;--ink2:#5c5b53;--ink3:#9c9b90;
@@ -259,6 +262,10 @@ button{font-family:'DM Mono',monospace;cursor:pointer;}
 
 /* ── REPORTES ── */
 .rep-layout{padding:24px;max-width:800px;}
+.rq-kv{display:flex;justify-content:space-between;padding:6px 0;font-size:11px;color:var(--ink2);border-bottom:1px solid var(--border);}
+.rq-kv:last-child{border-bottom:none;}
+.rq-kv b{color:var(--ink);font-weight:500;}
+.lbl-sm2{font-size:9px;letter-spacing:.08em;text-transform:uppercase;color:var(--ink3);margin-bottom:4px;}
 
 /* ── GESTION ── */
 .gestion-layout{display:grid;grid-template-columns:1fr 1fr;gap:24px;padding:24px;max-width:1100px;}
@@ -747,6 +754,10 @@ tr.comp-toggle-row:hover td{background:var(--bg2);}
     </div>
     <div class="fl"><label>Email *</label><input type="email" id="cf-email2" placeholder="val@hacer.mx"></div>
     <div class="fl"><label>Tarifa ($/hr) *</label><input type="number" id="cf-tarifa2" placeholder="350"></div>
+    <div style="display:flex;gap:10px">
+      <div class="fl" style="flex:1"><label>Puesto</label><input type="text" id="cf-puesto" placeholder="Arquitecto Colaborador"></div>
+      <div class="fl" style="flex:1"><label>Meta % tiempo productivo</label><input type="number" id="cf-metaprod" placeholder="80" min="0" max="100"></div>
+    </div>
     <div class="fl"><label>Fecha de entrada</label><input type="date" id="cf-entrada"></div>
     <div class="fl"><label>Tipo de perfil</label>
       <div style="display:flex;gap:8px">
@@ -1308,7 +1319,7 @@ async function tDone(id,cur){
   if(done){
     // Leer ANTES de marcar done
     const {data:e}=await sb.from('entregables').select('*').eq('id',id).single();
-    await sb.from('entregables').update({done:true}).eq('id',id);
+    await sb.from('entregables').update({done:true,completado_en:new Date().toISOString()}).eq('id',id);
     if(e?.recurrente&&e?.frecuencia){
       const baseDate=e.fecha_unica?new Date(e.fecha_unica+'T12:00:00'):new Date();
       const dias=new Set(e.dias_semana||[]);
@@ -1339,7 +1350,7 @@ async function tDone(id,cur){
       } else { toast('✓ Completado'); }
     } else { toast('✓ Completado'); }
   } else {
-    await sb.from('entregables').update({done:false}).eq('id',id);
+    await sb.from('entregables').update({done:false,completado_en:null}).eq('id',id);
     toast('Desmarcado');
   }
   renderMisTareas();
@@ -2793,7 +2804,7 @@ async function eliminarSeleccion(){
 async function asignarDetalle(entId,colabId){await sb.from('entregables').update({asignado_id:colabId||null}).eq('id',entId);toast('✓ Responsable actualizado');}
 async function toggleDoneDetalle(entId,cur){
   const done=cur===true||cur==='true'?false:true;
-  await sb.from('entregables').update({done}).eq('id',entId);
+  await sb.from('entregables').update({done,completado_en:done?new Date().toISOString():null}).eq('id',entId);
   if(done){
     const {data:e}=await sb.from('entregables').select('*').eq('id',entId).single();
     if(e?.recurrente&&e?.frecuencia){
@@ -2939,39 +2950,443 @@ async function eliminarEditReg(){
 }
 
 // ── REPORTES ──
+let repTab='quincenal';
 function renderRepUI(){
   const cont=document.getElementById('pane-reportes');if(!cont)return;
-  cont.innerHTML=`<div class="rep-layout">
-    <div class="sec">Reporte por colaborador</div>
-    <div class="card" style="padding:18px;margin-bottom:16px">
-      <div class="fl"><label>Colaborador</label><select id="rc2"><option value="">— todos —</option></select></div>
-      <div style="display:flex;gap:12px;margin-bottom:14px">
-        <div style="flex:1"><div style="font-size:9px;letter-spacing:.1em;text-transform:uppercase;color:var(--ink3);margin-bottom:5px">Desde</div><input type="date" id="rd" value="${hace(13)}"></div>
-        <div style="flex:1"><div style="font-size:9px;letter-spacing:.1em;text-transform:uppercase;color:var(--ink3);margin-bottom:5px">Hasta</div><input type="date" id="rh2" value="${hoy()}"></div>
-      </div>
-      <button class="bsave" style="margin-top:0" onclick="genRep()">Ver reporte</button>
+  cont.innerHTML=`<div class="rep-layout" style="max-width:960px">
+    <div class="det-tabs" style="margin-top:0;margin-bottom:18px">
+      <button class="det-tab ${repTab==='quincenal'?'on':''}" onclick="switchRepTab('quincenal',this)">Junta Quincenal</button>
+      <button class="det-tab ${repTab==='proyecto'?'on':''}" onclick="switchRepTab('proyecto',this)">Reporte por Proyecto</button>
     </div>
-    <div id="rep-res"></div>
+    <div id="rep-body"></div>
   </div>`;
-  sb.from('colaboradores').select('id,nombre,apellido,color').then(({data})=>{const s=document.getElementById('rc2');(data||[]).forEach(c=>s.innerHTML+=`<option value="${c.id}">${c.nombre} ${c.apellido||''}</option>`);});
+  renderRepBody();
 }
-async function genRep(){
-  const cid=document.getElementById('rc2').value,desde=document.getElementById('rd').value,hasta=document.getElementById('rh2').value;
-  if(!desde||!hasta){toast('Selecciona período');return;}
-  const cont=document.getElementById('rep-res');cont.innerHTML=`<div class="ldg">Generando...</div>`;
-  let q=sb.from('registros_horas').select('horas,fecha,proyecto_id,colaborador_id,colaboradores(nombre,apellido,color),proyectos(codigo,nombre)').gte('fecha',desde).lte('fecha',hasta);
-  if(cid)q=q.eq('colaborador_id',cid);
-  const {data:rs}=await q;
-  if(!rs||!rs.length){cont.innerHTML=`<div class="empty"><div class="empty-i">📊</div><div>Sin registros</div></div>`;return;}
-  const pc={};
-  rs.forEach(r=>{const c=r.colaborador_id;if(!pc[c])pc[c]={col:r.colaboradores,h:0,ps:{}};pc[c].h+=r.horas;const pid=r.proyecto_id;if(!pc[c].ps[pid])pc[c].ps[pid]={n:r.proyectos?.nombre||pid,c:r.proyectos?.codigo||'',h:0};pc[c].ps[pid].h+=r.horas;});
-  let html='';
-  Object.entries(pc).forEach(([cid2,d])=>{
-    const col=d.col;let pH='';
-    Object.entries(d.ps).sort((a,b)=>b[1].h-a[1].h).forEach(([pid,pd])=>{const pct=Math.round(pd.h/d.h*100);pH+=`<div style="display:flex;align-items:center;gap:10px;padding:9px 14px;border-bottom:1px solid var(--border)"><span class="cod">${pd.c}</span><div style="flex:1;min-width:0"><div style="font-size:11px;color:var(--ink)">${pd.n}</div><div style="height:3px;background:var(--bg2);border-radius:2px;overflow:hidden;margin-top:4px"><div style="height:100%;width:${pct}%;background:var(--accent);border-radius:2px"></div></div></div><span style="font-size:12px;font-weight:500;color:var(--accent)">${hT(pd.h)}</span></div>`;});
-    html+=`<div class="card" style="margin-bottom:12px"><div style="padding:12px 14px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:10px"><div style="width:30px;height:30px;border-radius:50%;background:${col?.color||'var(--accent)'};display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:500;color:#fff;flex-shrink:0">${ini(col?.nombre,col?.apellido)}</div><div><div style="font-size:12px;color:var(--ink)">${col?.nombre} ${col?.apellido||''}</div><div style="font-size:10px;color:var(--ink3)">${fF(desde)} — ${fF(hasta)}</div></div></div>${pH}<div style="display:flex;justify-content:space-between;padding:11px 14px;background:var(--ink)"><span style="font-size:10px;letter-spacing:.08em;text-transform:uppercase;color:var(--ink3)">Total período</span><span style="font-family:'Fraunces',serif;font-size:20px;font-weight:300;color:#fff">${hT(d.h)}</span></div></div>`;
+function switchRepTab(tab,btn){
+  repTab=tab;
+  document.querySelectorAll('#pane-reportes .det-tab').forEach(t=>t.classList.remove('on'));
+  btn.classList.add('on');
+  renderRepBody();
+}
+function renderRepBody(){
+  if(repTab==='quincenal')renderRepQuincenalUI();
+  else renderRepProyectoUI();
+}
+
+// ── Junta Quincenal ──
+async function renderRepQuincenalUI(){
+  const body=document.getElementById('rep-body');
+  body.innerHTML=`
+    <div class="card" style="padding:18px;margin-bottom:16px">
+      <div class="fl"><label>Colaborador</label><select id="rq-colab"><option value="">— seleccionar —</option></select></div>
+      <div style="display:flex;gap:12px;margin-bottom:14px">
+        <div style="flex:1"><div style="font-size:9px;letter-spacing:.1em;text-transform:uppercase;color:var(--ink3);margin-bottom:5px">Desde</div><input type="date" id="rq-desde" value="${hace(13)}"></div>
+        <div style="flex:1"><div style="font-size:9px;letter-spacing:.1em;text-transform:uppercase;color:var(--ink3);margin-bottom:5px">Hasta</div><input type="date" id="rq-hasta" value="${hoy()}"></div>
+      </div>
+      <button class="bsave" style="margin-top:0" onclick="genRepQuincenal()">Generar minuta</button>
+    </div>
+    <div id="rq-res"></div>`;
+  const {data:cs}=await sb.from('colaboradores').select('id,nombre,apellido,color').order('nombre');
+  const sel=document.getElementById('rq-colab');
+  (cs||[]).forEach(c=>sel.innerHTML+=`<option value="${c.id}">${c.nombre} ${c.apellido||''}</option>`);
+}
+
+function diasEnRango(iniStr,finStr){
+  const ini=new Date(iniStr+' 12:00'),fin=new Date(finStr+' 12:00');
+  return Math.round((fin-ini)/86400000)+1;
+}
+
+let _rqData=null;
+async function genRepQuincenal(){
+  const colabId=document.getElementById('rq-colab').value;
+  const desde=document.getElementById('rq-desde').value;
+  const hasta=document.getElementById('rq-hasta').value;
+  if(!colabId){toast('Selecciona un colaborador');return;}
+  if(!desde||!hasta){toast('Selecciona el período');return;}
+  const cont=document.getElementById('rq-res');
+  cont.innerHTML=`<div class="ldg">Generando minuta...</div>`;
+
+  const hastaD=new Date(hasta+'T12:00:00');
+  const prox1=new Date(hastaD);prox1.setDate(prox1.getDate()+1);
+  const prox15=new Date(hastaD);prox15.setDate(prox15.getDate()+15);
+  const prox1Str=fechaAStr(prox1),prox15Str=fechaAStr(prox15);
+
+  const [{data:colab},{data:completadas},{data:pendientes},{data:regs},{data:vacs},{data:festivos}]=await Promise.all([
+    sb.from('colaboradores').select('*').eq('id',colabId).single(),
+    sb.from('entregables').select('id,nombre,etapa_clave,proyecto_id,completado_en,proyectos(id,codigo,nombre)').eq('asignado_id',colabId).eq('eliminado',false).eq('done',true).gte('completado_en',desde+'T00:00:00').lte('completado_en',hasta+'T23:59:59'),
+    sb.from('entregables').select('id,nombre,etapa_clave,proyecto_id,fecha_unica,fecha_fin,proyectos(id,codigo,nombre)').eq('asignado_id',colabId).eq('eliminado',false).eq('done',false),
+    sb.from('registros_horas').select('horas,fecha,nota,proyecto_id,entregable_id,proyectos(id,codigo,nombre,tipo),entregables(nombre)').eq('colaborador_id',colabId).gte('fecha',desde).lte('fecha',hasta),
+    sb.from('vacaciones').select('fecha_inicio,fecha_fin').eq('colaborador_id',colabId),
+    sb.from('festivos').select('fecha')
+  ]);
+
+  const pend15=(pendientes||[]).filter(e=>{
+    const fr=e.fecha_unica||e.fecha_fin;
+    if(!fr)return false;
+    return fr>=prox1Str&&fr<=prox15Str;
   });
-  cont.innerHTML=html;
+
+  const proyMap={};
+  function ensureProy(p){
+    const pid=p?.id||'sin';
+    if(!proyMap[pid])proyMap[pid]={proy:p,completadas:[],pendientes:[]};
+    return proyMap[pid];
+  }
+  (completadas||[]).forEach(e=>ensureProy(e.proyectos).completadas.push(e));
+  pend15.forEach(e=>ensureProy(e.proyectos).pendientes.push(e));
+
+  let hTotal=0,hProd=0,hNoProd=0;
+  const tareaHoras={};
+  (regs||[]).forEach(r=>{
+    hTotal+=r.horas;
+    if(r.proyectos?.tipo==='en_blanco')hNoProd+=r.horas;else hProd+=r.horas;
+    const k=r.entregable_id||('nota:'+(r.nota||'sin_tarea'));
+    if(!tareaHoras[k])tareaHoras[k]={nombre:r.entregables?.nombre||r.nota||'(sin tarea)',horas:0,notas:new Set()};
+    tareaHoras[k].horas+=r.horas;
+    if(r.nota&&r.nota!=='(timer)')tareaHoras[k].notas.add(r.nota);
+  });
+  const pctProd=hTotal>0?Math.round(hProd/hTotal*100):0;
+
+  const festSet=new Set((festivos||[]).map(f=>f.fecha));
+  const diasHabTotales=diasHabilesRango(desde,hasta,festSet);
+  let diasVac=0;
+  (vacs||[]).forEach(v=>{
+    const ini2=v.fecha_inicio>desde?v.fecha_inicio:desde;
+    const fin2=v.fecha_fin<hasta?v.fecha_fin:hasta;
+    if(ini2<=fin2)diasVac+=diasHabilesRango(ini2,fin2,festSet);
+  });
+  const diasTrabajo=Math.max(0,diasHabTotales-diasVac);
+  const horasHabiles=diasTrabajo*8;
+  const pctRegistro=horasHabiles>0?Math.round(hTotal/horasHabiles*1000)/10:0;
+  const metaRegistro=100;
+  const metaProd=colab?.meta_productivo_pct??80;
+
+  _rqData={colab,desde,hasta,proyMap,hTotal,hProd,hNoProd,pctProd,metaProd,diasHabTotales,diasVac,diasTrabajo,horasHabiles,pctRegistro,metaRegistro,tareaHoras};
+  renderRepQuincenalResultado();
+}
+
+function renderRepQuincenalResultado(){
+  const cont=document.getElementById('rq-res');
+  const d=_rqData;
+  if(!d){cont.innerHTML='';return;}
+  const col=d.colab;
+  const proyEntries=Object.entries(d.proyMap).filter(([pid])=>pid!=='sin');
+  let proyHtml='';
+  if(!proyEntries.length){
+    proyHtml=`<div class="empty" style="padding:20px"><div class="empty-i">📁</div><div>Sin tareas completadas o próximas para este colaborador</div></div>`;
+  }
+  proyEntries.forEach(([pid,pd])=>{
+    const p=pd.proy;
+    const etapasComp={};pd.completadas.forEach(e=>{const k=e.etapa_clave||'_';(etapasComp[k]=etapasComp[k]||[]).push(e);});
+    const etapasPend={};pd.pendientes.forEach(e=>{const k=e.etapa_clave||'_';(etapasPend[k]=etapasPend[k]||[]).push(e);});
+    let bloqueComp='';
+    if(pd.completadas.length){
+      bloqueComp=`<div style="margin-bottom:10px"><div class="lbl-sm2">Completadas en el periodo</div>`+
+        Object.entries(etapasComp).map(([et,arr])=>`<div style="margin-bottom:6px"><span class="ec" style="font-size:8px">${et==='_'?'—':et}</span> `+arr.map(e=>`<div style="font-size:11px;color:var(--ink);padding:2px 0 2px 18px">✓ ${e.nombre}</div>`).join('')+`</div>`).join('')+`</div>`;
+    }
+    let bloquePend='';
+    if(pd.pendientes.length){
+      bloquePend=`<div style="margin-bottom:10px"><div class="lbl-sm2">Por completar (próx. 15 días)</div>`+
+        Object.entries(etapasPend).map(([et,arr])=>`<div style="margin-bottom:6px"><span class="ec" style="font-size:8px">${et==='_'?'—':et}</span> `+arr.map(e=>`<div style="font-size:11px;color:var(--ink2);padding:2px 0 2px 18px">○ ${e.nombre} <span style="color:var(--ink3);font-size:9px">${fF(e.fecha_unica||e.fecha_fin)||''}</span></div>`).join('')+`</div>`).join('')+`</div>`;
+    }
+    proyHtml+=`<div class="card" style="margin-bottom:12px;padding:14px 16px">
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px"><span class="cod">${p?.codigo||''}</span><span style="font-size:13px;color:var(--ink)">${p?.nombre||'Sin proyecto'}</span></div>
+      ${bloqueComp}${bloquePend}
+      <div class="fl" style="margin-top:8px;margin-bottom:0"><label>Comentarios</label><textarea id="rq-com-${pid}" rows="2" placeholder="Notas de la junta sobre este proyecto..."></textarea></div>
+    </div>`;
+  });
+
+  const tareasOrdenadas=Object.values(d.tareaHoras).sort((a,b)=>b.horas-a.horas).slice(0,10);
+  const tareasRepHtml=tareasOrdenadas.map(t=>{
+    const pct=d.hTotal>0?Math.round(t.horas/d.hTotal*1000)/10:0;
+    return `<tr><td style="padding:6px 10px;font-size:10px;color:var(--ink);border-bottom:1px solid var(--border)">${t.nombre}</td><td style="padding:6px 10px;font-size:10px;color:var(--ink2);text-align:right;border-bottom:1px solid var(--border)">${hT(t.horas)}</td><td style="padding:6px 10px;font-size:10px;color:var(--ink3);text-align:right;border-bottom:1px solid var(--border)">${pct}%</td><td style="padding:6px 10px;font-size:10px;color:var(--ink3);border-bottom:1px solid var(--border)">${[...t.notas].join('; ')}</td></tr>`;
+  }).join('');
+
+  cont.innerHTML=`
+    <div class="card" style="padding:16px 18px;margin-bottom:16px">
+      <div style="display:flex;align-items:center;gap:10px">
+        <div style="width:34px;height:34px;border-radius:50%;background:${col?.color||'var(--accent)'};display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:500;color:#fff;flex-shrink:0">${ini(col?.nombre,col?.apellido)}</div>
+        <div>
+          <div style="font-family:'Fraunces',serif;font-size:16px;color:var(--ink)">Minuta Junta Quincenal — ${col?.nombre} ${col?.apellido||''}</div>
+          <div style="font-size:10px;color:var(--ink3)">${fF(d.desde)} — ${fF(d.hasta)} · Emisión ${fF(hoy())}</div>
+        </div>
+      </div>
+    </div>
+    <div class="sec">Asistentes</div>
+    <div class="card" style="padding:14px 16px;margin-bottom:16px"><div id="rq-asist" style="display:flex;flex-wrap:wrap;gap:14px"></div></div>
+    <div class="sec">Proyectos</div>
+    ${proyHtml}
+    <div class="sec">Objetivos individuales</div>
+    <div class="card" style="padding:14px 16px;margin-bottom:16px"><textarea id="rq-obj" rows="3" placeholder="Avance y comentarios sobre objetivos individuales..."></textarea></div>
+    <div class="sec">Misceláneos</div>
+    <div class="card" style="padding:14px 16px;margin-bottom:16px"><textarea id="rq-misc" rows="3" placeholder="Temas diversos tratados en la junta..."></textarea></div>
+    <div class="sec">Horas hábiles del periodo vs. horas registradas</div>
+    <div class="card" style="padding:14px 16px;margin-bottom:16px">
+      <div class="rq-kv"><span>Días de trabajo</span><b>${d.diasTrabajo} días</b></div>
+      <div class="rq-kv"><span>Días de descanso / inhábiles</span><b>${diasEnRango(d.desde,d.hasta)-d.diasTrabajo} días</b></div>
+      <div class="rq-kv"><span>Horas hábiles del periodo</span><b>${hT(d.horasHabiles)}</b></div>
+      <div class="rq-kv"><span>Horas registradas</span><b>${hT(d.hTotal)}</b></div>
+      <div class="rq-kv"><span>% de registro de horas</span><b style="color:${d.pctRegistro>=d.metaRegistro?'var(--green)':'var(--amber)'}">${d.pctRegistro}%</b></div>
+      <div class="rq-kv"><span>Meta de registro</span><b>${d.metaRegistro}%</b></div>
+    </div>
+    <div class="sec">Tiempo productivo vs. no productivo</div>
+    <div class="card" style="padding:14px 16px;margin-bottom:16px">
+      <div class="rq-kv"><span>Horas en proyectos productivos</span><b>${hT(d.hProd)}</b></div>
+      <div class="rq-kv"><span>Horas en proyectos internos / no productivos</span><b>${hT(d.hNoProd)}</b></div>
+      <div class="rq-kv"><span>% tiempo productivo</span><b style="color:${d.pctProd>=d.metaProd?'var(--green)':'var(--amber)'}">${d.pctProd}%</b></div>
+      <div class="rq-kv"><span>Meta de tiempo productivo (${col?.puesto||'puesto no definido'})</span><b>${d.metaProd}%</b></div>
+    </div>
+    <div class="sec">Tareas más representativas del periodo</div>
+    <div class="card" style="padding:0;margin-bottom:20px;overflow:hidden"><table style="width:100%;border-collapse:collapse"><tbody>${tareasRepHtml||'<tr><td style="padding:10px;font-size:10px;color:var(--ink3)">Sin registros de horas en el periodo</td></tr>'}</tbody></table></div>
+    <button class="bsave" onclick="generarPDFQuincenal()">📄 Generar PDF</button>
+  `;
+  renderAsistentesQuincenal();
+}
+
+async function renderAsistentesQuincenal(){
+  const wrap=document.getElementById('rq-asist');if(!wrap||!_rqData)return;
+  const {data:admins}=await sb.from('colaboradores').select('id,nombre,apellido').eq('rol','admin').order('nombre');
+  const col=_rqData.colab;
+  let html='';
+  (admins||[]).forEach(a=>{html+=`<label style="display:flex;align-items:center;gap:6px;font-size:11px;color:var(--ink2);cursor:pointer"><input type="checkbox" class="rq-asist-chk" value="${a.nombre} ${a.apellido||''}" checked> ${a.nombre} ${a.apellido||''}</label>`;});
+  html+=`<label style="display:flex;align-items:center;gap:6px;font-size:11px;color:var(--ink2);cursor:pointer"><input type="checkbox" class="rq-asist-chk" value="${col?.nombre} ${col?.apellido||''}" checked> ${col?.nombre} ${col?.apellido||''}</label>`;
+  wrap.innerHTML=html;
+}
+
+function generarPDFQuincenal(){
+  const d=_rqData;if(!d)return;
+  const {jsPDF}=window.jspdf;
+  const doc=new jsPDF({unit:'pt',format:'letter'});
+  const marginX=40;let y=50;
+  const pageH=doc.internal.pageSize.getHeight();
+  const pageW=doc.internal.pageSize.getWidth();
+  function checkPage(need){if(y+need>pageH-40){doc.addPage();y=50;}}
+  function h1(text){checkPage(30);doc.setFont('helvetica','bold');doc.setFontSize(15);doc.setTextColor(20,20,20);doc.text(text,marginX,y);y+=22;}
+  function h2(text){checkPage(24);doc.setFont('helvetica','bold');doc.setFontSize(10.5);doc.setTextColor(30,30,30);doc.text(text.toUpperCase(),marginX,y);y+=6;doc.setDrawColor(210,210,210);doc.line(marginX,y,pageW-marginX,y);y+=14;}
+  function p(text,opts={}){
+    doc.setFont('helvetica',opts.bold?'bold':'normal');
+    doc.setFontSize(opts.size||9.5);
+    const col2=opts.color||[60,60,60];doc.setTextColor(col2[0],col2[1],col2[2]);
+    const lines=doc.splitTextToSize(String(text),pageW-marginX*2-(opts.indent||0));
+    checkPage(lines.length*12+4);
+    doc.text(lines,marginX+(opts.indent||0),y);
+    y+=lines.length*12+4;
+  }
+
+  h1(`Minuta Junta Quincenal — ${d.colab?.nombre||''} ${d.colab?.apellido||''}`);
+  doc.setFont('helvetica','normal');doc.setFontSize(9);doc.setTextColor(120,120,120);
+  doc.text(`${fF(d.desde)} — ${fF(d.hasta)}   ·   Emisión: ${fF(hoy())}`,marginX,y);y+=20;
+
+  const asistentes=[...document.querySelectorAll('.rq-asist-chk:checked')].map(c=>c.value);
+  h2('Asistentes');
+  p(asistentes.join(' · ')||'—');
+  y+=6;
+
+  h2('Proyectos');
+  const proyEntries=Object.entries(d.proyMap).filter(([pid])=>pid!=='sin');
+  if(!proyEntries.length)p('Sin tareas completadas o próximas en el periodo.');
+  proyEntries.forEach(([pid,pd])=>{
+    const pr=pd.proy;
+    p(`${pr?.codigo?pr.codigo+' — ':''}${pr?.nombre||'Sin proyecto'}`,{bold:true,size:10.5,color:[20,20,20]});
+    if(pd.completadas.length){
+      p('Completadas en el periodo:',{bold:true,size:9,color:[100,100,100],indent:8});
+      pd.completadas.forEach(e=>p(`✓ ${e.nombre}`,{indent:16}));
+    }
+    if(pd.pendientes.length){
+      p('Por completar (próximos 15 días):',{bold:true,size:9,color:[100,100,100],indent:8});
+      pd.pendientes.forEach(e=>p(`○ ${e.nombre}  (${fF(e.fecha_unica||e.fecha_fin)||''})`,{indent:16}));
+    }
+    const com=document.getElementById(`rq-com-${pid}`)?.value?.trim();
+    if(com){p('Comentarios:',{bold:true,size:9,color:[100,100,100],indent:8});p(com,{indent:16});}
+    y+=6;
+  });
+
+  h2('Objetivos individuales');
+  p(document.getElementById('rq-obj').value.trim()||'—');
+  y+=6;
+  h2('Misceláneos');
+  p(document.getElementById('rq-misc').value.trim()||'—');
+  y+=10;
+
+  h2('Horas hábiles del periodo vs. horas registradas');
+  checkPage(90);
+  doc.autoTable({
+    startY:y,margin:{left:marginX,right:marginX},theme:'plain',
+    styles:{fontSize:9,cellPadding:3,textColor:[60,60,60]},
+    body:[
+      ['Días de trabajo',d.diasTrabajo+' días'],
+      ['Días de descanso / inhábiles',(diasEnRango(d.desde,d.hasta)-d.diasTrabajo)+' días'],
+      ['Horas hábiles del periodo',hT(d.horasHabiles)],
+      ['Horas registradas',hT(d.hTotal)],
+      ['% de registro de horas',d.pctRegistro+'%'],
+      ['Meta de registro',d.metaRegistro+'%'],
+    ],
+    columnStyles:{0:{cellWidth:260},1:{fontStyle:'bold',textColor:[20,20,20]}}
+  });
+  y=doc.lastAutoTable.finalY+20;
+
+  h2('Tiempo productivo vs. no productivo');
+  checkPage(90);
+  doc.autoTable({
+    startY:y,margin:{left:marginX,right:marginX},theme:'plain',
+    styles:{fontSize:9,cellPadding:3,textColor:[60,60,60]},
+    body:[
+      ['Horas en proyectos productivos',hT(d.hProd)],
+      ['Horas en proyectos internos / no productivos',hT(d.hNoProd)],
+      ['% tiempo productivo',d.pctProd+'%'],
+      [`Meta de tiempo productivo (${d.colab?.puesto||'—'})`,d.metaProd+'%'],
+    ],
+    columnStyles:{0:{cellWidth:260},1:{fontStyle:'bold',textColor:[20,20,20]}}
+  });
+  y=doc.lastAutoTable.finalY+20;
+
+  h2('Tareas más representativas del periodo');
+  const rows=Object.values(d.tareaHoras).sort((a,b)=>b.horas-a.horas).slice(0,10).map(t=>{
+    const pct=d.hTotal>0?(Math.round(t.horas/d.hTotal*1000)/10)+'%':'0%';
+    return[t.nombre,hT(t.horas),pct,[...t.notas].join('; ')];
+  });
+  checkPage(60);
+  doc.autoTable({
+    startY:y,margin:{left:marginX,right:marginX},theme:'striped',
+    head:[['Tarea','Horas','%','Notas']],
+    styles:{fontSize:8.5,cellPadding:4},
+    headStyles:{fillColor:[30,30,30],textColor:255,fontStyle:'bold'},
+    columnStyles:{1:{cellWidth:55},2:{cellWidth:40}},
+    body:rows.length?rows:[['Sin registros de horas en el periodo','','','']]
+  });
+
+  const fname=`Minuta_${(d.colab?.nombre||'colab').replace(/\s+/g,'_')}_${d.desde}_${d.hasta}.pdf`;
+  doc.save(fname);
+}
+
+// ── Reporte por Proyecto ──
+async function renderRepProyectoUI(){
+  const body=document.getElementById('rep-body');
+  body.innerHTML=`
+    <div class="card" style="padding:18px;margin-bottom:16px">
+      <div class="fl"><label>Proyecto</label><select id="rp-proy"><option value="">— seleccionar —</option></select></div>
+      <div style="display:flex;gap:12px;margin-bottom:14px">
+        <div style="flex:1"><div style="font-size:9px;letter-spacing:.1em;text-transform:uppercase;color:var(--ink3);margin-bottom:5px">Desde (opcional)</div><input type="date" id="rp-desde"></div>
+        <div style="flex:1"><div style="font-size:9px;letter-spacing:.1em;text-transform:uppercase;color:var(--ink3);margin-bottom:5px">Hasta (opcional)</div><input type="date" id="rp-hasta"></div>
+      </div>
+      <button class="bsave" style="margin-top:0" onclick="genRepProyecto()">Ver resumen</button>
+    </div>
+    <div id="rp-res"></div>`;
+  const {data:ps}=await sb.from('proyectos').select('id,codigo,nombre').order('codigo');
+  const sel=document.getElementById('rp-proy');
+  (ps||[]).forEach(p=>sel.innerHTML+=`<option value="${p.id}">${p.codigo} — ${p.nombre}</option>`);
+}
+
+let _rpData=null;
+async function genRepProyecto(){
+  const pid=document.getElementById('rp-proy').value;
+  const desde=document.getElementById('rp-desde').value;
+  const hasta=document.getElementById('rp-hasta').value;
+  if(!pid){toast('Selecciona un proyecto');return;}
+  const cont=document.getElementById('rp-res');cont.innerHTML=`<div class="ldg">Generando...</div>`;
+  const esAdmin=PERFIL?.rol==='admin';
+
+  let regQ=sb.from('registros_horas').select('horas,fecha,etapa_clave,entregable_id,colaborador_id,colaboradores(nombre,apellido,tarifa),entregables(nombre)').eq('proyecto_id',pid);
+  if(desde)regQ=regQ.gte('fecha',desde);
+  if(hasta)regQ=regQ.lte('fecha',hasta);
+
+  const [{data:proy},{data:ents},{data:regsRaw}]=await Promise.all([
+    sb.from('proyectos').select('*').eq('id',pid).single(),
+    sb.from('entregables').select('id,nombre,etapa_clave,done,fecha_unica,fecha_fin,asignado_id,colaboradores(nombre,apellido)').eq('proyecto_id',pid).eq('eliminado',false),
+    regQ
+  ]);
+  const regs=regsRaw||[];
+
+  const totalEnt=ents?.length||0,doneEnt=(ents||[]).filter(e=>e.done).length;
+  const pctAvance=totalEnt?Math.round(doneEnt/totalEnt*100):0;
+
+  const horasPorColab={},horasPorEtapa={};
+  let horasTotal=0,costoTotal=0;
+  regs.forEach(r=>{
+    horasTotal+=r.horas;
+    const costo=r.horas*(r.colaboradores?.tarifa||0);
+    costoTotal+=costo;
+    const ck=r.colaborador_id;
+    if(!horasPorColab[ck])horasPorColab[ck]={nombre:(r.colaboradores?.nombre||'')+' '+(r.colaboradores?.apellido||''),horas:0,costo:0};
+    horasPorColab[ck].horas+=r.horas;horasPorColab[ck].costo+=costo;
+    const ek=r.etapa_clave||'_';
+    if(!horasPorEtapa[ek])horasPorEtapa[ek]={horas:0,costo:0};
+    horasPorEtapa[ek].horas+=r.horas;horasPorEtapa[ek].costo+=costo;
+  });
+
+  const presupTotal=proy?.presupuesto_total||0;
+  const pctPresup=(esAdmin&&presupTotal>0&&proy?.tipo!=='en_blanco')?Math.round(costoTotal/presupTotal*100):null;
+
+  _rpData={proy,ents,regs,horasPorColab,horasPorEtapa,horasTotal,costoTotal,totalEnt,doneEnt,pctAvance,pctPresup,esAdmin,desde,hasta};
+  renderRepProyectoResultado();
+}
+
+function renderRepProyectoResultado(){
+  const d=_rpData;const cont=document.getElementById('rp-res');if(!d)return;
+  const colabRows=Object.values(d.horasPorColab).sort((a,b)=>b.horas-a.horas)
+    .map(c=>`<tr><td style="padding:7px 10px;font-size:10px;color:var(--ink);border-bottom:1px solid var(--border)">${c.nombre}</td><td style="padding:7px 10px;font-size:10px;color:var(--ink2);text-align:right;border-bottom:1px solid var(--border)">${hT(c.horas)}</td>${d.esAdmin?`<td style="padding:7px 10px;font-size:10px;color:var(--ink2);text-align:right;border-bottom:1px solid var(--border)">$${Math.round(c.costo).toLocaleString('es-MX')}</td>`:''}</tr>`).join('');
+  const etapaRows=Object.entries(d.horasPorEtapa).sort((a,b)=>b[1].horas-a[1].horas)
+    .map(([et,e])=>`<tr><td style="padding:7px 10px;font-size:10px;color:var(--ink);border-bottom:1px solid var(--border)">${et==='_'?'—':et}</td><td style="padding:7px 10px;font-size:10px;color:var(--ink2);text-align:right;border-bottom:1px solid var(--border)">${hT(e.horas)}</td>${d.esAdmin?`<td style="padding:7px 10px;font-size:10px;color:var(--ink2);text-align:right;border-bottom:1px solid var(--border)">$${Math.round(e.costo).toLocaleString('es-MX')}</td>`:''}</tr>`).join('');
+
+  cont.innerHTML=`
+    <div class="card" style="padding:16px 18px;margin-bottom:16px">
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:2px"><span class="cod">${d.proy?.codigo||''}</span><span style="font-family:'Fraunces',serif;font-size:15px;color:var(--ink)">${d.proy?.nombre||''}</span></div>
+      <div style="font-size:10px;color:var(--ink3)">${d.proy?.cliente||''}${d.desde||d.hasta?` · ${d.desde?fF(d.desde):'inicio'} — ${d.hasta?fF(d.hasta):'hoy'}`:' · Histórico completo'}</div>
+    </div>
+    <div style="display:flex;gap:12px;margin-bottom:16px;flex-wrap:wrap">
+      <div class="card" style="flex:1;min-width:140px;padding:14px;text-align:center"><div style="font-size:9px;letter-spacing:.08em;text-transform:uppercase;color:var(--ink3);margin-bottom:6px">Entregables</div><div style="font-family:'Fraunces',serif;font-size:22px;color:var(--ink)">${d.pctAvance}%</div><div style="font-size:9px;color:var(--ink3)">${d.doneEnt} / ${d.totalEnt}</div></div>
+      <div class="card" style="flex:1;min-width:140px;padding:14px;text-align:center"><div style="font-size:9px;letter-spacing:.08em;text-transform:uppercase;color:var(--ink3);margin-bottom:6px">Horas registradas</div><div style="font-family:'Fraunces',serif;font-size:22px;color:var(--ink)">${hT(d.horasTotal)}</div></div>
+      ${d.esAdmin&&d.pctPresup!==null?`<div class="card" style="flex:1;min-width:140px;padding:14px;text-align:center"><div style="font-size:9px;letter-spacing:.08em;text-transform:uppercase;color:var(--ink3);margin-bottom:6px">Presupuesto consumido</div><div style="font-family:'Fraunces',serif;font-size:22px;color:var(--ink)">${d.pctPresup}%</div><div style="font-size:9px;color:var(--ink3)">$${Math.round(d.costoTotal).toLocaleString('es-MX')} / $${d.proy.presupuesto_total.toLocaleString('es-MX')}</div></div>`:''}
+    </div>
+    <div class="sec">Horas por colaborador</div>
+    <div class="card" style="padding:0;margin-bottom:16px;overflow:hidden"><table style="width:100%;border-collapse:collapse"><tbody>${colabRows||'<tr><td style="padding:10px;font-size:10px;color:var(--ink3)">Sin registros</td></tr>'}</tbody></table></div>
+    <div class="sec">Horas por etapa</div>
+    <div class="card" style="padding:0;margin-bottom:20px;overflow:hidden"><table style="width:100%;border-collapse:collapse"><tbody>${etapaRows||'<tr><td style="padding:10px;font-size:10px;color:var(--ink3)">Sin registros</td></tr>'}</tbody></table></div>
+    <button class="bsave" onclick="descargarExcelProyecto()">⬇ Descargar Excel</button>
+  `;
+}
+
+function descargarExcelProyecto(){
+  const d=_rpData;if(!d)return;
+  const wb=XLSX.utils.book_new();
+
+  const resumen=[
+    ['Reporte por Proyecto'],
+    ['Código',d.proy?.codigo||''],
+    ['Proyecto',d.proy?.nombre||''],
+    ['Cliente',d.proy?.cliente||''],
+    ['Periodo',d.desde||d.hasta?`${d.desde?fF(d.desde):'inicio'} - ${d.hasta?fF(d.hasta):'hoy'}`:'Histórico completo'],
+    [],
+    ['Entregables completados',d.doneEnt],
+    ['Entregables totales',d.totalEnt],
+    ['% avance',d.pctAvance+'%'],
+    ['Horas registradas',Math.round(d.horasTotal*100)/100],
+  ];
+  if(d.esAdmin){
+    resumen.push(['Presupuesto total',d.proy?.presupuesto_total||0]);
+    resumen.push(['Consumido ($)',Math.round(d.costoTotal)]);
+    if(d.pctPresup!==null)resumen.push(['% presupuesto consumido',d.pctPresup+'%']);
+  }
+  const wsResumen=XLSX.utils.aoa_to_sheet(resumen);
+  XLSX.utils.book_append_sheet(wb,wsResumen,'Resumen');
+
+  const colabHead=d.esAdmin?['Colaborador','Horas','Costo ($)']:['Colaborador','Horas'];
+  const colabRows=Object.values(d.horasPorColab).sort((a,b)=>b.horas-a.horas).map(c=>d.esAdmin?[c.nombre,Math.round(c.horas*100)/100,Math.round(c.costo)]:[c.nombre,Math.round(c.horas*100)/100]);
+  const wsColab=XLSX.utils.aoa_to_sheet([colabHead,...colabRows]);
+  XLSX.utils.book_append_sheet(wb,wsColab,'Horas por colaborador');
+
+  const etapaHead=d.esAdmin?['Etapa','Horas','Costo ($)']:['Etapa','Horas'];
+  const etapaRows=Object.entries(d.horasPorEtapa).sort((a,b)=>b[1].horas-a[1].horas).map(([et,e])=>d.esAdmin?[et==='_'?'—':et,Math.round(e.horas*100)/100,Math.round(e.costo)]:[et==='_'?'—':et,Math.round(e.horas*100)/100]);
+  const wsEtapa=XLSX.utils.aoa_to_sheet([etapaHead,...etapaRows]);
+  XLSX.utils.book_append_sheet(wb,wsEtapa,'Horas por etapa');
+
+  const entHead=['Etapa','Entregable','Estatus','Fecha','Responsable'];
+  const entRows=(d.ents||[]).map(e=>[e.etapa_clave==='_'||!e.etapa_clave?'—':e.etapa_clave,e.nombre,e.done?'Completado':'Pendiente',fF(e.fecha_unica||e.fecha_fin)||'',e.colaboradores?(e.colaboradores.nombre+' '+(e.colaboradores.apellido||'')):'']);
+  const wsEnt=XLSX.utils.aoa_to_sheet([entHead,...entRows]);
+  XLSX.utils.book_append_sheet(wb,wsEnt,'Entregables');
+
+  const fname=`Reporte_${(d.proy?.codigo||'proyecto')}_${new Date().toISOString().split('T')[0]}.xlsx`;
+  XLSX.writeFile(wb,fname);
 }
 
 // ── BUSCADOR GLOBAL ──
@@ -3150,7 +3565,8 @@ async function abrirNuevoEntregableColab(){
 async function toggleDoneColab(entId){
   const {data:e}=await sb.from('entregables').select('done').eq('id',entId).single();
   if(!e)return;
-  await sb.from('entregables').update({done:!e.done}).eq('id',entId);
+  const nuevoDone=!e.done;
+  await sb.from('entregables').update({done:nuevoDone,completado_en:nuevoDone?new Date().toISOString():null}).eq('id',entId);
   const ov=document.getElementById('ov-colab-tareas');
   await loadTareasColab(ov.dataset.colabId,ov.dataset.showDone==='1');
 }
@@ -3291,7 +3707,8 @@ let colabEditId=null,colSel='#2828b8',rolSel2='colaborador';
 function abrirNuevoColab(){
   colabEditId=null;rolSel2='colaborador';colSel=COLS[0];
   document.getElementById('cf-title2').textContent='Nuevo colaborador';
-  ['cf-nom','cf-ape','cf-email2','cf-tarifa2','cf-entrada'].forEach(id=>document.getElementById(id).value='');
+  ['cf-nom','cf-ape','cf-email2','cf-tarifa2','cf-entrada','cf-puesto'].forEach(id=>document.getElementById(id).value='');
+  document.getElementById('cf-metaprod').value=80;
   document.getElementById('cf-del').style.display='none';
   renderRoles2();renderColPicker2(colSel);document.getElementById('ov-colab2').classList.add('on');
 }
@@ -3302,6 +3719,8 @@ async function abrirEditColab(id){
   document.getElementById('cf-nom').value=c.nombre;document.getElementById('cf-ape').value=c.apellido||'';
   document.getElementById('cf-email2').value=c.email;document.getElementById('cf-tarifa2').value=c.tarifa;
   document.getElementById('cf-entrada').value=c.fecha_entrada||'';
+  document.getElementById('cf-puesto').value=c.puesto||'';
+  document.getElementById('cf-metaprod').value=c.meta_productivo_pct??80;
   document.getElementById('cf-del').style.display='block';
   renderRoles2();renderColPicker2(colSel);document.getElementById('ov-colab2').classList.add('on');
 }
@@ -3315,7 +3734,7 @@ async function guardarColab2(){
   const nom=document.getElementById('cf-nom').value.trim(),email=document.getElementById('cf-email2').value.trim(),tarifa=parseFloat(document.getElementById('cf-tarifa2').value)||0;
   if(!nom||!email||!tarifa){toast('Completa los campos obligatorios');return;}
   const btn=document.getElementById('cf-save');btn.disabled=true;btn.textContent='Guardando...';
-  const datos={nombre:nom,apellido:document.getElementById('cf-ape').value.trim(),email,tarifa,color:colSel,rol:rolSel2,fecha_entrada:document.getElementById('cf-entrada').value||null};
+  const datos={nombre:nom,apellido:document.getElementById('cf-ape').value.trim(),email,tarifa,color:colSel,rol:rolSel2,fecha_entrada:document.getElementById('cf-entrada').value||null,puesto:document.getElementById('cf-puesto').value.trim()||null,meta_productivo_pct:parseFloat(document.getElementById('cf-metaprod').value)||80};
   if(colabEditId){await sb.from('colaboradores').update(datos).eq('id',colabEditId);}
   else{const tempId=crypto.randomUUID();await sb.from('colaboradores').insert({id:tempId,...datos});toast('Colaborador agregado. Recuerda crear su usuario en Supabase Auth.');closeOv('ov-colab2');btn.disabled=false;btn.textContent='Guardar';await loadGColabs();return;}
   closeOv('ov-colab2');btn.disabled=false;btn.textContent='Guardar';await loadGColabs();toast('✓ Colaborador guardado');

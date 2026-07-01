@@ -2957,6 +2957,7 @@ function renderRepUI(){
     <div class="det-tabs" style="margin-top:0;margin-bottom:18px">
       <button class="det-tab ${repTab==='quincenal'?'on':''}" onclick="switchRepTab('quincenal',this)">Junta Quincenal</button>
       <button class="det-tab ${repTab==='proyecto'?'on':''}" onclick="switchRepTab('proyecto',this)">Reporte por Proyecto</button>
+      <button class="det-tab ${repTab==='mensual'?'on':''}" onclick="switchRepTab('mensual',this)">Reporte Mensual</button>
     </div>
     <div id="rep-body"></div>
   </div>`;
@@ -2970,7 +2971,8 @@ function switchRepTab(tab,btn){
 }
 function renderRepBody(){
   if(repTab==='quincenal')renderRepQuincenalUI();
-  else renderRepProyectoUI();
+  else if(repTab==='proyecto')renderRepProyectoUI();
+  else renderRepMensualUI();
 }
 
 // ── Junta Quincenal ──
@@ -3013,8 +3015,8 @@ async function genRepQuincenal(){
 
   const [{data:colab},{data:completadas},{data:pendientes},{data:regs},{data:vacs},{data:festivos}]=await Promise.all([
     sb.from('colaboradores').select('*').eq('id',colabId).single(),
-    sb.from('entregables').select('id,nombre,etapa_clave,proyecto_id,completado_en,proyectos(id,codigo,nombre)').eq('asignado_id',colabId).eq('eliminado',false).eq('done',true).gte('completado_en',desde+'T00:00:00').lte('completado_en',hasta+'T23:59:59'),
-    sb.from('entregables').select('id,nombre,etapa_clave,proyecto_id,fecha_unica,fecha_fin,proyectos(id,codigo,nombre)').eq('asignado_id',colabId).eq('eliminado',false).eq('done',false),
+    sb.from('entregables').select('id,nombre,etapa_clave,proyecto_id,completado_en,proyectos(id,codigo,nombre,tipo,presupuesto_total,gasto_previo)').eq('asignado_id',colabId).eq('eliminado',false).eq('done',true).gte('completado_en',desde+'T00:00:00').lte('completado_en',hasta+'T23:59:59'),
+    sb.from('entregables').select('id,nombre,etapa_clave,proyecto_id,fecha_unica,fecha_fin,proyectos(id,codigo,nombre,tipo,presupuesto_total,gasto_previo)').eq('asignado_id',colabId).eq('eliminado',false).eq('done',false),
     sb.from('registros_horas').select('horas,fecha,nota,proyecto_id,entregable_id,proyectos(id,codigo,nombre,tipo),entregables(nombre)').eq('colaborador_id',colabId).gte('fecha',desde).lte('fecha',hasta),
     sb.from('vacaciones').select('fecha_inicio,fecha_fin').eq('colaborador_id',colabId),
     sb.from('festivos').select('fecha')
@@ -3032,8 +3034,32 @@ async function genRepQuincenal(){
     if(!proyMap[pid])proyMap[pid]={proy:p,completadas:[],pendientes:[]};
     return proyMap[pid];
   }
-  (completadas||[]).forEach(e=>ensureProy(e.proyectos).completadas.push(e));
-  pend15.forEach(e=>ensureProy(e.proyectos).pendientes.push(e));
+  (completadas||[]).forEach(e=>{if(e.proyectos?.tipo!=='en_blanco')ensureProy(e.proyectos).completadas.push(e);});
+  pend15.forEach(e=>{if(e.proyectos?.tipo!=='en_blanco')ensureProy(e.proyectos).pendientes.push(e);});
+
+  const esAdmin=PERFIL?.rol==='admin';
+  const proyIds=Object.keys(proyMap).filter(pid=>pid!=='sin');
+  if(proyIds.length){
+    const [{data:entsGlobal},{data:regsGlobal}]=await Promise.all([
+      sb.from('entregables').select('proyecto_id,done').eq('eliminado',false).in('proyecto_id',proyIds),
+      esAdmin?sb.from('registros_horas').select('proyecto_id,horas,colaboradores(tarifa)').in('proyecto_id',proyIds):Promise.resolve({data:[]})
+    ]);
+    const entStats={};
+    (entsGlobal||[]).forEach(e=>{if(!entStats[e.proyecto_id])entStats[e.proyecto_id]={t:0,d:0};entStats[e.proyecto_id].t++;if(e.done)entStats[e.proyecto_id].d++;});
+    const consumoStats={};
+    (regsGlobal||[]).forEach(r=>{consumoStats[r.proyecto_id]=(consumoStats[r.proyecto_id]||0)+r.horas*(r.colaboradores?.tarifa||0);});
+    proyIds.forEach(pid=>{
+      const pd=proyMap[pid];
+      const es=entStats[pid]||{t:0,d:0};
+      pd.pctEntregables=es.t>0?Math.round(es.d/es.t*100):null;
+      pd.entDone=es.d;pd.entTotal=es.t;
+      const presupTotal=pd.proy?.presupuesto_total||0;
+      const gastoPrevio=pd.proy?.gasto_previo||0;
+      const consumo=(consumoStats[pid]||0)+gastoPrevio;
+      pd.pctPresupuesto=(esAdmin&&presupTotal>0)?Math.round(consumo/presupTotal*100):null;
+      pd.consumo=consumo;pd.presupTotal=presupTotal;
+    });
+  }
 
   let hTotal=0,hProd=0,hNoProd=0;
   const tareaHoras={};
@@ -3090,7 +3116,13 @@ function renderRepQuincenalResultado(){
         Object.entries(etapasPend).map(([et,arr])=>`<div style="margin-bottom:6px"><span class="ec" style="font-size:8px">${et==='_'?'—':et}</span> `+arr.map(e=>`<div style="font-size:11px;color:var(--ink2);padding:2px 0 2px 18px">○ ${e.nombre} <span style="color:var(--ink3);font-size:9px">${fF(e.fecha_unica||e.fecha_fin)||''}</span></div>`).join('')+`</div>`).join('')+`</div>`;
     }
     proyHtml+=`<div class="card" style="margin-bottom:12px;padding:14px 16px">
-      <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px"><span class="cod">${p?.codigo||''}</span><span style="font-size:13px;color:var(--ink)">${p?.nombre||'Sin proyecto'}</span></div>
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;flex-wrap:wrap">
+        <span class="cod">${p?.codigo||''}</span><span style="font-size:13px;color:var(--ink)">${p?.nombre||'Sin proyecto'}</span>
+      </div>
+      <div style="display:flex;gap:16px;flex-wrap:wrap;margin-bottom:10px">
+        ${pd.pctEntregables!==null?`<span style="font-size:10px;color:var(--ink3)">Entregables: <b style="color:var(--ink2)">${pd.pctEntregables}%</b> (${pd.entDone}/${pd.entTotal})</span>`:''}
+        ${pd.pctPresupuesto!==null?`<span style="font-size:10px;color:var(--ink3)">Presupuesto: <b style="color:var(--ink2)">${pd.pctPresupuesto}%</b> ($${Math.round(pd.consumo).toLocaleString('es-MX')} / $${pd.presupTotal.toLocaleString('es-MX')})</span>`:''}
+      </div>
       ${bloqueComp}${bloquePend}
       <div class="fl" style="margin-top:8px;margin-bottom:0"><label>Comentarios</label><textarea id="rq-com-${pid}" rows="2" placeholder="Notas de la junta sobre este proyecto..."></textarea></div>
     </div>`;
@@ -3188,6 +3220,10 @@ function generarPDFQuincenal(){
   proyEntries.forEach(([pid,pd])=>{
     const pr=pd.proy;
     p(`${pr?.codigo?pr.codigo+' — ':''}${pr?.nombre||'Sin proyecto'}`,{bold:true,size:10.5,color:[20,20,20]});
+    const metricas=[];
+    if(pd.pctEntregables!==null)metricas.push(`Entregables: ${pd.pctEntregables}% (${pd.entDone}/${pd.entTotal})`);
+    if(pd.pctPresupuesto!==null)metricas.push(`Presupuesto: ${pd.pctPresupuesto}% ($${Math.round(pd.consumo).toLocaleString('es-MX')} / $${pd.presupTotal.toLocaleString('es-MX')})`);
+    if(metricas.length)p(metricas.join('   ·   '),{size:8.5,color:[120,120,120],indent:8});
     if(pd.completadas.length){
       p('Completadas en el periodo:',{bold:true,size:9,color:[100,100,100],indent:8});
       pd.completadas.forEach(e=>p(`✓ ${e.nombre}`,{indent:16}));
@@ -3315,9 +3351,11 @@ async function genRepProyecto(){
   });
 
   const presupTotal=proy?.presupuesto_total||0;
-  const pctPresup=(esAdmin&&presupTotal>0&&proy?.tipo!=='en_blanco')?Math.round(costoTotal/presupTotal*100):null;
+  const gastoPrevio=proy?.gasto_previo||0;
+  const costoConGasto=costoTotal+gastoPrevio;
+  const pctPresup=(esAdmin&&presupTotal>0&&proy?.tipo!=='en_blanco')?Math.round(costoConGasto/presupTotal*100):null;
 
-  _rpData={proy,ents,regs,horasPorColab,horasPorEtapa,horasTotal,costoTotal,totalEnt,doneEnt,pctAvance,pctPresup,esAdmin,desde,hasta};
+  _rpData={proy,ents,regs,horasPorColab,horasPorEtapa,horasTotal,costoTotal:costoConGasto,gastoPrevio,totalEnt,doneEnt,pctAvance,pctPresup,esAdmin,desde,hasta};
   renderRepProyectoResultado();
 }
 
@@ -3364,7 +3402,8 @@ function descargarExcelProyecto(){
   ];
   if(d.esAdmin){
     resumen.push(['Presupuesto total',d.proy?.presupuesto_total||0]);
-    resumen.push(['Consumido ($)',Math.round(d.costoTotal)]);
+    resumen.push(['Gasto previo ($)',Math.round(d.gastoPrevio||0)]);
+    resumen.push(['Consumido total ($)',Math.round(d.costoTotal)]);
     if(d.pctPresup!==null)resumen.push(['% presupuesto consumido',d.pctPresup+'%']);
   }
   const wsResumen=XLSX.utils.aoa_to_sheet(resumen);
@@ -3386,6 +3425,134 @@ function descargarExcelProyecto(){
   XLSX.utils.book_append_sheet(wb,wsEnt,'Entregables');
 
   const fname=`Reporte_${(d.proy?.codigo||'proyecto')}_${new Date().toISOString().split('T')[0]}.xlsx`;
+  XLSX.writeFile(wb,fname);
+}
+
+// ── Reporte Mensual ──
+function primerDiaMes(){const d=new Date();return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-01`;}
+function ultimoDiaMes(){const d=new Date();const u=new Date(d.getFullYear(),d.getMonth()+1,0);return fechaAStr(u);}
+
+async function renderRepMensualUI(){
+  const body=document.getElementById('rep-body');
+  body.innerHTML=`
+    <div class="card" style="padding:18px;margin-bottom:16px">
+      <div style="display:flex;gap:12px;margin-bottom:14px">
+        <div style="flex:1"><div style="font-size:9px;letter-spacing:.1em;text-transform:uppercase;color:var(--ink3);margin-bottom:5px">Desde</div><input type="date" id="rm-desde" value="${primerDiaMes()}"></div>
+        <div style="flex:1"><div style="font-size:9px;letter-spacing:.1em;text-transform:uppercase;color:var(--ink3);margin-bottom:5px">Hasta</div><input type="date" id="rm-hasta" value="${ultimoDiaMes()}"></div>
+      </div>
+      <button class="bsave" style="margin-top:0" onclick="genRepMensual()">Generar reporte</button>
+    </div>
+    <div id="rm-res"></div>`;
+}
+
+let _rmData=null;
+async function genRepMensual(){
+  const desde=document.getElementById('rm-desde').value;
+  const hasta=document.getElementById('rm-hasta').value;
+  if(!desde||!hasta){toast('Selecciona el período');return;}
+  const cont=document.getElementById('rm-res');cont.innerHTML=`<div class="ldg">Generando...</div>`;
+
+  const [{data:colabs},{data:vacs},{data:festivos},{data:regs}]=await Promise.all([
+    sb.from('colaboradores').select('id,nombre,apellido,color').order('nombre'),
+    sb.from('vacaciones').select('colaborador_id,fecha_inicio,fecha_fin'),
+    sb.from('festivos').select('fecha'),
+    sb.from('registros_horas').select('horas,colaborador_id,proyecto_id,proyectos(tipo),colaboradores(nombre,apellido)').gte('fecha',desde).lte('fecha',hasta)
+  ]);
+
+  const festSet=new Set((festivos||[]).map(f=>f.fecha));
+  const diasHabBase=diasHabilesRango(desde,hasta,festSet);
+
+  const vacPorColab={};
+  (vacs||[]).forEach(v=>{
+    const ini2=v.fecha_inicio>desde?v.fecha_inicio:desde;
+    const fin2=v.fecha_fin<hasta?v.fecha_fin:hasta;
+    if(ini2<=fin2){
+      const dv=diasHabilesRango(ini2,fin2,festSet);
+      vacPorColab[v.colaborador_id]=(vacPorColab[v.colaborador_id]||0)+dv;
+    }
+  });
+
+  let horasHabilesTotal=0;
+  const detColab={};
+  (colabs||[]).forEach(c=>{
+    const diasVac=vacPorColab[c.id]||0;
+    const diasTrab=Math.max(0,diasHabBase-diasVac);
+    const hHab=diasTrab*8;
+    horasHabilesTotal+=hHab;
+    detColab[c.id]={col:c,horasHabiles:hHab,horas:0,facturable:0,noFacturable:0};
+  });
+
+  let horasTotal=0,horasFact=0,horasNoFact=0;
+  (regs||[]).forEach(r=>{
+    horasTotal+=r.horas;
+    const esFact=r.proyectos?.tipo!=='en_blanco';
+    if(esFact)horasFact+=r.horas;else horasNoFact+=r.horas;
+    if(!detColab[r.colaborador_id])detColab[r.colaborador_id]={col:r.colaboradores,horasHabiles:0,horas:0,facturable:0,noFacturable:0};
+    detColab[r.colaborador_id].horas+=r.horas;
+    if(esFact)detColab[r.colaborador_id].facturable+=r.horas;else detColab[r.colaborador_id].noFacturable+=r.horas;
+  });
+
+  const pctRegistro=horasHabilesTotal>0?Math.round(horasTotal/horasHabilesTotal*1000)/10:0;
+  const pctFact=horasTotal>0?Math.round(horasFact/horasTotal*1000)/10:0;
+  const pctNoFact=horasTotal>0?Math.round(horasNoFact/horasTotal*1000)/10:0;
+
+  _rmData={desde,hasta,diasHabBase,horasHabilesTotal,horasTotal,horasFact,horasNoFact,pctRegistro,pctFact,pctNoFact,detColab};
+  renderRepMensualResultado();
+}
+
+function renderRepMensualResultado(){
+  const d=_rmData;const cont=document.getElementById('rm-res');if(!d)return;
+  const filas=Object.values(d.detColab).filter(c=>c.col).sort((a,b)=>b.horas-a.horas).map(c=>{
+    const pctF=c.horas>0?Math.round(c.facturable/c.horas*1000)/10:0;
+    return `<tr><td style="padding:7px 10px;font-size:10px;color:var(--ink);border-bottom:1px solid var(--border)">${c.col.nombre} ${c.col.apellido||''}</td><td style="padding:7px 10px;font-size:10px;color:var(--ink2);text-align:right;border-bottom:1px solid var(--border)">${hT(c.horas)}</td><td style="padding:7px 10px;font-size:10px;color:var(--ink2);text-align:right;border-bottom:1px solid var(--border)">${hT(c.facturable)}</td><td style="padding:7px 10px;font-size:10px;color:var(--ink2);text-align:right;border-bottom:1px solid var(--border)">${hT(c.noFacturable)}</td><td style="padding:7px 10px;font-size:10px;color:var(--ink3);text-align:right;border-bottom:1px solid var(--border)">${pctF}%</td></tr>`;
+  }).join('');
+
+  cont.innerHTML=`
+    <div class="card" style="padding:16px 18px;margin-bottom:16px">
+      <div style="font-family:'Fraunces',serif;font-size:16px;color:var(--ink)">Reporte Mensual — Todo el despacho</div>
+      <div style="font-size:10px;color:var(--ink3)">${fF(d.desde)} — ${fF(d.hasta)}</div>
+    </div>
+    <div style="display:flex;gap:12px;margin-bottom:16px;flex-wrap:wrap">
+      <div class="card" style="flex:1;min-width:150px;padding:14px;text-align:center"><div style="font-size:9px;letter-spacing:.08em;text-transform:uppercase;color:var(--ink3);margin-bottom:6px">Horas hábiles del periodo</div><div style="font-family:'Fraunces',serif;font-size:20px;color:var(--ink)">${hT(d.horasHabilesTotal)}</div><div style="font-size:9px;color:var(--ink3)">${d.diasHabBase} días hábiles</div></div>
+      <div class="card" style="flex:1;min-width:150px;padding:14px;text-align:center"><div style="font-size:9px;letter-spacing:.08em;text-transform:uppercase;color:var(--ink3);margin-bottom:6px">Horas registradas</div><div style="font-family:'Fraunces',serif;font-size:20px;color:var(--ink)">${hT(d.horasTotal)}</div><div style="font-size:9px;color:${d.pctRegistro>=100?'var(--green)':'var(--amber)'}">${d.pctRegistro}% de lo hábil</div></div>
+      <div class="card" style="flex:1;min-width:150px;padding:14px;text-align:center"><div style="font-size:9px;letter-spacing:.08em;text-transform:uppercase;color:var(--ink3);margin-bottom:6px">Facturables</div><div style="font-family:'Fraunces',serif;font-size:20px;color:var(--ink)">${hT(d.horasFact)}</div><div style="font-size:9px;color:var(--ink3)">${d.pctFact}%</div></div>
+      <div class="card" style="flex:1;min-width:150px;padding:14px;text-align:center"><div style="font-size:9px;letter-spacing:.08em;text-transform:uppercase;color:var(--ink3);margin-bottom:6px">No facturables</div><div style="font-family:'Fraunces',serif;font-size:20px;color:var(--ink)">${hT(d.horasNoFact)}</div><div style="font-size:9px;color:var(--ink3)">${d.pctNoFact}%</div></div>
+    </div>
+    <div class="sec">Desglose por colaborador</div>
+    <div class="card" style="padding:0;margin-bottom:20px;overflow:hidden">
+      <table style="width:100%;border-collapse:collapse">
+        <thead><tr><th style="padding:7px 10px;font-size:9px;text-align:left;color:var(--ink3);text-transform:uppercase;letter-spacing:.06em;border-bottom:1px solid var(--border)">Colaborador</th><th style="padding:7px 10px;font-size:9px;text-align:right;color:var(--ink3);text-transform:uppercase;letter-spacing:.06em;border-bottom:1px solid var(--border)">Horas</th><th style="padding:7px 10px;font-size:9px;text-align:right;color:var(--ink3);text-transform:uppercase;letter-spacing:.06em;border-bottom:1px solid var(--border)">Facturable</th><th style="padding:7px 10px;font-size:9px;text-align:right;color:var(--ink3);text-transform:uppercase;letter-spacing:.06em;border-bottom:1px solid var(--border)">No factur.</th><th style="padding:7px 10px;font-size:9px;text-align:right;color:var(--ink3);text-transform:uppercase;letter-spacing:.06em;border-bottom:1px solid var(--border)">%</th></tr></thead>
+        <tbody>${filas||'<tr><td style="padding:10px;font-size:10px;color:var(--ink3)">Sin registros</td></tr>'}</tbody>
+      </table>
+    </div>
+    <button class="bsave" onclick="descargarExcelMensual()">⬇ Descargar Excel</button>
+  `;
+}
+
+function descargarExcelMensual(){
+  const d=_rmData;if(!d)return;
+  const wb=XLSX.utils.book_new();
+  const resumen=[
+    ['Reporte Mensual — Todo el despacho'],
+    ['Periodo',`${fF(d.desde)} - ${fF(d.hasta)}`],
+    [],
+    ['Días hábiles del periodo',d.diasHabBase],
+    ['Horas hábiles del periodo',Math.round(d.horasHabilesTotal*100)/100],
+    ['Horas registradas totales',Math.round(d.horasTotal*100)/100],
+    ['% de registro',d.pctRegistro+'%'],
+    ['Horas facturables',Math.round(d.horasFact*100)/100],
+    ['% facturable',d.pctFact+'%'],
+    ['Horas no facturables',Math.round(d.horasNoFact*100)/100],
+    ['% no facturable',d.pctNoFact+'%'],
+  ];
+  const wsResumen=XLSX.utils.aoa_to_sheet(resumen);
+  XLSX.utils.book_append_sheet(wb,wsResumen,'Resumen');
+
+  const colabRows=Object.values(d.detColab).filter(c=>c.col).sort((a,b)=>b.horas-a.horas).map(c=>[c.col.nombre+' '+(c.col.apellido||''),Math.round(c.horas*100)/100,Math.round(c.facturable*100)/100,Math.round(c.noFacturable*100)/100,c.horas>0?Math.round(c.facturable/c.horas*1000)/10+'%':'0%']);
+  const wsColab=XLSX.utils.aoa_to_sheet([['Colaborador','Horas','Facturable','No facturable','% facturable'],...colabRows]);
+  XLSX.utils.book_append_sheet(wb,wsColab,'Por colaborador');
+
+  const fname=`Reporte_Mensual_${d.desde}_${d.hasta}.xlsx`;
   XLSX.writeFile(wb,fname);
 }
 

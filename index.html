@@ -3066,8 +3066,9 @@ async function genRepQuincenal(){
   (regs||[]).forEach(r=>{
     hTotal+=r.horas;
     if(r.proyectos?.tipo==='en_blanco')hNoProd+=r.horas;else hProd+=r.horas;
-    const k=r.entregable_id||('nota:'+(r.nota||'sin_tarea'));
-    if(!tareaHoras[k])tareaHoras[k]={nombre:r.entregables?.nombre||r.nota||'(sin tarea)',horas:0,notas:new Set()};
+    const nombreTarea=(r.entregables?.nombre||r.nota||'(sin tarea)').trim();
+    const k=(r.proyecto_id||'sin')+'||'+nombreTarea.toLowerCase();
+    if(!tareaHoras[k])tareaHoras[k]={nombre:nombreTarea,horas:0,notas:new Set()};
     tareaHoras[k].horas+=r.horas;
     if(r.nota&&r.nota!=='(timer)')tareaHoras[k].notas.add(r.nota);
   });
@@ -3121,7 +3122,7 @@ function renderRepQuincenalResultado(){
       </div>
       <div style="display:flex;gap:16px;flex-wrap:wrap;margin-bottom:10px">
         ${pd.pctEntregables!==null?`<span style="font-size:10px;color:var(--ink3)">Entregables: <b style="color:var(--ink2)">${pd.pctEntregables}%</b> (${pd.entDone}/${pd.entTotal})</span>`:''}
-        ${pd.pctPresupuesto!==null?`<span style="font-size:10px;color:var(--ink3)">Presupuesto: <b style="color:var(--ink2)">${pd.pctPresupuesto}%</b> ($${Math.round(pd.consumo).toLocaleString('es-MX')} / $${pd.presupTotal.toLocaleString('es-MX')})</span>`:''}
+        ${pd.pctPresupuesto!==null?`<span style="font-size:10px;color:var(--ink3)">Presupuesto: <b style="color:var(--ink2)">${pd.pctPresupuesto}%</b></span>`:''}
       </div>
       ${bloqueComp}${bloquePend}
       <div class="fl" style="margin-top:8px;margin-bottom:0"><label>Comentarios</label><textarea id="rq-com-${pid}" rows="2" placeholder="Notas de la junta sobre este proyecto..."></textarea></div>
@@ -3222,7 +3223,7 @@ function generarPDFQuincenal(){
     p(`${pr?.codigo?pr.codigo+' — ':''}${pr?.nombre||'Sin proyecto'}`,{bold:true,size:10.5,color:[20,20,20]});
     const metricas=[];
     if(pd.pctEntregables!==null)metricas.push(`Entregables: ${pd.pctEntregables}% (${pd.entDone}/${pd.entTotal})`);
-    if(pd.pctPresupuesto!==null)metricas.push(`Presupuesto: ${pd.pctPresupuesto}% ($${Math.round(pd.consumo).toLocaleString('es-MX')} / $${pd.presupTotal.toLocaleString('es-MX')})`);
+    if(pd.pctPresupuesto!==null)metricas.push(`Presupuesto: ${pd.pctPresupuesto}%`);
     if(metricas.length)p(metricas.join('   ·   '),{size:8.5,color:[120,120,120],indent:8});
     if(pd.completadas.length){
       p('Completadas en el periodo:',{bold:true,size:9,color:[100,100,100],indent:8});

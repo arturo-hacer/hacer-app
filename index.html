@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>hacer: v41</title>
+<title>hacer: v49</title>
 <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><text x='1' y='26' font-family='Arial,Helvetica,sans-serif' font-size='26' font-weight='700' fill='%231c1b17'>h:</text></svg>">
 <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Fraunces:ital,opsz,wght@0,9..144,300;0,9..144,400;1,9..144,300&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
@@ -4626,14 +4626,20 @@ async function insertarRegsVac(colabId,iniStr,finStr,proyId,entId){
     if(dow!==0&&dow!==6&&!_vacFestivosSet.has(iso))regs.push({colaborador_id:colabId,proyecto_id:proyId,entregable_id:entId,etapa_clave:'_',horas:8,fecha:iso,nota:'Vacaciones'});
     d.setDate(d.getDate()+1);
   }
-  if(regs.length)await sb.from('registros_horas').insert(regs);
+  if(regs.length){
+    const{error}=await sb.from('registros_horas').insert(regs);
+    if(error)throw new Error('No se pudieron crear los registros de horas ('+error.message+')');
+  }
 }
 
 async function borrarRegsVac(colabId,iniStr,finStr,proyId){
   const fechas=[];
   let d=new Date(iniStr+' 12:00'),fin=new Date(finStr+' 12:00');
   while(d<=fin){fechas.push(d.toISOString().split('T')[0]);d.setDate(d.getDate()+1);}
-  if(fechas.length)await sb.from('registros_horas').delete().eq('colaborador_id',colabId).eq('proyecto_id',proyId).in('fecha',fechas);
+  if(fechas.length){
+    const{error}=await sb.from('registros_horas').delete().eq('colaborador_id',colabId).eq('proyecto_id',proyId).in('fecha',fechas);
+    if(error)throw new Error('No se pudieron borrar los registros de horas anteriores ('+error.message+')');
+  }
 }
 
 function abrirModalFestivo(){

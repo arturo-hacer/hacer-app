@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>hacer: v50</title>
+<title>hacer: v51</title>
 <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><text x='1' y='26' font-family='Arial,Helvetica,sans-serif' font-size='26' font-weight='700' fill='%231c1b17'>h:</text></svg>">
 <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Fraunces:ital,opsz,wght@0,9..144,300;0,9..144,400;1,9..144,300&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
@@ -949,7 +949,7 @@ function showApp(){
   setupApp();
 }
 async function loadPerfil(){
-  const {data}=await sb.from('colaboradores').select('*').eq('id',USER.id).single();
+  const {data}=await sb.from('colaboradores_seguro').select('*').eq('id',USER.id).single();
   PERFIL=data;
 }
 async function loginGoogle(){
@@ -1528,14 +1528,14 @@ async function renderDashboard(){
   const hoyStr=diaAct,diasSem=semana(),finSem=diasSem[diasSem.length-1];
 
   const regsPresupQ=esAdmin
-    ?sb.from('registros_horas').select('proyecto_id,horas,colaboradores(tarifa)')
+    ?sb.rpc('fn_consumo_proyectos')
     :Promise.resolve({data:[]});
 
   const[{data:colabs},{data:regsSem},{data:entsAll},{data:proys},{data:regsPresup},{data:ptags}]=await Promise.all([
-    sb.from('colaboradores').select('*').order('nombre'),
+    sb.from('colaboradores_seguro').select('*').order('nombre'),
     sb.from('registros_horas').select('colaborador_id,horas,fecha,proyecto_id,entregables(nombre)').in('fecha',diasSem),
     sb.from('entregables').select('id,nombre,done,eliminado,fecha_unica,fecha_fin,proyecto_id,asignado_id,etapa_clave').eq('eliminado',false),
-    sb.from('proyectos').select('id,codigo,nombre,cliente,tipo,presupuesto_total').order('codigo'),
+    sb.from('proyectos_seguro').select('id,codigo,nombre,cliente,tipo,presupuesto_total').order('codigo'),
     regsPresupQ,
     sb.from('proyecto_tags').select('proyecto_id,tags(nombre)')
   ]);
@@ -1568,7 +1568,7 @@ async function renderDashboard(){
     }
   });
   const hrsSemProy={};(regsSem||[]).forEach(r=>{if(!hrsSemProy[r.proyecto_id])hrsSemProy[r.proyecto_id]=0;hrsSemProy[r.proyecto_id]+=r.horas;});
-  const consumoProy={};(regsPresup||[]).forEach(r=>{if(!consumoProy[r.proyecto_id])consumoProy[r.proyecto_id]=0;consumoProy[r.proyecto_id]+=(r.horas*(r.colaboradores?.tarifa||0));});
+  const consumoProy={};(regsPresup||[]).forEach(r=>{consumoProy[r.proyecto_id]=r.costo||0;});
 
   // Cache para toggles
   _dashData={diasSem,hoyStr,colabs,regsPorColabDia,hrsSemColab,hrsTodayColab,proys,epMap,consumoProy,hrsSemProy,entsRetrasadas,entsSemMap,entsSemPendientes,archivadosIds,esAdmin};
@@ -1788,7 +1788,7 @@ async function renderProy(){
   const cont=document.getElementById('pane-proyectos');
   cont.innerHTML=`<div class="ldg">Cargando...</div>`;
   const esAdmin=PERFIL?.rol==='admin';
-  let q=sb.from('proyectos').select('*').order('codigo');
+  let q=sb.from('proyectos_seguro').select('*').order('codigo');
   if(!esAdmin){
     const {data:acceso}=await sb.from('proyecto_colaboradores').select('proyecto_id').eq('colaborador_id',USER.id);
     const ids=(acceso||[]).map(a=>a.proyecto_id);
@@ -1809,8 +1809,8 @@ async function renderProy(){
   const {data:es}=await sb.from('entregables').select('proyecto_id,done,eliminado');
   const ep={};(es||[]).forEach(e=>{if(!ep[e.proyecto_id])ep[e.proyecto_id]={t:0,d:0};if(!e.eliminado){ep[e.proyecto_id].t++;if(e.done)ep[e.proyecto_id].d++;}});
 
-  const {data:regs}=await sb.from('registros_horas').select('proyecto_id,horas,colaboradores(tarifa)').in('proyecto_id',proyIds.length?proyIds:['_']);
-  const consumo={};(regs||[]).forEach(r=>{if(!consumo[r.proyecto_id])consumo[r.proyecto_id]=0;consumo[r.proyecto_id]+=(r.horas*(r.colaboradores?.tarifa||0));});
+  const {data:consumoRows}=proyIds.length?await sb.rpc('fn_consumo_proyectos',{p_proyecto_ids:proyIds}):{data:[]};
+  const consumo={};(consumoRows||[]).forEach(r=>{consumo[r.proyecto_id]=r.costo||0;});
 
   _proyData={ps:psVisibles,ep,consumo,archivadosIds,facturablesIds,noFacIds,esAdmin};
   renderProyTabla();
@@ -1900,7 +1900,7 @@ function switchDetProy(tab,btn){
 }
 async function abrirDetalleProy(proyId){
   proyDetalleId=proyId;detProyTab='entregables';
-  const {data:p}=await sb.from('proyectos').select('*').eq('id',proyId).single();
+  const {data:p}=await sb.from('proyectos_seguro').select('*').eq('id',proyId).single();
   proyDetalleTipo=p?.tipo||'productivo';
   document.getElementById('det-proy-title').textContent=p.nombre;
   document.getElementById('det-proy-sub').textContent=`${p.codigo}${p.cliente?' · '+p.cliente:''}${proyDetalleTipo==='en_blanco'?' · en blanco':''}`;
@@ -1986,17 +1986,20 @@ async function renderReporteDetalle(){
   const esAdmin=PERFIL?.rol==='admin';
   const esBlanco=proyDetalleTipo==='en_blanco';
 
-  const [{data:ents},{data:presupEtapas},{data:regs},{data:proyData}]=await Promise.all([
+  const [{data:ents},{data:presupEtapas},{data:regs},{data:proyData},{data:pctColab}]=await Promise.all([
     sb.from('entregables').select('etapa_clave,done,eliminado').eq('proyecto_id',proyDetalleId).eq('eliminado',false),
     sb.from('presupuesto_etapas').select('etapa_clave,monto').eq('proyecto_id',proyDetalleId),
     // Solo admins calculan consumo en $; colaboradores no tienen acceso a tarifa
     esAdmin
-      ? sb.from('registros_horas').select('horas,etapa_clave,colaboradores(tarifa)').eq('proyecto_id',proyDetalleId)
+      ? sb.rpc('fn_costo_proyecto_detalle',{p_proyecto_id:proyDetalleId})
       : Promise.resolve({data:[]}),
-    sb.from('proyectos').select('presupuesto_total,gasto_previo,etapas_activas').eq('id',proyDetalleId).single()
+    sb.from('proyectos_seguro').select('presupuesto_total,gasto_previo,etapas_activas,tiene_presupuesto').eq('id',proyDetalleId).single(),
+    // Colaboradores: % consumido sin pesos, calculado en el servidor
+    esAdmin ? Promise.resolve({data:null}) : sb.rpc('fn_pct_presupuesto_proyecto',{p_proyecto_id:proyDetalleId})
   ]);
   const presupTotal=proyData?.presupuesto_total||0;
   const gastoPrevio=proyData?.gasto_previo||0;
+  const tienePresupuesto=!!proyData?.tiene_presupuesto;
 
   // ── Avance entregables por etapa ──
   const avEtapa={};
@@ -2012,24 +2015,25 @@ async function renderReporteDetalle(){
   // ── Presupuesto por etapa ──
   // Si RLS bloquea presupuesto_etapas para colaboradores, construir distribución
   // uniforme a partir de etapas_activas del proyecto como fallback.
+  // Nota: la distribución por etapa (donut) ahora es solo-admin, ver
+  // más abajo — así que este fallback uniforme ya no aplica a colaboradores.
   let montoEtapa={};
-  if(presupEtapas&&presupEtapas.length){
+  if(esAdmin&&presupEtapas&&presupEtapas.length){
     presupEtapas.forEach(r=>montoEtapa[r.etapa_clave]=r.monto);
-  } else if(!esAdmin&&presupTotal>0&&proyData?.etapas_activas?.length){
-    // Fallback: distribución uniforme — muestra proporciones aunque no exactas
+  } else if(esAdmin&&presupTotal>0&&proyData?.etapas_activas?.length){
     const etActivas=proyData.etapas_activas;
     const montoPorEtapa=Math.round(presupTotal/etActivas.length);
     etActivas.forEach(k=>montoEtapa[k]=montoPorEtapa);
   }
 
   const consumoEtapa={};
-  (regs||[]).forEach(r=>{
-    const k=r.etapa_clave||'_';
-    if(!consumoEtapa[k])consumoEtapa[k]=0;
-    consumoEtapa[k]+=(r.horas*(r.colaboradores?.tarifa||0));
+  (regs||[]).filter(r=>r.agrupador==='etapa').forEach(r=>{
+    consumoEtapa[r.clave||'_']=r.costo||0;
   });
-  const consumoTotal=Object.values(consumoEtapa).reduce((s,v)=>s+v,0)+gastoPrevio;
-  const pctConsumido=presupTotal>0?Math.min(100,Math.round(consumoTotal/presupTotal*100)):0;
+  const consumoTotal=esAdmin?(Object.values(consumoEtapa).reduce((s,v)=>s+v,0)+gastoPrevio):0;
+  const pctConsumido=esAdmin
+    ?(presupTotal>0?Math.min(100,Math.round(consumoTotal/presupTotal*100)):0)
+    :(pctColab==null?0:Math.min(100,pctColab));
 
   const COLORES_ET={DE:'#7b9ec0',SD:'#9e7bc0',DD:'#7bc09e',CD:'#c0a77b',PC:'#c07b9e','_':'#8a8ae5'};
   const etapasOrden=esBlanco?['_']:['DE','SD','DD','CD','PC'];
@@ -2060,7 +2064,7 @@ async function renderReporteDetalle(){
   let html=`<div style="padding:20px 20px 0">`;
 
   // Tarjeta resumen global
-  html+=`<div style="display:grid;grid-template-columns:${!esBlanco&&presupTotal>0?'1fr 1fr':'1fr'};gap:12px;margin-bottom:20px">`;
+  html+=`<div style="display:grid;grid-template-columns:${!esBlanco&&tienePresupuesto?'1fr 1fr':'1fr'};gap:12px;margin-bottom:20px">`;
 
   // Card avance global
   html+=`<div style="background:#fff;border:1.5px solid var(--border);border-radius:10px;padding:16px 18px">
@@ -2079,7 +2083,7 @@ async function renderReporteDetalle(){
   </div>`;
 
   // Card presupuesto (solo productivo + admin o % para colab)
-  if(!esBlanco&&presupTotal>0){
+  if(!esBlanco&&tienePresupuesto){
     const colorPres=pctConsumido>=90?'var(--rose)':pctConsumido>=70?'var(--amber)':'var(--green)';
     const libre=Math.max(0,presupTotal-consumoTotal);
     html+=`<div style="background:#fff;border:1.5px solid var(--border);border-radius:10px;padding:16px 18px">
@@ -2128,8 +2132,8 @@ async function renderReporteDetalle(){
     html+=`</div>`;
   }
 
-  // ── Distribución presupuesto por etapa (productivo con presupuesto, todos los roles) ──
-  if(!esBlanco&&presupTotal>0&&Object.keys(montoEtapa).length){
+  // ── Distribución presupuesto por etapa (solo admin: requiere montos en pesos) ──
+  if(esAdmin&&!esBlanco&&presupTotal>0&&Object.keys(montoEtapa).length){
     // Construir slices para el donut de presupuesto
     const slicesPresup=[];
     etapasOrden.forEach(k=>{
@@ -3062,9 +3066,9 @@ async function genRepQuincenal(){
   cont.innerHTML=`<div class="ldg">Generando minuta...</div>`;
 
   const [{data:colab},{data:completadas},{data:pendientes},{data:regs},{data:vacs},{data:festivos},{data:proyObjInd}]=await Promise.all([
-    sb.from('colaboradores').select('*').eq('id',colabId).single(),
-    sb.from('entregables').select('id,nombre,etapa_clave,proyecto_id,completado_en,proyectos(id,codigo,nombre,tipo,presupuesto_total,gasto_previo)').eq('asignado_id',colabId).eq('eliminado',false).eq('done',true).gte('completado_en',desde+'T00:00:00').lte('completado_en',hasta+'T23:59:59'),
-    sb.from('entregables').select('id,nombre,etapa_clave,proyecto_id,fecha_unica,fecha_fin,proyectos(id,codigo,nombre,tipo,presupuesto_total,gasto_previo)').eq('asignado_id',colabId).eq('eliminado',false).eq('done',false),
+    sb.from('colaboradores_seguro').select('*').eq('id',colabId).single(),
+    sb.from('entregables').select('id,nombre,etapa_clave,proyecto_id,completado_en,proyectos(id,codigo,nombre,tipo)').eq('asignado_id',colabId).eq('eliminado',false).eq('done',true).gte('completado_en',desde+'T00:00:00').lte('completado_en',hasta+'T23:59:59'),
+    sb.from('entregables').select('id,nombre,etapa_clave,proyecto_id,fecha_unica,fecha_fin,proyectos(id,codigo,nombre,tipo)').eq('asignado_id',colabId).eq('eliminado',false).eq('done',false),
     sb.from('registros_horas').select('horas,fecha,nota,proyecto_id,entregable_id,proyectos(id,codigo,nombre,tipo),entregables(nombre)').eq('colaborador_id',colabId).gte('fecha',desde).lte('fecha',hasta),
     sb.from('vacaciones').select('fecha_inicio,fecha_fin').eq('colaborador_id',colabId),
     sb.from('festivos').select('fecha'),
@@ -3089,21 +3093,24 @@ async function genRepQuincenal(){
   const esAdmin=PERFIL?.rol==='admin';
   const proyIds=Object.keys(proyMap).filter(pid=>pid!=='sin');
   if(proyIds.length){
-    const [{data:entsGlobal},{data:regsGlobal}]=await Promise.all([
+    const [{data:entsGlobal},{data:regsGlobal},{data:presupPorProy}]=await Promise.all([
       sb.from('entregables').select('proyecto_id,done').eq('eliminado',false).in('proyecto_id',proyIds),
-      esAdmin?sb.from('registros_horas').select('proyecto_id,horas,colaboradores(tarifa)').in('proyecto_id',proyIds):Promise.resolve({data:[]})
+      esAdmin?sb.rpc('fn_consumo_proyectos',{p_proyecto_ids:proyIds}):Promise.resolve({data:[]}),
+      esAdmin?sb.from('proyectos_seguro').select('id,presupuesto_total,gasto_previo').in('id',proyIds):Promise.resolve({data:[]})
     ]);
     const entStats={};
     (entsGlobal||[]).forEach(e=>{if(!entStats[e.proyecto_id])entStats[e.proyecto_id]={t:0,d:0};entStats[e.proyecto_id].t++;if(e.done)entStats[e.proyecto_id].d++;});
     const consumoStats={};
-    (regsGlobal||[]).forEach(r=>{consumoStats[r.proyecto_id]=(consumoStats[r.proyecto_id]||0)+r.horas*(r.colaboradores?.tarifa||0);});
+    (regsGlobal||[]).forEach(r=>{consumoStats[r.proyecto_id]=r.costo||0;});
+    const presupMap={};
+    (presupPorProy||[]).forEach(p=>{presupMap[p.id]={presupuesto_total:p.presupuesto_total,gasto_previo:p.gasto_previo};});
     proyIds.forEach(pid=>{
       const pd=proyMap[pid];
       const es=entStats[pid]||{t:0,d:0};
       pd.pctEntregables=es.t>0?Math.round(es.d/es.t*100):null;
       pd.entDone=es.d;pd.entTotal=es.t;
-      const presupTotal=pd.proy?.presupuesto_total||0;
-      const gastoPrevio=pd.proy?.gasto_previo||0;
+      const presupTotal=presupMap[pid]?.presupuesto_total||0;
+      const gastoPrevio=presupMap[pid]?.gasto_previo||0;
       const consumo=(consumoStats[pid]||0)+gastoPrevio;
       pd.pctPresupuesto=(esAdmin&&presupTotal>0)?Math.round(consumo/presupTotal*100):null;
       pd.consumo=consumo;pd.presupTotal=presupTotal;
@@ -3385,33 +3392,53 @@ async function genRepProyecto(){
   const cont=document.getElementById('rp-res');cont.innerHTML=`<div class="ldg">Generando...</div>`;
   const esAdmin=PERFIL?.rol==='admin';
 
-  let regQ=sb.from('registros_horas').select('horas,fecha,etapa_clave,entregable_id,colaborador_id,colaboradores(nombre,apellido,tarifa),entregables(nombre)').eq('proyecto_id',pid);
-  if(desde)regQ=regQ.gte('fecha',desde);
-  if(hasta)regQ=regQ.lte('fecha',hasta);
+  // Horas simples (para no depender del RPC si el usuario no es admin)
+  let horasQ=sb.from('registros_horas').select('horas,fecha,etapa_clave,entregable_id,colaborador_id,entregables(nombre)').eq('proyecto_id',pid);
+  if(desde)horasQ=horasQ.gte('fecha',desde);
+  if(hasta)horasQ=horasQ.lte('fecha',hasta);
 
-  const [{data:proy},{data:ents},{data:regsRaw}]=await Promise.all([
-    sb.from('proyectos').select('*').eq('id',pid).single(),
+  const [{data:proy},{data:ents},{data:horasRaw},{data:costoDetalle}]=await Promise.all([
+    sb.from('proyectos_seguro').select('*').eq('id',pid).single(),
     sb.from('entregables').select('id,nombre,etapa_clave,done,fecha_unica,fecha_fin,asignado_id,colaboradores(nombre,apellido)').eq('proyecto_id',pid).eq('eliminado',false),
-    regQ
+    horasQ,
+    esAdmin?sb.rpc('fn_costo_proyecto_detalle',{p_proyecto_id:pid,p_desde:desde||null,p_hasta:hasta||null}):Promise.resolve({data:[]})
   ]);
-  const regs=regsRaw||[];
+  const regs=horasRaw||[];
 
   const totalEnt=ents?.length||0,doneEnt=(ents||[]).filter(e=>e.done).length;
   const pctAvance=totalEnt?Math.round(doneEnt/totalEnt*100):0;
 
+  // Horas por colaborador y por etapa siempre se calculan (sin costo);
+  // el costo, si aplica, viene ya agregado del RPC (solo admin).
   const horasPorColab={},horasPorEtapa={};
   let horasTotal=0,costoTotal=0;
   regs.forEach(r=>{
     horasTotal+=r.horas;
-    const costo=r.horas*(r.colaboradores?.tarifa||0);
-    costoTotal+=costo;
     const ck=r.colaborador_id;
-    if(!horasPorColab[ck])horasPorColab[ck]={nombre:(r.colaboradores?.nombre||'')+' '+(r.colaboradores?.apellido||''),horas:0,costo:0};
-    horasPorColab[ck].horas+=r.horas;horasPorColab[ck].costo+=costo;
+    if(!horasPorColab[ck])horasPorColab[ck]={nombre:'',horas:0,costo:0};
+    horasPorColab[ck].horas+=r.horas;
     const ek=r.etapa_clave||'_';
     if(!horasPorEtapa[ek])horasPorEtapa[ek]={horas:0,costo:0};
-    horasPorEtapa[ek].horas+=r.horas;horasPorEtapa[ek].costo+=costo;
+    horasPorEtapa[ek].horas+=r.horas;
   });
+  (costoDetalle||[]).forEach(r=>{
+    if(r.agrupador==='colaborador'){
+      if(!horasPorColab[r.clave])horasPorColab[r.clave]={nombre:r.nombre,horas:0,costo:0};
+      horasPorColab[r.clave].nombre=r.nombre;horasPorColab[r.clave].costo=r.costo||0;
+      costoTotal+=r.costo||0;
+    } else if(r.agrupador==='etapa'){
+      if(!horasPorEtapa[r.clave])horasPorEtapa[r.clave]={horas:0,costo:0};
+      horasPorEtapa[r.clave].costo=r.costo||0;
+    }
+  });
+  if(!esAdmin){
+    // Necesitamos el nombre del colaborador aunque no haya costo visible
+    const idsFaltantes=Object.keys(horasPorColab).filter(k=>!horasPorColab[k].nombre);
+    if(idsFaltantes.length){
+      const {data:cs}=await sb.from('colaboradores_seguro').select('id,nombre,apellido').in('id',idsFaltantes);
+      (cs||[]).forEach(c=>{horasPorColab[c.id].nombre=`${c.nombre} ${c.apellido||''}`;});
+    }
+  }
 
   const presupTotal=proy?.presupuesto_total||0;
   const gastoPrevio=proy?.gasto_previo||0;
@@ -4027,7 +4054,7 @@ function switchGestionTab(tab,btn){
 }
 async function loadGColabs(){
   const cont=document.getElementById('g-colabs');if(!cont)return;
-  const {data:cs}=await sb.from('colaboradores').select('*').order('nombre');
+  const {data:cs}=await sb.from('colaboradores_seguro').select('*').order('nombre');
   if(!cs||!cs.length){cont.innerHTML=`<div class="empty"><div class="empty-i">👤</div><div>Sin colaboradores</div></div>`;return;}
   cont.innerHTML=cs.map(c=>`<div class="card" style="padding:12px 14px;margin-bottom:8px;display:flex;align-items:center;gap:10px">
     <div style="width:32px;height:32px;border-radius:50%;background:${c.color};display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:500;color:#fff;flex-shrink:0">${ini(c.nombre,c.apellido)}</div>
@@ -4041,7 +4068,7 @@ async function loadGColabs(){
 }
 async function loadGProys(mostrarArchivados=false){
   const cont=document.getElementById('g-proys');if(!cont)return;
-  const {data:ps}=await sb.from('proyectos').select('*').order('codigo');
+  const {data:ps}=await sb.from('proyectos_seguro').select('*').order('codigo');
   const {data:ptags}=await sb.from('proyecto_tags').select('proyecto_id,tags(id,nombre,fijo)');
   if(!ps||!ps.length){cont.innerHTML=`<div class="empty"><div class="empty-i">📁</div><div>Sin proyectos</div></div>`;return;}
   const tagsXProy={};(ptags||[]).forEach(pt=>{if(!tagsXProy[pt.proyecto_id])tagsXProy[pt.proyecto_id]=[];if(pt.tags)tagsXProy[pt.proyecto_id].push(pt.tags);});
@@ -4100,7 +4127,7 @@ function abrirNuevoColab(){
   renderRoles2();renderColPicker2(colSel);document.getElementById('ov-colab2').classList.add('on');
 }
 async function abrirEditColab(id){
-  const {data:c}=await sb.from('colaboradores').select('*').eq('id',id).single();if(!c)return;
+  const {data:c}=await sb.from('colaboradores_seguro').select('*').eq('id',id).single();if(!c)return;
   colabEditId=id;rolSel2=c.rol;colSel=c.color;
   document.getElementById('cf-title2').textContent='Editar colaborador';
   document.getElementById('cf-nom').value=c.nombre;document.getElementById('cf-ape').value=c.apellido||'';
@@ -4204,7 +4231,7 @@ async function abrirNuevoProy(){
 }
 async function abrirEditProy(id){
   const [{data:p},{data:presupEtapasDB}]=await Promise.all([
-    sb.from('proyectos').select('*').eq('id',id).single(),
+    sb.from('proyectos_seguro').select('*').eq('id',id).single(),
     sb.from('presupuesto_etapas').select('etapa_clave,monto').eq('proyecto_id',id)
   ]);
   if(!p)return;
@@ -4260,7 +4287,7 @@ async function guardarProy2(){
     await sb.from('proyectos').update(datos).eq('id',proyEditId2);
     if(!esBlanco){await sb.from('presupuesto_etapas').delete().eq('proyecto_id',proyEditId2);const inserts=Object.entries(presupEtapas).map(([k,m])=>({proyecto_id:proyEditId2,etapa_clave:k,monto:m}));if(inserts.length)await sb.from('presupuesto_etapas').insert(inserts);}
   } else {
-    const {data:np}=await sb.from('proyectos').insert(datos).select().single();npId=np?.id;
+    const {data:np}=await sb.from('proyectos').insert(datos).select('id').single();npId=np?.id;
     if(np&&!esBlanco){
       const {data:tpls}=await sb.from('templates').select('*').in('etapa_clave',[...etapasSel2]).order('orden');
       if(tpls?.length){
@@ -4461,7 +4488,7 @@ async function renderVacaciones(){
   const esAdmin=PERFIL?.rol==='admin';
 
   const[{data:colabs},{data:vacs},{data:festivos}]=await Promise.all([
-    sb.from('colaboradores').select('*').order('nombre'),
+    sb.from('colaboradores_seguro').select('*').order('nombre'),
     esAdmin
       ?sb.from('vacaciones').select('*,colaboradores(id,nombre,apellido,color)').order('fecha_inicio')
       :sb.from('vacaciones').select('*').eq('colaborador_id',USER.id).order('fecha_inicio'),

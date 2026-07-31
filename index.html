@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>hacer: v49</title>
+<title>hacer: v50</title>
 <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><text x='1' y='26' font-family='Arial,Helvetica,sans-serif' font-size='26' font-weight='700' fill='%231c1b17'>h:</text></svg>">
 <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Fraunces:ital,opsz,wght@0,9..144,300;0,9..144,400;1,9..144,300&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
@@ -2944,7 +2944,7 @@ async function renderSemana(){
 }
 
 // ── EDITAR REGISTRO ──
-let editRegId=null,editRegH=0;
+let editRegId=null,editRegH=0,editRegRefresh=renderSemana;
 
 function erParsearHoras(val){
   // Acepta: "2:30", "2.5", "2,5", "2h30", "2h", "90m", "90", "2"
@@ -2966,8 +2966,8 @@ function erParsearHoras(val){
   document.getElementById('er-horas-preview').textContent=hT(editRegH);
 }
 
-function abrirEditReg(id,horas,notaEnc,entNombre,proyCode,fecha){
-  editRegId=id;editRegH=horas;
+function abrirEditReg(id,horas,notaEnc,entNombre,proyCode,fecha,refreshFn){
+  editRegId=id;editRegH=horas;editRegRefresh=refreshFn||renderSemana;
   document.getElementById('er-confirm').style.display='none';
   document.getElementById('er-ent').textContent=entNombre+(proyCode?' · '+proyCode:'');
   document.getElementById('er-horas-txt').value=hD(horas);
@@ -2988,14 +2988,16 @@ async function guardarEditReg(){
   const nota=document.getElementById('er-nota').value.trim();
   const fecha=document.getElementById('er-fecha').value||hoy();
   const btn=document.getElementById('er-save');btn.disabled=true;btn.textContent='Guardando...';
-  await sb.from('registros_horas').update({horas:editRegH,nota,fecha}).eq('id',editRegId);
+  const {error}=await sb.from('registros_horas').update({horas:editRegH,nota,fecha}).eq('id',editRegId);
   btn.disabled=false;btn.textContent='Guardar';
-  closeOv('ov-er');updateCounter();renderSemana();toast('✓ Registro actualizado');
+  if(error){toast('Error al actualizar');console.error(error);return;}
+  closeOv('ov-er');updateCounter();editRegRefresh();toast('✓ Registro actualizado');
 }
 
 async function eliminarEditReg(){
-  await sb.from('registros_horas').delete().eq('id',editRegId);
-  closeOv('ov-er');updateCounter();renderSemana();toast('✓ Registro eliminado');
+  const {error}=await sb.from('registros_horas').delete().eq('id',editRegId);
+  if(error){toast('Error al eliminar');console.error(error);return;}
+  closeOv('ov-er');updateCounter();editRegRefresh();toast('✓ Registro eliminado');
 }
 
 // ── REPORTES ──
@@ -3007,6 +3009,7 @@ function renderRepUI(){
       <button class="det-tab ${repTab==='quincenal'?'on':''}" onclick="switchRepTab('quincenal',this)">Junta Quincenal</button>
       <button class="det-tab ${repTab==='proyecto'?'on':''}" onclick="switchRepTab('proyecto',this)">Reporte por Proyecto</button>
       <button class="det-tab ${repTab==='mensual'?'on':''}" onclick="switchRepTab('mensual',this)">Reporte Mensual</button>
+      <button class="det-tab ${repTab==='registro'?'on':''}" onclick="switchRepTab('registro',this)">Registro de Tiempo</button>
     </div>
     <div id="rep-body"></div>
   </div>`;
@@ -3021,6 +3024,7 @@ function switchRepTab(tab,btn){
 function renderRepBody(){
   if(repTab==='quincenal')renderRepQuincenalUI();
   else if(repTab==='proyecto')renderRepProyectoUI();
+  else if(repTab==='registro')renderRepRegistroUI();
   else renderRepMensualUI();
 }
 
@@ -3613,6 +3617,162 @@ function descargarExcelMensual(){
 
   const fname=`Reporte_Mensual_${d.desde}_${d.hasta}.xlsx`;
   XLSX.writeFile(wb,fname);
+}
+
+// ── Registro de Tiempo ──
+let vistaReg='dia';
+function diaCorto(fecha){
+  const dsem=['Dom','Lun','Mar','Mié','Jue','Vie','Sáb'],meses=['ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic'];
+  const d=new Date(fecha+'T12:00:00');
+  return `${dsem[d.getDay()]} ${d.getDate()} ${meses[d.getMonth()]}`;
+}
+function lunesDe(fecha){
+  const d=new Date(fecha+'T12:00:00');const day=d.getDay();const diff=(day===0?-6:1-day);
+  d.setDate(d.getDate()+diff);return fechaAStr(d);
+}
+function domingoDe(lunes){
+  const d=new Date(lunes+'T12:00:00');d.setDate(d.getDate()+6);return fechaAStr(d);
+}
+
+async function renderRepRegistroUI(){
+  const body=document.getElementById('rep-body');
+  body.innerHTML=`
+    <div class="card" style="padding:18px;margin-bottom:16px">
+      <div class="fl"><label>Colaborador</label><select id="rt-colab"><option value="">— seleccionar —</option></select></div>
+      <div style="display:flex;gap:12px;margin-bottom:14px">
+        <div style="flex:1"><div style="font-size:9px;letter-spacing:.1em;text-transform:uppercase;color:var(--ink3);margin-bottom:5px">Desde</div><input type="date" id="rt-desde" value="${hace(13)}"></div>
+        <div style="flex:1"><div style="font-size:9px;letter-spacing:.1em;text-transform:uppercase;color:var(--ink3);margin-bottom:5px">Hasta</div><input type="date" id="rt-hasta" value="${hoy()}"></div>
+      </div>
+      <div style="margin-bottom:14px">
+        <div style="font-size:9px;letter-spacing:.1em;text-transform:uppercase;color:var(--ink3);margin-bottom:5px">Agrupar por</div>
+        <div style="display:flex;gap:8px">
+          <button type="button" class="rol-b2 on2" id="rt-vista-dia" onclick="selVistaReg('dia')">Día</button>
+          <button type="button" class="rol-b2" id="rt-vista-semana" onclick="selVistaReg('semana')">Semana</button>
+          <button type="button" class="rol-b2" id="rt-vista-proyecto" onclick="selVistaReg('proyecto')">Proyecto</button>
+        </div>
+      </div>
+      <button class="bsave" style="margin-top:0" onclick="genRepRegistro()">Generar</button>
+    </div>
+    <div id="rt-res"></div>`;
+  const {data:cs}=await sb.from('colaboradores').select('id,nombre,apellido,color').order('nombre');
+  const sel=document.getElementById('rt-colab');
+  (cs||[]).forEach(c=>sel.innerHTML+=`<option value="${c.id}">${c.nombre} ${c.apellido||''}</option>`);
+}
+
+function selVistaReg(v){
+  vistaReg=v;
+  ['dia','semana','proyecto'].forEach(x=>document.getElementById('rt-vista-'+x)?.classList.toggle('on2',x===v));
+  if(_rtData){_rtData.vista=v;renderRepRegistroResultado();}
+}
+
+let _rtData=null;
+async function genRepRegistro(){
+  const colabId=document.getElementById('rt-colab').value;
+  const desde=document.getElementById('rt-desde').value;
+  const hasta=document.getElementById('rt-hasta').value;
+  if(!colabId){toast('Selecciona un colaborador');return;}
+  if(!desde||!hasta){toast('Selecciona el período');return;}
+  const cont=document.getElementById('rt-res');
+  cont.innerHTML=`<div class="ldg">Generando...</div>`;
+
+  const [{data:colab},{data:regs,error}]=await Promise.all([
+    sb.from('colaboradores').select('nombre,apellido').eq('id',colabId).single(),
+    sb.from('registros_horas').select('id,horas,fecha,nota,proyecto_id,entregable_id,proyectos(id,codigo,nombre),entregables(nombre)').eq('colaborador_id',colabId).gte('fecha',desde).lte('fecha',hasta)
+  ]);
+  if(error){cont.innerHTML=`<div class="card" style="padding:20px;text-align:center;font-size:11px;color:var(--ink3)">Error al cargar registros</div>`;console.error(error);return;}
+
+  const total=(regs||[]).reduce((s,r)=>s+r.horas,0);
+  _rtData={colabId,colabNombre:`${colab?.nombre||''} ${colab?.apellido||''}`,desde,hasta,vista:vistaReg,regs:regs||[],total};
+  renderRepRegistroResultado();
+}
+
+function filaRegistro(r,mostrarFecha){
+  const entNom=r.entregables?.nombre||'Sin entregable',pCod=r.proyectos?.codigo||'',pNom=r.proyectos?.nombre||'Sin proyecto';
+  return `<div class="card reg-row" style="padding:10px 14px;margin-bottom:6px;display:flex;align-items:center;gap:10px;cursor:pointer"
+    data-rid="${r.id}" data-horas="${r.horas}" data-nota="${encodeURIComponent(r.nota||'')}"
+    data-ent="${encodeURIComponent(entNom)}" data-cod="${pCod}" data-fecha="${r.fecha}">
+    ${mostrarFecha?`<span style="font-size:9px;color:var(--ink3);width:56px;flex-shrink:0">${diaCorto(r.fecha)}</span>`:''}
+    <div style="flex:1;min-width:0">
+      <div style="font-size:11px;color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${entNom}</div>
+      <div style="font-size:9px;color:var(--ink3);margin-top:2px">${pCod?pCod+' · ':''}${pNom}${r.nota?' · '+r.nota:''}</div>
+    </div>
+    <span style="font-size:13px;font-weight:500;color:var(--accent);white-space:nowrap;flex-shrink:0">${hT(r.horas)}</span>
+    <span style="font-size:10px;color:var(--ink3);flex-shrink:0">✏</span>
+  </div>`;
+}
+
+function grupoRegistroHtml(titulo,total,regs,mostrarFecha){
+  return `<div style="margin-bottom:16px">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;padding:0 2px">
+      <span style="font-size:10px;font-weight:600;color:var(--ink2);text-transform:uppercase;letter-spacing:.05em">${titulo}</span>
+      <span style="font-size:10px;color:var(--ink3)">${hT(total)}</span>
+    </div>
+    ${regs.map(r=>filaRegistro(r,mostrarFecha)).join('')}
+  </div>`;
+}
+
+function renderRepRegistroResultado(){
+  const d=_rtData;const cont=document.getElementById('rt-res');if(!d)return;
+
+  if(!d.regs.length){
+    cont.innerHTML=`
+      <div class="card" style="padding:16px 18px;margin-bottom:16px">
+        <div style="font-family:'Fraunces',serif;font-size:16px;color:var(--ink)">${d.colabNombre}</div>
+        <div style="font-size:10px;color:var(--ink3)">${fF(d.desde)} — ${fF(d.hasta)}</div>
+      </div>
+      <div class="card" style="padding:30px;text-align:center;font-size:11px;color:var(--ink3)">Sin registros en este período</div>`;
+    return;
+  }
+
+  let gruposHtml='';
+  if(d.vista==='semana'){
+    const porSemana={};
+    d.regs.forEach(r=>{const l=lunesDe(r.fecha);(porSemana[l]=porSemana[l]||[]).push(r);});
+    Object.keys(porSemana).sort((a,b)=>b.localeCompare(a)).forEach(lunes=>{
+      const regs=porSemana[lunes].sort((a,b)=>b.fecha.localeCompare(a.fecha));
+      const tot=regs.reduce((s,r)=>s+r.horas,0);
+      gruposHtml+=grupoRegistroHtml(`Semana del ${fF(lunes)} al ${fF(domingoDe(lunes))}`,tot,regs,true);
+    });
+  } else if(d.vista==='proyecto'){
+    const porProy={};
+    d.regs.forEach(r=>{const pid=r.proyecto_id||'sin';if(!porProy[pid])porProy[pid]={proy:r.proyectos,regs:[]};porProy[pid].regs.push(r);});
+    Object.keys(porProy).sort((a,b)=>{
+      const ta=porProy[a].regs.reduce((s,r)=>s+r.horas,0),tb=porProy[b].regs.reduce((s,r)=>s+r.horas,0);
+      return tb-ta;
+    }).forEach(pid=>{
+      const g=porProy[pid],regs=g.regs.sort((a,b)=>b.fecha.localeCompare(a.fecha));
+      const tot=regs.reduce((s,r)=>s+r.horas,0);
+      const label=g.proy?`${g.proy.codigo?g.proy.codigo+' · ':''}${g.proy.nombre}`:'Sin proyecto';
+      gruposHtml+=grupoRegistroHtml(label,tot,regs,true);
+    });
+  } else {
+    const porFecha={};
+    d.regs.forEach(r=>{(porFecha[r.fecha]=porFecha[r.fecha]||[]).push(r);});
+    Object.keys(porFecha).sort((a,b)=>b.localeCompare(a)).forEach(fecha=>{
+      const regs=porFecha[fecha].sort((a,b)=>(a.entregables?.nombre||'').localeCompare(b.entregables?.nombre||''));
+      const tot=regs.reduce((s,r)=>s+r.horas,0);
+      gruposHtml+=grupoRegistroHtml(diaCorto(fecha),tot,regs,false);
+    });
+  }
+
+  cont.innerHTML=`
+    <div class="card" style="padding:16px 18px;margin-bottom:16px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px">
+      <div>
+        <div style="font-family:'Fraunces',serif;font-size:16px;color:var(--ink)">${d.colabNombre}</div>
+        <div style="font-size:10px;color:var(--ink3)">${fF(d.desde)} — ${fF(d.hasta)}</div>
+      </div>
+      <div style="text-align:right">
+        <div style="font-family:'Fraunces',serif;font-size:22px;color:var(--accent)">${hT(d.total)}</div>
+        <div style="font-size:9px;color:var(--ink3);text-transform:uppercase;letter-spacing:.06em">Total registrado</div>
+      </div>
+    </div>
+    ${gruposHtml}`;
+
+  cont.querySelectorAll('.reg-row').forEach(el=>{
+    el.addEventListener('click',()=>{
+      abrirEditReg(el.dataset.rid,parseFloat(el.dataset.horas),el.dataset.nota,decodeURIComponent(el.dataset.ent),el.dataset.cod,el.dataset.fecha,genRepRegistro);
+    });
+  });
 }
 
 // ── BUSCADOR GLOBAL ──

@@ -566,7 +566,8 @@ tr.comp-toggle-row:hover td{background:var(--bg2);}
   <div class="modal" style="position:relative;max-width:420px">
     <button class="modal-close" onclick="closeOv('ov-pausar-proy')">×</button>
     <div class="stitle">Pausar proyecto</div>
-    <div class="ssub">Se guardará la fecha de hoy como inicio de la pausa. El plan de trabajo se ajustará automáticamente cuando reactives.</div>
+    <div class="ssub">El plan de trabajo se ajustará automáticamente cuando reactives.</div>
+    <div class="fl"><label>Pausado desde</label><input type="date" id="pp-fecha"></div>
     <div class="fl"><label>Motivo de la pausa</label><textarea id="pp-nota" rows="3" placeholder="Ej. cliente en espera de aprobación de presupuesto"></textarea></div>
     <button class="bsave" id="pp-save" onclick="guardarPausaProy()">Pausar proyecto</button>
   </div>
@@ -849,12 +850,13 @@ tr.comp-toggle-row:hover td{background:var(--bg2);}
       </div>
       <div class="fl"><label>Fecha de inicio del proyecto</label>
         <input type="date" id="pf-inicio">
-        <div style="font-size:9px;color:var(--ink3);margin-top:4px">Para calcular fechas automáticamente</div>
+        <div style="font-size:9px;color:var(--ink3);margin-top:4px">Se usa para calcular la fecha original de las etapas que todavía no la tengan. Las etapas que ya tienen fecha original no se mueven al cambiar esto.</div>
       </div>
       <div class="fl" id="pf-dist2" style="display:none">
-        <label>Distribución por etapa</label>
+        <label>Distribución y duración por etapa</label>
         <div id="pf-dist-cont"></div>
         <div style="font-size:9px;margin-top:4px" id="pf-dist-total2"></div>
+        <div style="font-size:9px;color:var(--ink3);margin-top:6px">La duración se guarda en semanas hábiles (lun–vie). Con la fecha de inicio de arriba, se calcula el plan de trabajo original de cada etapa — una vez calculado, no se vuelve a mover salvo por una pausa o una ampliación formal.</div>
       </div>
     </div>
     <div class="fl">
@@ -1865,10 +1867,13 @@ function renderProyTabla(filtro=''){
     const tienePresup=p.presupuesto_total>0&&p.tipo!=='en_blanco';
     const pct=tienePresup?Math.min(100,Math.round((consumo[p.id]||0)/p.presupuesto_total*100)):null;
     const colorPct=pct>=90?'var(--rose)':pct>=70?'var(--amber)':'var(--green)';
+    const estadoTxt=p.estado==='pausado'?'⏸ Pausado':p.estado==='archivado'?'Archivado':'● Activo';
+    const estadoColor=p.estado==='pausado'?'var(--amber)':p.estado==='archivado'?'var(--ink3)':'var(--green)';
     return `<tr onclick="abrirDetalleProy('${p.id}')">
       <td><span class="cod" style="font-size:9px">${p.codigo}</span></td>
       <td style="font-size:12px;color:var(--ink);font-family:'Fraunces',serif;font-weight:300">${p.nombre}</td>
       <td style="font-size:10px;color:var(--ink3)">${p.cliente||'—'}</td>
+      <td style="font-size:9px;color:${estadoColor};white-space:nowrap">${estadoTxt}</td>
       <td style="min-width:100px">
         <div style="display:flex;align-items:center;gap:6px">
           <div class="mini-bar" style="flex:1"><div class="mini-bar-fill" style="width:${av}%;background:var(--accent)"></div></div>
@@ -1884,7 +1889,7 @@ function renderProyTabla(filtro=''){
     </tr>`;
   }).join('');
 
-  if(!filas)filas=`<tr><td colspan="5" style="padding:32px;text-align:center;color:var(--ink3);font-size:11px">Sin proyectos en esta categoría</td></tr>`;
+  if(!filas)filas=`<tr><td colspan="6" style="padding:32px;text-align:center;color:var(--ink3);font-size:11px">Sin proyectos en esta categoría</td></tr>`;
 
   cont.innerHTML=`
     <div class="proy-tabs">
@@ -1899,7 +1904,7 @@ function renderProyTabla(filtro=''){
     <div style="overflow-y:auto;flex:1">
       <table class="proy-tabla">
         <thead><tr>
-          <th>Código</th><th>Nombre</th><th>Cliente</th>
+          <th>Código</th><th>Nombre</th><th>Cliente</th><th>Estatus</th>
           <th>Entregables</th><th>Presupuesto</th>
         </tr></thead>
         <tbody>${filas}</tbody>
@@ -1918,7 +1923,7 @@ function onProySearch(val){
 }
 
 // ── DETALLE PROYECTO ──
-let proyDetalleId=null, proyDetalleTipo='productivo', detProyTab='entregables';
+let proyDetalleId=null, proyDetalleTipo='productivo', detProyTab='entregables', detProyEsFacturable=false;
 
 function switchDetProy(tab,btn){
   detProyTab=tab;
@@ -1936,11 +1941,13 @@ async function abrirDetalleProy(proyId){
   document.getElementById('det-tab-gantt').style.display=proyDetalleTipo==='en_blanco'?'none':'block';
   document.querySelectorAll('#ov-det-proy .det-tab').forEach((t,i)=>t.classList.toggle('on',i===0));
   document.getElementById('ov-det-proy').classList.add('on');
-  await renderEstadoBarDetalle(p);
+  const {data:pt}=await sb.from('proyecto_tags').select('tags(nombre)').eq('proyecto_id',proyId);
+  detProyEsFacturable=(pt||[]).some(x=>x.tags?.nombre==='facturable');
+  await renderEstadoBarDetalle(p,detProyEsFacturable);
   await renderDetProyBody();
 }
 const btnEstadoStyle='padding:5px 10px;border:1.5px solid var(--border);border-radius:6px;background:none;font-size:10px;color:var(--ink2);cursor:pointer';
-async function renderEstadoBarDetalle(p){
+async function renderEstadoBarDetalle(p,esFacturable){
   const bar=document.getElementById('det-proy-estado-bar');if(!bar)return;
   const esAdmin=PERFIL?.rol==='admin';
   const estado=p.estado||'activo';
@@ -1952,28 +1959,31 @@ async function renderEstadoBarDetalle(p){
     if(esAdmin)html+=`<button style="${btnEstadoStyle}" onclick="reactivarProy()">▶ Reactivar</button>`;
   } else if(estado==='archivado'){
     html+=`<span class="tag-pill archivado" style="font-size:9px">Archivado</span>`;
-  } else if(esAdmin){
+  } else if(esAdmin&&esFacturable){
     html+=`<button style="${btnEstadoStyle}" onclick="abrirPausarProy()">⏸ Pausar proyecto</button>`;
   }
-  if(esAdmin)html+=`<button style="${btnEstadoStyle};opacity:.75" onclick="abrirHistorialPausas()">Historial de pausas</button>`;
+  if(esAdmin&&esFacturable)html+=`<button style="${btnEstadoStyle};opacity:.75" onclick="abrirHistorialPausas()">Historial de pausas</button>`;
   if(!html){bar.style.display='none';bar.innerHTML='';return;}
   bar.style.display='flex';bar.innerHTML=html;
 }
 function abrirPausarProy(){
   document.getElementById('pp-nota').value='';
+  document.getElementById('pp-fecha').value=hoy();
   document.getElementById('ov-pausar-proy').classList.add('on');
 }
 async function guardarPausaProy(){
   const nota=document.getElementById('pp-nota').value.trim();
+  const fechaInicio=document.getElementById('pp-fecha').value||hoy();
+  if(fechaInicio>hoy()){toast('La fecha de pausa no puede ser en el futuro');return;}
   const btn=document.getElementById('pp-save');btn.disabled=true;btn.textContent='Guardando...';
-  const {error:errIns}=await sb.from('pausas_proyecto').insert({proyecto_id:proyDetalleId,fecha_inicio:hoy(),nota:nota||null,creado_por:USER.id});
+  const {error:errIns}=await sb.from('pausas_proyecto').insert({proyecto_id:proyDetalleId,fecha_inicio:fechaInicio,nota:nota||null,creado_por:USER.id});
   if(errIns){toast('Error al pausar: '+errIns.message);btn.disabled=false;btn.textContent='Pausar proyecto';return;}
   const {error:errUpd}=await sb.from('proyectos').update({estado:'pausado'}).eq('id',proyDetalleId);
   btn.disabled=false;btn.textContent='Pausar proyecto';
   if(errUpd){toast('Error al actualizar estado: '+errUpd.message);return;}
   closeOv('ov-pausar-proy');toast('✓ Proyecto pausado');
   const {data:p}=await sb.from('proyectos_seguro').select('*').eq('id',proyDetalleId).single();
-  await renderEstadoBarDetalle(p);
+  await renderEstadoBarDetalle(p,detProyEsFacturable);
 }
 async function reactivarProy(){
   if(!confirm('¿Reactivar este proyecto? Las fechas del plan de trabajo se ajustarán por los días que estuvo pausado.'))return;
@@ -1989,7 +1999,7 @@ async function reactivarProy(){
   if(errUpd2){toast('Error al actualizar estado: '+errUpd2.message);return;}
   toast(`✓ Proyecto reactivado · pausado ${diasHab} día(s) hábil(es)`);
   const {data:p}=await sb.from('proyectos_seguro').select('*').eq('id',proyDetalleId).single();
-  await renderEstadoBarDetalle(p);
+  await renderEstadoBarDetalle(p,detProyEsFacturable);
 }
 async function abrirHistorialPausas(){
   const cont=document.getElementById('hist-pausas-body');
@@ -4343,21 +4353,25 @@ async function abrirNuevoProy(){
 async function abrirEditProy(id){
   const [{data:p},{data:presupEtapasDB}]=await Promise.all([
     sb.from('proyectos_seguro').select('*').eq('id',id).single(),
-    sb.from('presupuesto_etapas').select('etapa_clave,monto').eq('proyecto_id',id)
+    sb.from('presupuesto_etapas').select('etapa_clave,monto,duracion_dias_habiles,fecha_inicio_original').eq('proyecto_id',id)
   ]);
   if(!p)return;
   // Convertir montos guardados a porcentajes para pre-llenar el form
   const presupTotal=p.presupuesto_total||0;
-  const pctGuardados={};
+  const pctGuardados={},durGuardadosSemanas={};
+  let fechaInicioProy='';
   (presupEtapasDB||[]).forEach(r=>{
     pctGuardados[r.etapa_clave]=presupTotal>0?Math.round(r.monto/presupTotal*100):0;
+    durGuardadosSemanas[r.etapa_clave]=r.duracion_dias_habiles!=null?Math.round((r.duracion_dias_habiles/5)*10)/10:'';
+    if(r.fecha_inicio_original&&(!fechaInicioProy||r.fecha_inicio_original<fechaInicioProy))fechaInicioProy=r.fecha_inicio_original;
   });
   proyEditId2=id;etapasSel2=new Set(p.etapas_activas||[]);estadoProy=p.estado||'activo';
   document.getElementById('pf-title2').textContent='Editar proyecto';
   document.getElementById('pf-cod').value=p.codigo;document.getElementById('pf-nom2').value=p.nombre;
   document.getElementById('pf-cli').value=p.cliente||'';document.getElementById('pf-presup2').value=presupTotal||'';
   document.getElementById('pf-gasto').value=p.gasto_previo||0;document.getElementById('pf-del').style.display='block';
-  selTipoProy(p.tipo||'productivo');renderEtapasCheck2();actualizarDist2(pctGuardados);await renderColabsCheck(id);await renderTagsSel(id);
+  const pfInicioEl=document.getElementById('pf-inicio');if(pfInicioEl)pfInicioEl.value=fechaInicioProy;
+  selTipoProy(p.tipo||'productivo');renderEtapasCheck2();actualizarDist2(pctGuardados,durGuardadosSemanas);await renderColabsCheck(id);await renderTagsSel(id);
   renderEstadoProyLock();
   document.getElementById('ov-proy2').classList.add('on');
 }
@@ -4371,11 +4385,22 @@ function renderEtapasCheck2(){
     c.appendChild(b);
   });
 }
-function actualizarDist2(pctGuardados){
+function actualizarDist2(pctGuardados,durGuardadosSemanas){
   const presup=parseFloat(document.getElementById('pf-presup2')?.value)||0;const wrap=document.getElementById('pf-dist2');
   if(!etapasSel2.size||!presup){if(wrap)wrap.style.display='none';return;}if(wrap)wrap.style.display='block';
   const cont=document.getElementById('pf-dist-cont');if(!cont)return;const pctDef=Math.round(100/etapasSel2.size);cont.innerHTML='';
-  etapasSel2.forEach(k=>{const et=ETAPAS_C.find(x=>x.k===k);const pct=(pctGuardados&&pctGuardados[k]!=null)?pctGuardados[k]:pctDef;const monto=Math.round(presup*pct/100);cont.innerHTML+=`<div style="display:flex;align-items:center;gap:8px;margin-bottom:10px"><span style="font-size:10px;color:var(--ink2);width:120px;flex-shrink:0"><b style="color:var(--accent)">${k}</b> · ${et?.n}</span><input type="number" id="dist2-${k}" value="${pct}" min="0" max="100" style="width:60px;padding:6px 8px;text-align:right" oninput="recalcDist2()"> %<span style="font-size:11px;color:var(--ink3);flex:1;text-align:right" id="dm2-${k}">$${monto.toLocaleString('es-MX')}</span></div>`;});
+  etapasSel2.forEach(k=>{
+    const et=ETAPAS_C.find(x=>x.k===k);const pct=(pctGuardados&&pctGuardados[k]!=null)?pctGuardados[k]:pctDef;const monto=Math.round(presup*pct/100);
+    const sem=(durGuardadosSemanas&&durGuardadosSemanas[k]!=null)?durGuardadosSemanas[k]:'';
+    const durHtml=k==='PC'?'':`<span style="font-size:9px;color:var(--ink3);margin-left:8px">Duración:</span>
+      <input type="number" id="durw2-${k}" value="${sem}" min="0" max="52" step="0.5" placeholder="—" style="width:50px;padding:6px 8px;text-align:right" title="Semanas hábiles que dura esta etapa"> <span style="font-size:9px;color:var(--ink3)">sem</span>`;
+    cont.innerHTML+=`<div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;flex-wrap:wrap">
+      <span style="font-size:10px;color:var(--ink2);width:120px;flex-shrink:0"><b style="color:var(--accent)">${k}</b> · ${et?.n}</span>
+      <input type="number" id="dist2-${k}" value="${pct}" min="0" max="100" style="width:60px;padding:6px 8px;text-align:right" oninput="recalcDist2()"> %
+      <span style="font-size:11px;color:var(--ink3);min-width:80px;text-align:right" id="dm2-${k}">$${monto.toLocaleString('es-MX')}</span>
+      ${durHtml}
+    </div>`;
+  });
 }
 function recalcDist2(){
   const presup=parseFloat(document.getElementById('pf-presup2').value)||0;let tot=0;
@@ -4391,42 +4416,77 @@ async function guardarProy2(){
   const btn=document.getElementById('pf-save');btn.disabled=true;btn.textContent='Guardando...';
   const gastoPrevio=esBlanco?0:parseFloat(document.getElementById('pf-gasto').value)||0;
   const fechaInicio=esBlanco?null:document.getElementById('pf-inicio').value||null;
-  const presupEtapas={};
-  if(!esBlanco)etapasSel2.forEach(k=>{const pct=parseFloat(document.getElementById(`dist2-${k}`)?.value)||0;presupEtapas[k]=Math.round(presup*pct/100);});
+  const ORDEN_ET=['DE','SD','DD','CD']; // PC no tiene fechas ni duración
+  const presupEtapas={},durEtapasDias={};
+  if(!esBlanco)etapasSel2.forEach(k=>{
+    const pct=parseFloat(document.getElementById(`dist2-${k}`)?.value)||0;presupEtapas[k]=Math.round(presup*pct/100);
+    if(k!=='PC'){const sem=parseFloat(document.getElementById(`durw2-${k}`)?.value)||0;durEtapasDias[k]=Math.round(sem*5);}
+  });
   const datos={codigo,nombre,cliente:document.getElementById('pf-cli').value.trim(),presupuesto_total:presup,gasto_previo:gastoPrevio,etapas_activas:esBlanco?[]:[...etapasSel2],tipo:tipoProy,estado:estadoProy};
   let npId=proyEditId2;
+
+  let festSet=new Set();
+  if(!esBlanco){const {data:festivos}=await sb.from('festivos').select('fecha');festSet=new Set((festivos||[]).map(f=>f.fecha));}
+
   if(proyEditId2){
     const {error:errUpd}=await sb.from('proyectos').update(datos).eq('id',proyEditId2);
     if(errUpd){toast('Error al guardar: '+errUpd.message);btn.disabled=false;btn.textContent='Guardar proyecto';return;}
-    if(!esBlanco){await sb.from('presupuesto_etapas').delete().eq('proyecto_id',proyEditId2);const inserts=Object.entries(presupEtapas).map(([k,m])=>({proyecto_id:proyEditId2,etapa_clave:k,monto:m}));if(inserts.length)await sb.from('presupuesto_etapas').insert(inserts);}
+    if(!esBlanco){
+      const {data:existentes}=await sb.from('presupuesto_etapas').select('*').eq('proyecto_id',proyEditId2);
+      const exMap={};(existentes||[]).forEach(r=>exMap[r.etapa_clave]=r);
+      const aBorrar=(existentes||[]).filter(r=>!etapasSel2.has(r.etapa_clave)).map(r=>r.id);
+      if(aBorrar.length)await sb.from('presupuesto_etapas').delete().in('id',aBorrar);
+
+      let cursor=fechaInicio;
+      for(const k of ORDEN_ET){
+        if(!etapasSel2.has(k))continue;
+        const ex=exMap[k];
+        let iniOrig=ex?.fecha_inicio_original||null, finOrig=ex?.fecha_fin_original||null;
+        let iniVig=ex?.fecha_inicio_vigente||null, finVig=ex?.fecha_fin_vigente||null;
+        if(!iniOrig&&cursor&&durEtapasDias[k]){
+          // Primera vez que esta etapa recibe fechas: se calculan y quedan fijas como "original"
+          iniOrig=cursor;finOrig=sumarDiasHabiles(cursor,durEtapasDias[k],festSet);
+          iniVig=iniOrig;finVig=finOrig;
+        }
+        if(finOrig)cursor=finOrig; // la siguiente etapa arranca donde ésta termina
+        const row={proyecto_id:proyEditId2,etapa_clave:k,monto:presupEtapas[k]||0,duracion_dias_habiles:durEtapasDias[k]||null,fecha_inicio_original:iniOrig,fecha_fin_original:finOrig,fecha_inicio_vigente:iniVig,fecha_fin_vigente:finVig};
+        const {error:errRow}=ex?await sb.from('presupuesto_etapas').update(row).eq('id',ex.id):await sb.from('presupuesto_etapas').insert(row);
+        if(errRow){toast('Error al guardar etapa '+k+': '+errRow.message);btn.disabled=false;btn.textContent='Guardar proyecto';return;}
+      }
+      if(etapasSel2.has('PC')){
+        const exPC=exMap['PC'];
+        const rowPC={proyecto_id:proyEditId2,etapa_clave:'PC',monto:presupEtapas['PC']||0};
+        if(exPC)await sb.from('presupuesto_etapas').update(rowPC).eq('id',exPC.id);
+        else await sb.from('presupuesto_etapas').insert(rowPC);
+      }
+    }
   } else {
     const {data:np}=await sb.from('proyectos').insert(datos).select('id').single();npId=np?.id;
     if(np&&!esBlanco){
+      const fechasEtapa={};
+      let cursor=fechaInicio;
+      ORDEN_ET.forEach(k=>{
+        if(!etapasSel2.has(k))return;
+        if(!cursor||!durEtapasDias[k]){fechasEtapa[k]={ini:null,fin:null};return;}
+        const ini=cursor,fin=sumarDiasHabiles(cursor,durEtapasDias[k],festSet);
+        fechasEtapa[k]={ini,fin};
+        cursor=fin;
+      });
       const {data:tpls}=await sb.from('templates').select('*').in('etapa_clave',[...etapasSel2]).order('orden');
       if(tpls?.length){
         const ordenEtapas=['DE','SD','DD','CD','PC'];
         tpls.sort((a,b)=>{const ia=ordenEtapas.indexOf(a.etapa_clave),ib=ordenEtapas.indexOf(b.etapa_clave);if(ia!==ib)return ia-ib;return (a.orden||0)-(b.orden||0);});
-        // Calcular fechas por etapa secuencialmente
-        const dursEtapa=getDurEtapas();
-        const ORDEN_ET=['DE','SD','DD','CD']; // PC sin fechas
-        const fechasEtapa={};
-        let cursor=fechaInicio?new Date(fechaInicio+' 00:00'):null;
-        ORDEN_ET.forEach(k=>{
-          const sem=parseFloat(dursEtapa[k])||0;
-          if(!cursor||!sem){fechasEtapa[k]={ini:null,fin:null};return;}
-          const ini=fechaAStr(new Date(cursor));
-          const finD=new Date(cursor);finD.setDate(finD.getDate()+Math.round(sem*7));
-          const fin=fechaAStr(finD);
-          fechasEtapa[k]={ini,fin};
-          cursor=finD;
-        });
         const ents=tpls.map(t=>{
           const ef=fechasEtapa[t.etapa_clave]||{ini:null,fin:null};
           return {proyecto_id:np.id,etapa_clave:t.etapa_clave,grupo:t.grupo,nombre:t.nombre,done:false,eliminado:false,fecha_inicio:ef.ini,fecha_fin:ef.fin};
         });
         await sb.from('entregables').insert(ents);
       }
-      const inserts=Object.entries(presupEtapas).map(([k,m])=>({proyecto_id:np.id,etapa_clave:k,monto:m}));if(inserts.length)await sb.from('presupuesto_etapas').insert(inserts);
+      const inserts=[...etapasSel2].map(k=>{
+        const ef=fechasEtapa[k]||{ini:null,fin:null};
+        return {proyecto_id:np.id,etapa_clave:k,monto:presupEtapas[k]||0,duracion_dias_habiles:k==='PC'?null:(durEtapasDias[k]||null),fecha_inicio_original:ef.ini,fecha_fin_original:ef.fin,fecha_inicio_vigente:ef.ini,fecha_fin_vigente:ef.fin};
+      });
+      if(inserts.length)await sb.from('presupuesto_etapas').insert(inserts);
     }
   }
   if(npId){
@@ -4444,70 +4504,15 @@ async function eliminarProy2(){
 
 // ── TEMPLATES ──
 let tplEtapaSel=null;
-// duraciones_etapa: objeto guardado en localStorage { DE: 8, SD: 6, DD: 10, CD: 4 }
-function getDurEtapas(){try{return JSON.parse(localStorage.getItem('dur_etapas')||'{}')}catch{return {};}}
-function setDurEtapa(k,v){const d=getDurEtapas();d[k]=v;localStorage.setItem('dur_etapas',JSON.stringify(d));}
 
 async function loadGTemplates(){
   const cont=document.getElementById('g-tpls');if(!cont)return;
   const {data:tpls}=await sb.from('templates').select('*').order('orden');
   const porEtapa={};(tpls||[]).forEach(t=>{if(!porEtapa[t.etapa_clave])porEtapa[t.etapa_clave]=[];porEtapa[t.etapa_clave].push(t);});
-  const durs=getDurEtapas();
-  const ETAPAS_TPL=ETAPAS_C.filter(e=>e.k!=='PC'); // PC sin fechas
-
-  // Preview de fechas secuenciales
-  function previewFechas(){
-    const d2=getDurEtapas();
-    const inicioEl=document.getElementById('tpl-fecha-inicio');
-    if(!inicioEl||!inicioEl.value) return;
-    let cursor=new Date(inicioEl.value+' 00:00');
-    ETAPAS_TPL.forEach(et=>{
-      const sem=parseFloat(d2[et.k])||0;
-      const ini=document.getElementById('tpl-prev-ini-'+et.k);
-      const fin=document.getElementById('tpl-prev-fin-'+et.k);
-      if(!ini||!fin) return;
-      if(!sem){ini.textContent='—';fin.textContent='—';return;}
-      const iniDate=new Date(cursor);
-      const finDate=new Date(cursor);finDate.setDate(finDate.getDate()+Math.round(sem*7));
-      ini.textContent=fF(fechaAStr(iniDate));
-      fin.textContent=fF(fechaAStr(finDate));
-      cursor=finDate;
-    });
-  }
 
   let html=`<div style="background:var(--acc-lt);border-radius:8px;padding:12px 14px;margin-bottom:14px">
     <div style="font-size:10px;font-weight:600;color:var(--accent);margin-bottom:8px;letter-spacing:.05em">DURACIÓN POR ETAPA</div>
-    <div style="font-size:10px;color:var(--ink2);margin-bottom:10px">Las etapas son secuenciales (DE → SD → DD → CD). Todas las tareas de una etapa comparten sus fechas. Procesos no tiene fechas.</div>
-    <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px;padding-bottom:12px;border-bottom:1px solid var(--border)">
-      <span style="font-size:10px;color:var(--ink2);flex-shrink:0">Fecha de inicio del proyecto:</span>
-      <input type="date" id="tpl-fecha-inicio" style="font-size:11px;padding:5px 8px;border:1.5px solid var(--border);border-radius:7px;background:#fff" oninput="previewFechasTPL()">
-    </div>
-    <table style="width:100%;border-collapse:collapse">
-      <thead><tr>
-        <th style="font-size:9px;letter-spacing:.1em;text-transform:uppercase;color:var(--ink3);text-align:left;padding:4px 8px 6px">Etapa</th>
-        <th style="font-size:9px;letter-spacing:.1em;text-transform:uppercase;color:var(--ink3);text-align:center;padding:4px 8px 6px">Semanas</th>
-        <th style="font-size:9px;letter-spacing:.1em;text-transform:uppercase;color:var(--ink3);text-align:left;padding:4px 8px 6px">Inicio aprox.</th>
-        <th style="font-size:9px;letter-spacing:.1em;text-transform:uppercase;color:var(--ink3);text-align:left;padding:4px 8px 6px">Término aprox.</th>
-      </tr></thead>
-      <tbody>`;
-
-  ETAPAS_TPL.forEach(et=>{
-    const sem=durs[et.k]||'';
-    html+=`<tr style="border-top:1px solid var(--border)">
-      <td style="padding:8px;"><span class="ec">${et.k}</span> <span style="font-size:10px;color:var(--ink2)">${et.n}</span></td>
-      <td style="padding:8px;text-align:center">
-        <input type="number" id="tpl-dur-${et.k}" value="${sem}" min="0" max="104" step="0.5" placeholder="—"
-          style="width:56px;padding:5px 6px;font-size:12px;text-align:center;border:1.5px solid var(--border);border-radius:7px;background:#fff"
-          oninput="setDurEtapa('${et.k}',parseFloat(this.value)||0);previewFechasTPL()" title="Semanas que dura esta etapa">
-        <span style="font-size:9px;color:var(--ink3)">sem</span>
-      </td>
-      <td style="padding:8px;font-size:10px;color:var(--green)" id="tpl-prev-ini-${et.k}">—</td>
-      <td style="padding:8px;font-size:10px;color:var(--green)" id="tpl-prev-fin-${et.k}">—</td>
-    </tr>`;
-  });
-
-  html+=`</tbody></table>
-  <div style="font-size:9px;color:var(--ink3);margin-top:8px">* Las fechas son orientativas. Se calculan en secuencia al crear un proyecto nuevo con fecha de inicio.</div>
+    <div style="font-size:10px;color:var(--ink2)">Las etapas son secuenciales (DE → SD → DD → CD). Todas las tareas de una etapa comparten sus fechas. Procesos no tiene fechas. La duración de cada etapa ya no se define aquí — se define por proyecto, en el formulario de crear/editar proyecto (Gestión → Proyectos), junto con el presupuesto.</div>
   </div>`;
 
   // Tareas por etapa (sin control de duración individual)
@@ -4536,8 +4541,6 @@ async function loadGTemplates(){
   });
 
   cont.innerHTML=html;
-  // Exponer previewFechasTPL al scope global
-  window.previewFechasTPL=previewFechas;
 }
 let editTplId=null;
 function abrirEditarTemplate(tplId,nombre,grupo){editTplId=tplId;document.getElementById('etpl-nom').value=nombre;document.getElementById('etpl-grupo').value=grupo;document.getElementById('ov-etpl').classList.add('on');}
@@ -4593,6 +4596,17 @@ function diasHabilesRango(iniStr,finStr,festivosSet){
   const fin=new Date(finStr+' 12:00');
   while(d<=fin){const dow=d.getDay(),iso=d.toISOString().split('T')[0];if(dow!==0&&dow!==6&&!festivosSet.has(iso))count++;d.setDate(d.getDate()+1);}
   return count;
+}
+// Devuelve la fecha tal que diasHabilesRango(iniStr,resultado,festivosSet)===nDias (ini cuenta como día 1)
+function sumarDiasHabiles(iniStr,nDias,festivosSet){
+  if(!nDias||nDias<1)return iniStr;
+  let d=new Date(iniStr+' 12:00'),count=0;
+  while(count<nDias){
+    const dow=d.getDay(),iso=d.toISOString().split('T')[0];
+    if(dow!==0&&dow!==6&&!festivosSet.has(iso))count++;
+    if(count<nDias)d.setDate(d.getDate()+1);
+  }
+  return fechaAStr(d);
 }
 
 async function renderVacaciones(){

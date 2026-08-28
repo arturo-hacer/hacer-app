@@ -561,6 +561,17 @@ tr.comp-toggle-row:hover td{background:var(--bg2);}
   </div>
 </div>
 
+<!-- REACTIVAR PROYECTO -->
+<div class="ov" id="ov-reactivar-proy" onclick="closeOv('ov-reactivar-proy',event)" style="z-index:700">
+  <div class="modal" style="position:relative;max-width:420px">
+    <button class="modal-close" onclick="closeOv('ov-reactivar-proy')">×</button>
+    <div class="stitle">Reactivar proyecto</div>
+    <div class="ssub">Las fechas del plan de trabajo se ajustarán por los días hábiles que estuvo pausado, hasta la fecha que indiques.</div>
+    <div class="fl"><label>Reactivado desde</label><input type="date" id="rp-fecha"></div>
+    <button class="bsave" id="rp-save" onclick="guardarReactivarProy()">Reactivar proyecto</button>
+  </div>
+</div>
+
 <!-- PAUSAR PROYECTO -->
 <div class="ov" id="ov-pausar-proy" onclick="closeOv('ov-pausar-proy',event)" style="z-index:700">
   <div class="modal" style="position:relative;max-width:420px">
@@ -1995,7 +2006,7 @@ async function renderEstadoBarDetalle(p,esFacturable){
     const {data:pausaAbierta}=await sb.from('pausas_proyecto').select('fecha_inicio').eq('proyecto_id',proyDetalleId).is('fecha_fin',null).maybeSingle();
     const desde=pausaAbierta?.fecha_inicio?fF(pausaAbierta.fecha_inicio):'';
     html+=`<span class="tag-pill archivado" style="font-size:9px">⏸ Pausado${desde?' desde '+desde:''}</span>`;
-    if(esAdmin)html+=`<button style="${btnEstadoStyle}" onclick="reactivarProy()">▶ Reactivar</button>`;
+    if(esAdmin)html+=`<button style="${btnEstadoStyle}" onclick="abrirReactivarProy()">▶ Reactivar</button>`;
   } else if(estado==='archivado'){
     html+=`<span class="tag-pill archivado" style="font-size:9px">Archivado</span>`;
   } else if(esAdmin&&esFacturable){
@@ -2030,21 +2041,29 @@ async function guardarPausaProy(){
   await renderEstadoBarDetalle(p,detProyEsFacturable);
   if(detProyTab==='entregables')await renderDetProyBody();
 }
-async function reactivarProy(){
-  if(!confirm('¿Reactivar este proyecto? Las fechas del plan de trabajo se ajustarán por los días que estuvo pausado.'))return;
+async function abrirReactivarProy(){
+  document.getElementById('rp-fecha').value=hoy();
+  document.getElementById('ov-reactivar-proy').classList.add('on');
+}
+async function guardarReactivarProy(){
   const {data:pausaAbierta}=await sb.from('pausas_proyecto').select('*').eq('proyecto_id',proyDetalleId).is('fecha_fin',null).maybeSingle();
   if(!pausaAbierta){toast('No se encontró la pausa activa');return;}
+  const fechaFin=document.getElementById('rp-fecha').value||hoy();
+  if(fechaFin<pausaAbierta.fecha_inicio){toast('La fecha de reactivación no puede ser antes de que inició la pausa');return;}
+  if(fechaFin>hoy()){toast('La fecha de reactivación no puede ser en el futuro');return;}
+  const btn=document.getElementById('rp-save');btn.disabled=true;btn.textContent='Guardando...';
   const {data:festivos}=await sb.from('festivos').select('fecha');
   const festSet=new Set((festivos||[]).map(f=>f.fecha));
-  const fechaFin=hoy();
   const diasHab=diasHabilesRango(pausaAbierta.fecha_inicio,fechaFin,festSet);
   const {error:errUpd1}=await sb.from('pausas_proyecto').update({fecha_fin:fechaFin,dias_habiles:diasHab}).eq('id',pausaAbierta.id);
-  if(errUpd1){toast('Error al cerrar la pausa: '+errUpd1.message);return;}
+  if(errUpd1){toast('Error al cerrar la pausa: '+errUpd1.message);btn.disabled=false;btn.textContent='Reactivar proyecto';return;}
 
   const msgRecalc=await recalcularFechasPorPausa(proyDetalleId,pausaAbierta.fecha_inicio,diasHab,festSet);
 
   const {error:errUpd2}=await sb.from('proyectos').update({estado:'activo'}).eq('id',proyDetalleId);
+  btn.disabled=false;btn.textContent='Reactivar proyecto';
   if(errUpd2){toast('Error al actualizar estado: '+errUpd2.message);return;}
+  closeOv('ov-reactivar-proy');
   toast(`✓ Proyecto reactivado · pausado ${diasHab} día(s) hábil(es)${msgRecalc?' · '+msgRecalc:''}`);
   const {data:p}=await sb.from('proyectos_seguro').select('*').eq('id',proyDetalleId).single();
   detProyEstado=p.estado||'activo';
@@ -2087,6 +2106,34 @@ async function recalcularFechasPorPausa(proyectoId,pausaInicio,diasHab,festSet){
   }
   return `${updates.length} etapa(s) ajustada(s)`;
 }
+// Deshace el corrimiento de recalcularFechasPorPausa (misma detección de etapa "en curso", pero restando en vez de sumando)
+async function revertirFechasPorPausa(proyectoId,pausaInicio,diasHab,festSet){
+  if(!diasHab)return '';
+  const ORDEN_ET=['DE','SD','DD','CD'];
+  const {data:etapas}=await sb.from('presupuesto_etapas').select('*').eq('proyecto_id',proyectoId).in('etapa_clave',ORDEN_ET);
+  if(!etapas||!etapas.length)return '';
+  const porClave={};etapas.forEach(r=>porClave[r.etapa_clave]=r);
+  const ordenadas=ORDEN_ET.map(k=>porClave[k]).filter(r=>r&&r.fecha_inicio_vigente&&r.fecha_fin_vigente);
+  if(!ordenadas.length)return '';
+  let idxEnCurso=ordenadas.findIndex(r=>r.fecha_inicio_vigente<=pausaInicio&&pausaInicio<=r.fecha_fin_vigente);
+  let updates=[];
+  if(idxEnCurso>=0){
+    const enCurso=ordenadas[idxEnCurso];
+    updates.push({id:enCurso.id,fecha_fin_vigente:retrocederDiasHabiles(enCurso.fecha_fin_vigente,diasHab,festSet)});
+    for(let i=idxEnCurso+1;i<ordenadas.length;i++){
+      const r=ordenadas[i];
+      updates.push({id:r.id,fecha_inicio_vigente:retrocederDiasHabiles(r.fecha_inicio_vigente,diasHab,festSet),fecha_fin_vigente:retrocederDiasHabiles(r.fecha_fin_vigente,diasHab,festSet)});
+    }
+  } else {
+    const pendientes=ordenadas.filter(r=>r.fecha_fin_vigente>=pausaInicio);
+    pendientes.forEach(r=>updates.push({id:r.id,fecha_inicio_vigente:retrocederDiasHabiles(r.fecha_inicio_vigente,diasHab,festSet),fecha_fin_vigente:retrocederDiasHabiles(r.fecha_fin_vigente,diasHab,festSet)}));
+  }
+  for(const u of updates){
+    const patch={};if(u.fecha_inicio_vigente)patch.fecha_inicio_vigente=u.fecha_inicio_vigente;if(u.fecha_fin_vigente)patch.fecha_fin_vigente=u.fecha_fin_vigente;
+    await sb.from('presupuesto_etapas').update(patch).eq('id',u.id);
+  }
+  return '';
+}
 // Corre las fechas VIGENTES por una ampliación de alcance a partir de una etapa específica.
 async function recalcularFechasPorAmpliacion(proyectoId,etapaClave,diasAgregados,festSet){
   const ORDEN_ET=['DE','SD','DD','CD'];
@@ -2108,6 +2155,34 @@ async function recalcularFechasPorAmpliacion(proyectoId,etapaClave,diasAgregados
     if(error)return 'error al ajustar fechas: '+error.message;
   }
   return `${updates.length} etapa(s) ajustada(s)`;
+}
+// Deshace el corrimiento de recalcularFechasPorAmpliacion
+async function revertirFechasPorAmpliacion(proyectoId,etapaClave,diasAgregados,festSet){
+  const ORDEN_ET=['DE','SD','DD','CD'];
+  const {data:etapas}=await sb.from('presupuesto_etapas').select('*').eq('proyecto_id',proyectoId).in('etapa_clave',ORDEN_ET);
+  if(!etapas||!etapas.length)return;
+  const porClave={};etapas.forEach(r=>porClave[r.etapa_clave]=r);
+  const ordenadas=ORDEN_ET.map(k=>porClave[k]).filter(r=>r&&r.fecha_inicio_vigente&&r.fecha_fin_vigente);
+  const idx=ordenadas.findIndex(r=>r.etapa_clave===etapaClave);
+  if(idx<0)return;
+  const et=ordenadas[idx];
+  await sb.from('presupuesto_etapas').update({fecha_fin_vigente:retrocederDiasHabiles(et.fecha_fin_vigente,diasAgregados,festSet)}).eq('id',et.id);
+  for(let i=idx+1;i<ordenadas.length;i++){
+    const r=ordenadas[i];
+    await sb.from('presupuesto_etapas').update({fecha_inicio_vigente:retrocederDiasHabiles(r.fecha_inicio_vigente,diasAgregados,festSet),fecha_fin_vigente:retrocederDiasHabiles(r.fecha_fin_vigente,diasAgregados,festSet)}).eq('id',r.id);
+  }
+}
+// Determina cuál es la acción (pausa o ampliación) más reciente de un proyecto,
+// comparando created_at entre ambas tablas. Solo esa acción se puede borrar/deshacer.
+async function obtenerUltimaAccionProyecto(proyectoId){
+  const [{data:pausas},{data:amps}]=await Promise.all([
+    sb.from('pausas_proyecto').select('id,created_at').eq('proyecto_id',proyectoId).order('created_at',{ascending:false}).limit(1),
+    sb.from('historial_ampliaciones_etapa').select('id,created_at').eq('proyecto_id',proyectoId).order('created_at',{ascending:false}).limit(1)
+  ]);
+  const p=pausas?.[0],a=amps?.[0];
+  if(!p&&!a)return null;
+  if(p&&(!a||p.created_at>=a.created_at))return {tipo:'pausa',id:p.id};
+  return {tipo:'ampliacion',id:a.id};
 }
 async function abrirAmpliarEtapa(){
   const ORDEN_ET=['DE','SD','DD','CD'];
@@ -2161,33 +2236,88 @@ async function abrirHistorialAmpliaciones(){
   const cont=document.getElementById('hist-ampliaciones-body');
   cont.innerHTML='<div class="ldg">Cargando...</div>';
   document.getElementById('ov-historial-ampliaciones').classList.add('on');
-  const {data:amps}=await sb.from('historial_ampliaciones_etapa').select('*').eq('proyecto_id',proyDetalleId).order('created_at',{ascending:false});
+  const [{data:amps},ultima]=await Promise.all([
+    sb.from('historial_ampliaciones_etapa').select('*').eq('proyecto_id',proyDetalleId).order('created_at',{ascending:false}),
+    obtenerUltimaAccionProyecto(proyDetalleId)
+  ]);
   if(!amps||!amps.length){cont.innerHTML='<div class="empty"><div class="empty-i">📐</div><div>Sin ampliaciones registradas</div></div>';return;}
   cont.innerHTML=amps.map(a=>{
     const semanas=Math.round((a.dias_habiles_agregados/5)*10)/10;
     const fechaReg=a.created_at?fF(a.created_at.slice(0,10)):'';
+    const esUltima=ultima?.tipo==='ampliacion'&&ultima?.id===a.id;
     return `<div style="padding:10px 0;border-bottom:1px solid var(--border)">
-      <div style="font-size:11px;color:var(--ink);font-weight:500"><span class="ec">${a.etapa_clave}</span> +${a.dias_habiles_agregados} día(s) hábil(es) (≈${semanas} sem)${a.monto_adicional?' · +$'+Math.round(a.monto_adicional).toLocaleString('es-MX'):''}</div>
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px">
+        <div style="font-size:11px;color:var(--ink);font-weight:500"><span class="ec">${a.etapa_clave}</span> +${a.dias_habiles_agregados} día(s) hábil(es) (≈${semanas} sem)${a.monto_adicional?' · +$'+Math.round(a.monto_adicional).toLocaleString('es-MX'):''}</div>
+        ${esUltima?`<button style="flex-shrink:0;font-size:9px;color:var(--rose);background:none;border:1px solid rgba(237,37,78,.4);border-radius:5px;padding:3px 7px;cursor:pointer" onclick="eliminarAmpliacion('${a.id}')" title="Deshacer esta ampliación">Deshacer</button>`:''}
+      </div>
       <div style="font-size:9px;color:var(--ink3);margin-top:2px">${fechaReg}</div>
       ${a.nota?`<div style="font-size:10px;color:var(--ink2);margin-top:5px;background:var(--bg2);padding:6px 8px;border-radius:6px">${a.nota}</div>`:''}
     </div>`;
   }).join('');
 }
+async function eliminarAmpliacion(id){
+  if(!confirm('¿Deshacer esta ampliación? Se revertirá el presupuesto, la duración y las fechas vigentes que había ajustado.'))return;
+  const ultima=await obtenerUltimaAccionProyecto(proyDetalleId);
+  if(!(ultima?.tipo==='ampliacion'&&ultima?.id===id)){toast('Ya no es la acción más reciente de este proyecto — no se puede deshacer desde aquí');await abrirHistorialAmpliaciones();return;}
+  const {data:amp,error:errGet}=await sb.from('historial_ampliaciones_etapa').select('*').eq('id',id).single();
+  if(errGet||!amp){toast('No se encontró el registro');return;}
+  const {data:etRow}=await sb.from('presupuesto_etapas').select('id,monto,duracion_dias_habiles').eq('proyecto_id',amp.proyecto_id).eq('etapa_clave',amp.etapa_clave).maybeSingle();
+  if(etRow){
+    await sb.from('presupuesto_etapas').update({monto:Math.max(0,(etRow.monto||0)-(amp.monto_adicional||0)),duracion_dias_habiles:Math.max(0,(etRow.duracion_dias_habiles||0)-amp.dias_habiles_agregados)}).eq('id',etRow.id);
+  }
+  if(amp.monto_adicional){
+    const {data:proyRow}=await sb.from('proyectos').select('presupuesto_total').eq('id',amp.proyecto_id).single();
+    if(proyRow)await sb.from('proyectos').update({presupuesto_total:Math.max(0,(proyRow.presupuesto_total||0)-amp.monto_adicional)}).eq('id',amp.proyecto_id);
+  }
+  const {data:festivos}=await sb.from('festivos').select('fecha');
+  const festSet=new Set((festivos||[]).map(f=>f.fecha));
+  await revertirFechasPorAmpliacion(amp.proyecto_id,amp.etapa_clave,amp.dias_habiles_agregados,festSet);
+  await sb.from('historial_ampliaciones_etapa').delete().eq('id',id);
+  toast('✓ Ampliación deshecha');
+  await abrirHistorialAmpliaciones();
+}
 async function abrirHistorialPausas(){
   const cont=document.getElementById('hist-pausas-body');
   cont.innerHTML='<div class="ldg">Cargando...</div>';
   document.getElementById('ov-historial-pausas').classList.add('on');
-  const {data:pausas}=await sb.from('pausas_proyecto').select('*').eq('proyecto_id',proyDetalleId).order('fecha_inicio',{ascending:false});
+  const [{data:pausas},ultima]=await Promise.all([
+    sb.from('pausas_proyecto').select('*').eq('proyecto_id',proyDetalleId).order('fecha_inicio',{ascending:false}),
+    obtenerUltimaAccionProyecto(proyDetalleId)
+  ]);
   if(!pausas||!pausas.length){cont.innerHTML='<div class="empty"><div class="empty-i">⏸</div><div>Sin pausas registradas</div></div>';return;}
   cont.innerHTML=pausas.map(pa=>{
     const rango=pa.fecha_fin?`${fF(pa.fecha_inicio)} — ${fF(pa.fecha_fin)}`:`${fF(pa.fecha_inicio)} — en curso`;
     const dias=pa.dias_habiles!=null?`${pa.dias_habiles} día(s) hábil(es)`:'';
+    const esUltima=ultima?.tipo==='pausa'&&ultima?.id===pa.id;
     return `<div style="padding:10px 0;border-bottom:1px solid var(--border)">
-      <div style="font-size:11px;color:var(--ink);font-weight:500">${rango}</div>
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px">
+        <div style="font-size:11px;color:var(--ink);font-weight:500">${rango}</div>
+        ${esUltima?`<button style="flex-shrink:0;font-size:9px;color:var(--rose);background:none;border:1px solid rgba(237,37,78,.4);border-radius:5px;padding:3px 7px;cursor:pointer" onclick="eliminarPausa('${pa.id}')" title="Deshacer esta pausa">Deshacer</button>`:''}
+      </div>
       <div style="font-size:9px;color:var(--ink3);margin-top:2px">${dias}</div>
       ${pa.nota?`<div style="font-size:10px;color:var(--ink2);margin-top:5px;background:var(--bg2);padding:6px 8px;border-radius:6px">${pa.nota}</div>`:''}
     </div>`;
   }).join('');
+}
+async function eliminarPausa(id){
+  if(!confirm('¿Deshacer esta pausa? Si ya había sido reactivada, se revertirán las fechas vigentes que había ajustado.'))return;
+  const ultima=await obtenerUltimaAccionProyecto(proyDetalleId);
+  if(!(ultima?.tipo==='pausa'&&ultima?.id===id)){toast('Ya no es la acción más reciente de este proyecto — no se puede deshacer desde aquí');await abrirHistorialPausas();return;}
+  const {data:pa,error:errGet}=await sb.from('pausas_proyecto').select('*').eq('id',id).single();
+  if(errGet||!pa){toast('No se encontró el registro');return;}
+  if(pa.fecha_fin){
+    const {data:festivos}=await sb.from('festivos').select('fecha');
+    const festSet=new Set((festivos||[]).map(f=>f.fecha));
+    await revertirFechasPorPausa(pa.proyecto_id,pa.fecha_inicio,pa.dias_habiles,festSet);
+  } else {
+    await sb.from('proyectos').update({estado:'activo'}).eq('id',pa.proyecto_id);
+  }
+  await sb.from('pausas_proyecto').delete().eq('id',id);
+  toast('✓ Pausa deshecha');
+  const {data:p}=await sb.from('proyectos_seguro').select('*').eq('id',proyDetalleId).single();
+  detProyEstado=p.estado||'activo';
+  await renderEstadoBarDetalle(p,detProyEsFacturable);
+  await abrirHistorialPausas();
 }
 async function renderDetProyBody(){
   if(detProyTab==='entregables')await renderEntregablesDetalle();
@@ -4790,6 +4920,17 @@ function avanzarDiasHabiles(fechaStr,nDias,festivosSet){
   let d=new Date(fechaStr+' 12:00'),count=0;
   while(count<nDias){
     d.setDate(d.getDate()+1);
+    const dow=d.getDay(),iso=d.toISOString().split('T')[0];
+    if(dow!==0&&dow!==6&&!festivosSet.has(iso))count++;
+  }
+  return fechaAStr(d);
+}
+// Devuelve la fecha nDias días hábiles ANTES de fechaStr (fechaStr no cuenta) — inversa de avanzarDiasHabiles
+function retrocederDiasHabiles(fechaStr,nDias,festivosSet){
+  if(!nDias)return fechaStr;
+  let d=new Date(fechaStr+' 12:00'),count=0;
+  while(count<nDias){
+    d.setDate(d.getDate()-1);
     const dow=d.getDay(),iso=d.toISOString().split('T')[0];
     if(dow!==0&&dow!==6&&!festivosSet.has(iso))count++;
   }

@@ -541,7 +541,7 @@ tr.comp-toggle-row:hover td{background:var(--bg2);}
     <div class="det-modal-header">
       <div style="font-family:'Fraunces',serif;font-size:20px;font-weight:300;margin-bottom:2px" id="det-proy-title"></div>
       <div style="font-size:10px;color:var(--ink3);margin-bottom:0" id="det-proy-sub"></div>
-      <div id="det-proy-estado-bar" style="display:none;align-items:center;gap:8px;margin:8px 0 2px"></div>
+      <div id="det-proy-estado-bar" style="display:none;align-items:center;flex-wrap:wrap;gap:8px;margin:8px 0 2px"></div>
       <div class="det-tabs">
         <button class="det-tab on" onclick="switchDetProy('entregables',this)">Entregables</button>
         <button class="det-tab" id="det-tab-gantt" onclick="switchDetProy('gantt',this)">Gantt</button>
@@ -579,6 +579,29 @@ tr.comp-toggle-row:hover td{background:var(--bg2);}
     <button class="modal-close" onclick="closeOv('ov-historial-pausas')">×</button>
     <div class="stitle">Historial de pausas</div>
     <div id="hist-pausas-body" style="margin-top:10px"></div>
+  </div>
+</div>
+
+<!-- AMPLIAR ETAPA -->
+<div class="ov" id="ov-ampliar-etapa" onclick="closeOv('ov-ampliar-etapa',event)" style="z-index:700">
+  <div class="modal" style="position:relative;max-width:440px">
+    <button class="modal-close" onclick="closeOv('ov-ampliar-etapa')">×</button>
+    <div class="stitle">Ampliar etapa</div>
+    <div class="ssub">Registra un aumento de alcance pedido por el cliente. La fecha vigente de esta etapa (y las siguientes) se recorre; la fecha original nunca se toca.</div>
+    <div class="fl"><label>Etapa</label><select id="amp-etapa"></select></div>
+    <div class="fl"><label>Semanas hábiles agregadas</label><input type="number" id="amp-semanas" min="0.5" step="0.5" placeholder="2"></div>
+    <div class="fl"><label>Monto adicional ($, opcional)</label><input type="number" id="amp-monto" placeholder="0"></div>
+    <div class="fl"><label>Motivo</label><textarea id="amp-nota" rows="3" placeholder="Ej. cliente agregó 2 recámaras al proyecto"></textarea></div>
+    <button class="bsave" id="amp-save" onclick="guardarAmpliacion()">Guardar ampliación</button>
+  </div>
+</div>
+
+<!-- HISTORIAL DE AMPLIACIONES -->
+<div class="ov" id="ov-historial-ampliaciones" onclick="closeOv('ov-historial-ampliaciones',event)" style="z-index:700">
+  <div class="modal" style="position:relative;max-width:480px">
+    <button class="modal-close" onclick="closeOv('ov-historial-ampliaciones')">×</button>
+    <div class="stitle">Historial de ampliaciones</div>
+    <div id="hist-ampliaciones-body" style="margin-top:10px"></div>
   </div>
 </div>
 
@@ -1979,6 +2002,10 @@ async function renderEstadoBarDetalle(p,esFacturable){
     html+=`<button style="${btnEstadoStyle}" onclick="abrirPausarProy()">⏸ Pausar proyecto</button>`;
   }
   if(esAdmin&&esFacturable)html+=`<button style="${btnEstadoStyle};opacity:.75" onclick="abrirHistorialPausas()">Historial de pausas</button>`;
+  if(esAdmin&&proyDetalleTipo!=='en_blanco'){
+    html+=`<button style="${btnEstadoStyle}" onclick="abrirAmpliarEtapa()">📐 Ampliar etapa</button>`;
+    html+=`<button style="${btnEstadoStyle};opacity:.75" onclick="abrirHistorialAmpliaciones()">Historial de ampliaciones</button>`;
+  }
   if(!html){bar.style.display='none';bar.innerHTML='';return;}
   bar.style.display='flex';bar.innerHTML=html;
 }
@@ -2059,6 +2086,73 @@ async function recalcularFechasPorPausa(proyectoId,pausaInicio,diasHab,festSet){
     if(error)return 'error al ajustar fechas: '+error.message;
   }
   return `${updates.length} etapa(s) ajustada(s)`;
+}
+// Corre las fechas VIGENTES por una ampliación de alcance a partir de una etapa específica.
+async function recalcularFechasPorAmpliacion(proyectoId,etapaClave,diasAgregados,festSet){
+  const ORDEN_ET=['DE','SD','DD','CD'];
+  const {data:etapas}=await sb.from('presupuesto_etapas').select('*').eq('proyecto_id',proyectoId).in('etapa_clave',ORDEN_ET);
+  if(!etapas||!etapas.length)return 'sin etapas configuradas';
+  const porClave={};etapas.forEach(r=>porClave[r.etapa_clave]=r);
+  const ordenadas=ORDEN_ET.map(k=>porClave[k]).filter(r=>r&&r.fecha_inicio_vigente&&r.fecha_fin_vigente);
+  const idx=ordenadas.findIndex(r=>r.etapa_clave===etapaClave);
+  if(idx<0)return 'esta etapa no tiene fechas calculadas todavía — configúrale duración y fecha de inicio primero';
+  const updates=[];
+  const et=ordenadas[idx];
+  updates.push({id:et.id,fecha_inicio_vigente:et.fecha_inicio_vigente,fecha_fin_vigente:avanzarDiasHabiles(et.fecha_fin_vigente,diasAgregados,festSet)});
+  for(let i=idx+1;i<ordenadas.length;i++){
+    const r=ordenadas[i];
+    updates.push({id:r.id,fecha_inicio_vigente:avanzarDiasHabiles(r.fecha_inicio_vigente,diasAgregados,festSet),fecha_fin_vigente:avanzarDiasHabiles(r.fecha_fin_vigente,diasAgregados,festSet)});
+  }
+  for(const u of updates){
+    const {error}=await sb.from('presupuesto_etapas').update({fecha_inicio_vigente:u.fecha_inicio_vigente,fecha_fin_vigente:u.fecha_fin_vigente}).eq('id',u.id);
+    if(error)return 'error al ajustar fechas: '+error.message;
+  }
+  return `${updates.length} etapa(s) ajustada(s)`;
+}
+async function abrirAmpliarEtapa(){
+  const ORDEN_ET=['DE','SD','DD','CD'];
+  const {data:etapas}=await sb.from('presupuesto_etapas').select('etapa_clave').eq('proyecto_id',proyDetalleId).in('etapa_clave',ORDEN_ET);
+  const claves=(etapas||[]).map(e=>e.etapa_clave).sort((a,b)=>ORDEN_ET.indexOf(a)-ORDEN_ET.indexOf(b));
+  if(!claves.length){toast('Este proyecto no tiene etapas con duración configurada todavía');return;}
+  const et=ETAPAS_C;
+  document.getElementById('amp-etapa').innerHTML=claves.map(k=>{const e=et.find(x=>x.k===k);return `<option value="${k}">${k} · ${e?.n||''}</option>`;}).join('');
+  document.getElementById('amp-semanas').value='';
+  document.getElementById('amp-monto').value='';
+  document.getElementById('amp-nota').value='';
+  document.getElementById('ov-ampliar-etapa').classList.add('on');
+}
+async function guardarAmpliacion(){
+  const etapaClave=document.getElementById('amp-etapa').value;
+  const semanas=parseFloat(document.getElementById('amp-semanas').value)||0;
+  const diasAgregados=Math.round(semanas*5);
+  if(!etapaClave||!diasAgregados){toast('Indica la etapa y las semanas agregadas');return;}
+  const monto=parseFloat(document.getElementById('amp-monto').value)||0;
+  const nota=document.getElementById('amp-nota').value.trim();
+  const btn=document.getElementById('amp-save');btn.disabled=true;btn.textContent='Guardando...';
+  const {error:errIns}=await sb.from('historial_ampliaciones_etapa').insert({proyecto_id:proyDetalleId,etapa_clave:etapaClave,dias_habiles_agregados:diasAgregados,monto_adicional:monto,nota:nota||null,creado_por:USER.id});
+  if(errIns){toast('Error al guardar: '+errIns.message);btn.disabled=false;btn.textContent='Guardar ampliación';return;}
+  const {data:festivos}=await sb.from('festivos').select('fecha');
+  const festSet=new Set((festivos||[]).map(f=>f.fecha));
+  const msg=await recalcularFechasPorAmpliacion(proyDetalleId,etapaClave,diasAgregados,festSet);
+  btn.disabled=false;btn.textContent='Guardar ampliación';
+  closeOv('ov-ampliar-etapa');
+  toast(`✓ Ampliación registrada${msg?' · '+msg:''}`);
+}
+async function abrirHistorialAmpliaciones(){
+  const cont=document.getElementById('hist-ampliaciones-body');
+  cont.innerHTML='<div class="ldg">Cargando...</div>';
+  document.getElementById('ov-historial-ampliaciones').classList.add('on');
+  const {data:amps}=await sb.from('historial_ampliaciones_etapa').select('*').eq('proyecto_id',proyDetalleId).order('created_at',{ascending:false});
+  if(!amps||!amps.length){cont.innerHTML='<div class="empty"><div class="empty-i">📐</div><div>Sin ampliaciones registradas</div></div>';return;}
+  cont.innerHTML=amps.map(a=>{
+    const semanas=Math.round((a.dias_habiles_agregados/5)*10)/10;
+    const fechaReg=a.created_at?fF(a.created_at.slice(0,10)):'';
+    return `<div style="padding:10px 0;border-bottom:1px solid var(--border)">
+      <div style="font-size:11px;color:var(--ink);font-weight:500"><span class="ec">${a.etapa_clave}</span> +${a.dias_habiles_agregados} día(s) hábil(es) (≈${semanas} sem)${a.monto_adicional?' · +$'+Math.round(a.monto_adicional).toLocaleString('es-MX'):''}</div>
+      <div style="font-size:9px;color:var(--ink3);margin-top:2px">${fechaReg}</div>
+      ${a.nota?`<div style="font-size:10px;color:var(--ink2);margin-top:5px;background:var(--bg2);padding:6px 8px;border-radius:6px">${a.nota}</div>`:''}
+    </div>`;
+  }).join('');
 }
 async function abrirHistorialPausas(){
   const cont=document.getElementById('hist-pausas-body');

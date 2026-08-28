@@ -2272,7 +2272,8 @@ async function eliminarAmpliacion(id){
   const {data:festivos}=await sb.from('festivos').select('fecha');
   const festSet=new Set((festivos||[]).map(f=>f.fecha));
   await revertirFechasPorAmpliacion(amp.proyecto_id,amp.etapa_clave,amp.dias_habiles_agregados,festSet);
-  await sb.from('historial_ampliaciones_etapa').delete().eq('id',id);
+  const {error:errDel}=await sb.from('historial_ampliaciones_etapa').delete().eq('id',id);
+  if(errDel){toast('El presupuesto y las fechas ya se revirtieron, pero no pude borrar el registro del historial: '+errDel.message);await abrirHistorialAmpliaciones();return;}
   toast('✓ Ampliación deshecha');
   await abrirHistorialAmpliaciones();
 }
@@ -2328,9 +2329,59 @@ async function renderDetProyBody(){
 async function renderGanttDetalle(){
   const cont=document.getElementById('det-proy-body');
   cont.innerHTML=`<div class="ldg">Cargando Gantt...</div>`;
-  const {data:ents}=await sb.from('entregables').select('*').eq('proyecto_id',proyDetalleId).eq('eliminado',false).order('etapa_clave').order('grupo').order('orden').order('created_at');
+  const [{data:ents},{data:etapasPlan}]=await Promise.all([
+    sb.from('entregables').select('*').eq('proyecto_id',proyDetalleId).eq('eliminado',false).order('etapa_clave').order('grupo').order('orden').order('created_at'),
+    sb.from('presupuesto_etapas_seguro').select('*').eq('proyecto_id',proyDetalleId).in('etapa_clave',['DE','SD','DD','CD'])
+  ]);
+
+  let html=`<div style="padding:16px;overflow-x:auto">`;
+
+  // ── Plan de trabajo por etapa: original vs vigente ──
+  const ORDEN_ET=['DE','SD','DD','CD'];
+  const etapasConFecha=(etapasPlan||[]).filter(e=>e.fecha_inicio_original&&e.fecha_fin_original).sort((a,b)=>ORDEN_ET.indexOf(a.etapa_clave)-ORDEN_ET.indexOf(b.etapa_clave));
+  if(etapasConFecha.length){
+    const todasFechas=etapasConFecha.flatMap(e=>[e.fecha_inicio_original,e.fecha_fin_original,e.fecha_inicio_vigente,e.fecha_fin_vigente].filter(Boolean));
+    const minP=todasFechas.reduce((a,b)=>a<b?a:b),maxP=todasFechas.reduce((a,b)=>a>b?a:b);
+    const startP=new Date(minP+' 00:00'),endP=new Date(maxP+' 00:00');
+    const spanP=Math.max(1,endP-startP);
+    const coloresBarra={DE:'#7b9ec0',SD:'#9e7bc0',DD:'#7bc09e',CD:'#c0a77b'};
+    html+=`<div style="margin-bottom:20px;padding-bottom:16px;border-bottom:1px solid var(--border)">
+      <div style="font-size:9px;letter-spacing:.1em;text-transform:uppercase;color:var(--ink3);margin-bottom:10px">Plan de trabajo por etapa</div>`;
+    etapasConFecha.forEach(e=>{
+      const et=ETAPAS_C.find(x=>x.k===e.etapa_clave);
+      const color=coloresBarra[e.etapa_clave]||'var(--accent)';
+      const movida=e.fecha_inicio_vigente!==e.fecha_inicio_original||e.fecha_fin_vigente!==e.fecha_fin_original;
+      const oS=new Date(e.fecha_inicio_original+' 00:00'),oE=new Date(e.fecha_fin_original+' 00:00');
+      const oLeft=((oS-startP)/spanP)*100,oWidth=Math.max(1.5,((oE-oS)/spanP)*100);
+      let vigBar='';
+      if(movida&&e.fecha_inicio_vigente&&e.fecha_fin_vigente){
+        const vS=new Date(e.fecha_inicio_vigente+' 00:00'),vE=new Date(e.fecha_fin_vigente+' 00:00');
+        const vLeft=((vS-startP)/spanP)*100,vWidth=Math.max(1.5,((vE-vS)/spanP)*100);
+        vigBar=`<div style="position:absolute;height:8px;bottom:0;left:${vLeft}%;width:${vWidth}%;border-radius:4px;background:${color}"></div>`;
+      }
+      html+=`<div style="margin-bottom:14px">
+        <div style="display:flex;justify-content:space-between;align-items:baseline;flex-wrap:wrap;gap:4px;margin-bottom:3px">
+          <span style="font-size:10px;color:var(--ink2)"><b style="color:${color}">${e.etapa_clave}</b> · ${et?.n||''}</span>
+          <span style="font-size:9px;color:var(--ink3)">
+            Original: ${fF(e.fecha_inicio_original)} – ${fF(e.fecha_fin_original)}${movida?` &nbsp;·&nbsp; <span style="color:var(--amber);font-weight:600">Vigente: ${fF(e.fecha_inicio_vigente)} – ${fF(e.fecha_fin_vigente)}</span>`:''}
+          </span>
+        </div>
+        <div style="position:relative;height:${movida?'20px':'10px'};background:var(--bg2);border-radius:4px">
+          <div style="position:absolute;height:${movida?'8px':'10px'};top:0;left:${oLeft}%;width:${oWidth}%;border-radius:4px;background:${color};opacity:${movida?'.35':'1'};${movida?`border:1px dashed ${color}`:''}"></div>
+          ${vigBar}
+        </div>
+      </div>`;
+    });
+    html+=`<div style="font-size:9px;color:var(--ink3);margin-top:2px">Barra tenue y punteada = plan original (lo prometido al cliente) · barra sólida = plan vigente, cuando se movió por una pausa o una ampliación</div>`;
+    html+=`</div>`;
+  }
+
+  // ── Gantt de entregables ──
   const conFecha=(ents||[]).filter(e=>e.fecha_inicio&&e.fecha_fin);
-  if(!conFecha.length){cont.innerHTML=`<div class="empty"><div class="empty-i">📅</div><div>Sin fechas asignadas todavía</div></div>`;return;}
+  if(!conFecha.length){
+    if(!etapasConFecha.length){cont.innerHTML=`<div class="empty"><div class="empty-i">📅</div><div>Sin fechas asignadas todavía</div></div>`;return;}
+    cont.innerHTML=html+`</div>`;return;
+  }
   const fechas=conFecha.flatMap(e=>[e.fecha_inicio,e.fecha_fin]);
   const minD=fechas.reduce((a,b)=>a<b?a:b),maxD=fechas.reduce((a,b)=>a>b?a:b);
   const start=new Date(minD+' 00:00'),end=new Date(maxD+' 00:00');
@@ -2338,7 +2389,7 @@ async function renderGanttDetalle(){
   const hoyD=new Date(hoy()+' 00:00'),hoyPct=Math.max(0,Math.min(100,((hoyD-start)/span)*100));
   const porEtapa={};conFecha.forEach(e=>{if(!porEtapa[e.etapa_clave])porEtapa[e.etapa_clave]=[];porEtapa[e.etapa_clave].push(e);});
   const coloresBarra={DE:'#7b9ec0',SD:'#9e7bc0',DD:'#7bc09e',CD:'#c0a77b',PC:'#c07b9e'};
-  let html=`<div style="padding:16px;overflow-x:auto">
+  html+=`<div style="font-size:9px;letter-spacing:.1em;text-transform:uppercase;color:var(--ink3);margin-bottom:8px">Entregables</div>
     <div style="display:flex;justify-content:space-between;font-size:8px;color:var(--ink3);padding:0 0 8px;letter-spacing:.03em">
       <span>${fF(minD)}</span><span style="color:var(--rose)">Hoy</span><span>${fF(maxD)}</span>
     </div>`;

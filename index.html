@@ -1155,7 +1155,7 @@ async function renderMisTareas(){
   function filaT(e){
     const pid=e.proyecto_id, clave=e.etapa_clave||'_';
     const pl=timerEnt===e.id;
-    const bloqueada=e.proyectos?.estado==='pausado'&&clave!=='PC';
+    const bloqueada=e.proyectos?.estado==='pausado';
 
     // Fechas — editables al click
     let fIni='+ fecha', fFin='+ fecha', fFinC='sin', fIniC='sin';
@@ -1516,7 +1516,7 @@ async function _guardarTimer(){
       const hrs=Math.max(1/60,Math.round(secsEfectivos/60)/60);
       const {data:ent}=await sb.from('entregables').select('proyecto_id,etapa_clave,proyectos(estado)').eq('id',entId).single();
       if(ent){
-        if(ent.proyectos?.estado==='pausado'&&ent.etapa_clave!=='PC'){
+        if(ent.proyectos?.estado==='pausado'){
           toast('⏸ Proyecto pausado — el tiempo del timer no se guardó');
         } else {
         const {data:ex}=await sb.from('registros_horas').select('id,horas').eq('colaborador_id',USER.id).eq('entregable_id',entId).eq('fecha',diaAct).maybeSingle();
@@ -1563,9 +1563,8 @@ async function rActEtapas(pe=null,pent=null){
   const {data}=await sb.from('entregables').select('etapa_clave').eq('proyecto_id',pid).eq('eliminado',false);
   let claves=[...new Set((data||[]).map(e=>e.etapa_clave).filter(Boolean))];
   if(proy?.estado==='pausado'){
-    claves=claves.filter(c=>c==='PC');
-    if(!claves.length){toast('Este proyecto está pausado — no hay etapa Procesos disponible');return;}
-    toast('Proyecto pausado — solo puedes registrar en Procesos');
+    toast('⏸ Este proyecto está pausado — no se pueden registrar horas');
+    return;
   }
   claves.forEach(c=>s.innerHTML+=`<option value="${c}">${c}</option>`);
   if(pe){s.value=pe;await rActEnts(pent);}
@@ -1588,7 +1587,7 @@ async function saveReg(){
   if(!pid||!ec||!eid){toast('Completa todos los campos');return;}
   const etapaClave=ec==='_'?'_':ec;
   const {data:proyChk}=await sb.from('proyectos').select('estado').eq('id',pid).single();
-  if(proyChk?.estado==='pausado'&&etapaClave!=='PC'){toast('⏸ Este proyecto está pausado — no se pueden registrar horas fuera de Procesos');return;}
+  if(proyChk?.estado==='pausado'){toast('⏸ Este proyecto está pausado — no se pueden registrar horas');return;}
   const btn=document.getElementById('rsave');btn.disabled=true;btn.textContent='Guardando...';
   const fechaReg=document.getElementById('reg-fecha-input').value||diaAct;
   const {data:ex}=await sb.from('registros_horas').select('id,horas').eq('colaborador_id',USER.id).eq('entregable_id',eid).eq('fecha',fechaReg).maybeSingle();
@@ -2727,7 +2726,7 @@ function _filaTabla(e, colabs, esAdmin){
   }
 
   // Acciones cell
-  const bloqueadaDet=detProyEstado==='pausado'&&etClave!=='PC';
+  const bloqueadaDet=detProyEstado==='pausado';
   const accCell = `<div style="display:flex;gap:4px;justify-content:center;align-items:center">
     ${bloqueadaDet
       ?`<button class="bplay" disabled title="Proyecto pausado" style="opacity:.35;cursor:not-allowed">⏸</button><button class="bhrs" disabled title="Proyecto pausado" style="opacity:.35;cursor:not-allowed">+</button>`

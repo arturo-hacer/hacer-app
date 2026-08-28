@@ -2129,14 +2129,31 @@ async function guardarAmpliacion(){
   const monto=parseFloat(document.getElementById('amp-monto').value)||0;
   const nota=document.getElementById('amp-nota').value.trim();
   const btn=document.getElementById('amp-save');btn.disabled=true;btn.textContent='Guardando...';
+
   const {error:errIns}=await sb.from('historial_ampliaciones_etapa').insert({proyecto_id:proyDetalleId,etapa_clave:etapaClave,dias_habiles_agregados:diasAgregados,monto_adicional:monto,nota:nota||null,creado_por:USER.id});
   if(errIns){toast('Error al guardar: '+errIns.message);btn.disabled=false;btn.textContent='Guardar ampliación';return;}
+
+  // Aplicar el monto adicional al presupuesto real: suma a la etapa y al total del proyecto
+  if(monto){
+    const {data:etRow,error:errEt}=await sb.from('presupuesto_etapas').select('id,monto').eq('proyecto_id',proyDetalleId).eq('etapa_clave',etapaClave).maybeSingle();
+    if(errEt||!etRow){toast('Ampliación registrada, pero no pude actualizar el presupuesto de la etapa: '+(errEt?.message||'etapa no encontrada'));}
+    else{
+      const {error:errUpdMonto}=await sb.from('presupuesto_etapas').update({monto:(etRow.monto||0)+monto}).eq('id',etRow.id);
+      if(errUpdMonto)toast('Ampliación registrada, pero no pude actualizar el presupuesto de la etapa: '+errUpdMonto.message);
+    }
+    const {data:proyRow,error:errProy}=await sb.from('proyectos').select('presupuesto_total').eq('id',proyDetalleId).single();
+    if(!errProy&&proyRow){
+      const {error:errUpdTotal}=await sb.from('proyectos').update({presupuesto_total:(proyRow.presupuesto_total||0)+monto}).eq('id',proyDetalleId);
+      if(errUpdTotal)toast('Ampliación registrada, pero no pude actualizar el presupuesto total: '+errUpdTotal.message);
+    }
+  }
+
   const {data:festivos}=await sb.from('festivos').select('fecha');
   const festSet=new Set((festivos||[]).map(f=>f.fecha));
   const msg=await recalcularFechasPorAmpliacion(proyDetalleId,etapaClave,diasAgregados,festSet);
   btn.disabled=false;btn.textContent='Guardar ampliación';
   closeOv('ov-ampliar-etapa');
-  toast(`✓ Ampliación registrada${msg?' · '+msg:''}`);
+  toast(`✓ Ampliación registrada${monto?' · +$'+monto.toLocaleString('es-MX')+' al presupuesto':''}${msg?' · '+msg:''}`);
 }
 async function abrirHistorialAmpliaciones(){
   const cont=document.getElementById('hist-ampliaciones-body');

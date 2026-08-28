@@ -541,6 +541,7 @@ tr.comp-toggle-row:hover td{background:var(--bg2);}
     <div class="det-modal-header">
       <div style="font-family:'Fraunces',serif;font-size:20px;font-weight:300;margin-bottom:2px" id="det-proy-title"></div>
       <div style="font-size:10px;color:var(--ink3);margin-bottom:0" id="det-proy-sub"></div>
+      <div id="det-proy-estado-bar" style="display:none;align-items:center;gap:8px;margin:8px 0 2px"></div>
       <div class="det-tabs">
         <button class="det-tab on" onclick="switchDetProy('entregables',this)">Entregables</button>
         <button class="det-tab" id="det-tab-gantt" onclick="switchDetProy('gantt',this)">Gantt</button>
@@ -557,6 +558,26 @@ tr.comp-toggle-row:hover td{background:var(--bg2);}
         <button class="sel-bar-clr" onclick="limpiarSeleccion()" title="Cancelar selección">×</button>
       </div>
       <div class="det-modal-body" id="det-proy-body"></div>
+  </div>
+</div>
+
+<!-- PAUSAR PROYECTO -->
+<div class="ov" id="ov-pausar-proy" onclick="closeOv('ov-pausar-proy',event)" style="z-index:700">
+  <div class="modal" style="position:relative;max-width:420px">
+    <button class="modal-close" onclick="closeOv('ov-pausar-proy')">×</button>
+    <div class="stitle">Pausar proyecto</div>
+    <div class="ssub">Se guardará la fecha de hoy como inicio de la pausa. El plan de trabajo se ajustará automáticamente cuando reactives.</div>
+    <div class="fl"><label>Motivo de la pausa</label><textarea id="pp-nota" rows="3" placeholder="Ej. cliente en espera de aprobación de presupuesto"></textarea></div>
+    <button class="bsave" id="pp-save" onclick="guardarPausaProy()">Pausar proyecto</button>
+  </div>
+</div>
+
+<!-- HISTORIAL DE PAUSAS -->
+<div class="ov" id="ov-historial-pausas" onclick="closeOv('ov-historial-pausas',event)" style="z-index:700">
+  <div class="modal" style="position:relative;max-width:480px">
+    <button class="modal-close" onclick="closeOv('ov-historial-pausas')">×</button>
+    <div class="stitle">Historial de pausas</div>
+    <div id="hist-pausas-body" style="margin-top:10px"></div>
   </div>
 </div>
 
@@ -1915,7 +1936,76 @@ async function abrirDetalleProy(proyId){
   document.getElementById('det-tab-gantt').style.display=proyDetalleTipo==='en_blanco'?'none':'block';
   document.querySelectorAll('#ov-det-proy .det-tab').forEach((t,i)=>t.classList.toggle('on',i===0));
   document.getElementById('ov-det-proy').classList.add('on');
+  await renderEstadoBarDetalle(p);
   await renderDetProyBody();
+}
+const btnEstadoStyle='padding:5px 10px;border:1.5px solid var(--border);border-radius:6px;background:none;font-size:10px;color:var(--ink2);cursor:pointer';
+async function renderEstadoBarDetalle(p){
+  const bar=document.getElementById('det-proy-estado-bar');if(!bar)return;
+  const esAdmin=PERFIL?.rol==='admin';
+  const estado=p.estado||'activo';
+  let html='';
+  if(estado==='pausado'){
+    const {data:pausaAbierta}=await sb.from('pausas_proyecto').select('fecha_inicio').eq('proyecto_id',proyDetalleId).is('fecha_fin',null).maybeSingle();
+    const desde=pausaAbierta?.fecha_inicio?fF(pausaAbierta.fecha_inicio):'';
+    html+=`<span class="tag-pill archivado" style="font-size:9px">⏸ Pausado${desde?' desde '+desde:''}</span>`;
+    if(esAdmin)html+=`<button style="${btnEstadoStyle}" onclick="reactivarProy()">▶ Reactivar</button>`;
+  } else if(estado==='archivado'){
+    html+=`<span class="tag-pill archivado" style="font-size:9px">Archivado</span>`;
+  } else if(esAdmin){
+    html+=`<button style="${btnEstadoStyle}" onclick="abrirPausarProy()">⏸ Pausar proyecto</button>`;
+  }
+  if(esAdmin)html+=`<button style="${btnEstadoStyle};opacity:.75" onclick="abrirHistorialPausas()">Historial de pausas</button>`;
+  if(!html){bar.style.display='none';bar.innerHTML='';return;}
+  bar.style.display='flex';bar.innerHTML=html;
+}
+function abrirPausarProy(){
+  document.getElementById('pp-nota').value='';
+  document.getElementById('ov-pausar-proy').classList.add('on');
+}
+async function guardarPausaProy(){
+  const nota=document.getElementById('pp-nota').value.trim();
+  const btn=document.getElementById('pp-save');btn.disabled=true;btn.textContent='Guardando...';
+  const {error:errIns}=await sb.from('pausas_proyecto').insert({proyecto_id:proyDetalleId,fecha_inicio:hoy(),nota:nota||null,creado_por:USER.id});
+  if(errIns){toast('Error al pausar: '+errIns.message);btn.disabled=false;btn.textContent='Pausar proyecto';return;}
+  const {error:errUpd}=await sb.from('proyectos').update({estado:'pausado'}).eq('id',proyDetalleId);
+  btn.disabled=false;btn.textContent='Pausar proyecto';
+  if(errUpd){toast('Error al actualizar estado: '+errUpd.message);return;}
+  closeOv('ov-pausar-proy');toast('✓ Proyecto pausado');
+  const {data:p}=await sb.from('proyectos_seguro').select('*').eq('id',proyDetalleId).single();
+  await renderEstadoBarDetalle(p);
+}
+async function reactivarProy(){
+  if(!confirm('¿Reactivar este proyecto? Las fechas del plan de trabajo se ajustarán por los días que estuvo pausado.'))return;
+  const {data:pausaAbierta}=await sb.from('pausas_proyecto').select('*').eq('proyecto_id',proyDetalleId).is('fecha_fin',null).maybeSingle();
+  if(!pausaAbierta){toast('No se encontró la pausa activa');return;}
+  const {data:festivos}=await sb.from('festivos').select('fecha');
+  const festSet=new Set((festivos||[]).map(f=>f.fecha));
+  const fechaFin=hoy();
+  const diasHab=diasHabilesRango(pausaAbierta.fecha_inicio,fechaFin,festSet);
+  const {error:errUpd1}=await sb.from('pausas_proyecto').update({fecha_fin:fechaFin,dias_habiles:diasHab}).eq('id',pausaAbierta.id);
+  if(errUpd1){toast('Error al cerrar la pausa: '+errUpd1.message);return;}
+  const {error:errUpd2}=await sb.from('proyectos').update({estado:'activo'}).eq('id',proyDetalleId);
+  if(errUpd2){toast('Error al actualizar estado: '+errUpd2.message);return;}
+  toast(`✓ Proyecto reactivado · pausado ${diasHab} día(s) hábil(es)`);
+  const {data:p}=await sb.from('proyectos_seguro').select('*').eq('id',proyDetalleId).single();
+  await renderEstadoBarDetalle(p);
+}
+async function abrirHistorialPausas(){
+  const cont=document.getElementById('hist-pausas-body');
+  cont.innerHTML='<div class="ldg">Cargando...</div>';
+  document.getElementById('ov-historial-pausas').classList.add('on');
+  const {data:pausas}=await sb.from('pausas_proyecto').select('*').eq('proyecto_id',proyDetalleId).order('fecha_inicio',{ascending:false});
+  if(!pausas||!pausas.length){cont.innerHTML='<div class="empty"><div class="empty-i">⏸</div><div>Sin pausas registradas</div></div>';return;}
+  cont.innerHTML=pausas.map(pa=>{
+    const rango=pa.fecha_fin?`${fF(pa.fecha_inicio)} — ${fF(pa.fecha_fin)}`:`${fF(pa.fecha_inicio)} — en curso`;
+    const dias=pa.dias_habiles!=null?`${pa.dias_habiles} día(s) hábil(es)`:'';
+    return `<div style="padding:10px 0;border-bottom:1px solid var(--border)">
+      <div style="font-size:11px;color:var(--ink);font-weight:500">${rango}</div>
+      <div style="font-size:9px;color:var(--ink3);margin-top:2px">${dias}</div>
+      ${pa.nota?`<div style="font-size:10px;color:var(--ink2);margin-top:5px;background:var(--bg2);padding:6px 8px;border-radius:6px">${pa.nota}</div>`:''}
+    </div>`;
+  }).join('');
 }
 async function renderDetProyBody(){
   if(detProyTab==='entregables')await renderEntregablesDetalle();

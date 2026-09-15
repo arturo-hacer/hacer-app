@@ -1098,12 +1098,15 @@ async function renderReg(){
 async function renderMisTareas(){
   const cont=document.getElementById('mis-t');if(!cont)return;
 
-  const {data:ents}=await sb.from('entregables')
+  const {data:entsRaw}=await sb.from('entregables')
     .select('*,proyectos(id,codigo,nombre,estado),colaboradores(id,nombre,apellido,color)')
     .eq('asignado_id',USER.id)
     .eq('eliminado',false)
     .order('fecha_unica',{ascending:true,nullsFirst:false})
     .order('fecha_fin',{ascending:true,nullsFirst:false});
+
+  // Proyectos pausados no meten ruido en Mis Tareas — se manejan aparte, desde el detalle del proyecto
+  const ents=(entsRaw||[]).filter(e=>e.proyectos?.estado!=='pausado');
 
   // También traer todos los colaboradores para el selector de responsable
   const {data:colabs}=await sb.from('colaboradores').select('id,nombre,apellido,color').order('nombre');
@@ -1613,7 +1616,7 @@ async function renderDashboard(){
     sb.from('colaboradores_seguro').select('*').order('nombre'),
     sb.from('registros_horas').select('colaborador_id,horas,fecha,proyecto_id,entregables(nombre)').in('fecha',diasSem),
     sb.from('entregables').select('id,nombre,done,eliminado,fecha_unica,fecha_fin,proyecto_id,asignado_id,etapa_clave').eq('eliminado',false),
-    sb.from('proyectos_seguro').select('id,codigo,nombre,cliente,tipo,presupuesto_total,estado').order('codigo'),
+    sb.from('proyectos_seguro').select('id,codigo,nombre,cliente,tipo,presupuesto_total,gasto_previo,estado').order('codigo'),
     regsPresupQ
   ]);
 
@@ -1634,8 +1637,10 @@ async function renderDashboard(){
   // Datos proyectos
   const epMap={},entsRetrasadas={},entsSemMap={},entsSemPendientes={};
   (entsAll||[]).forEach(e=>{
-    if(!epMap[e.proyecto_id])epMap[e.proyecto_id]={t:0,d:0};
-    epMap[e.proyecto_id].t++;if(e.done)epMap[e.proyecto_id].d++;
+    if(e.etapa_clave!=='PC'){
+      if(!epMap[e.proyecto_id])epMap[e.proyecto_id]={t:0,d:0};
+      epMap[e.proyecto_id].t++;if(e.done)epMap[e.proyecto_id].d++;
+    }
     const fr=e.fecha_unica||e.fecha_fin;if(!fr)return;
     if(fr<hoyStr&&!e.done){if(!entsRetrasadas[e.proyecto_id])entsRetrasadas[e.proyecto_id]=[];entsRetrasadas[e.proyecto_id].push(e);}
     if(fr>=hoyStr&&fr<=finSem){
@@ -1702,7 +1707,8 @@ async function renderDashboard(){
     const ep=epMap[p.id]||{t:0,d:0};
     const av=ep.t>0?Math.round(ep.d/ep.t*100):0;
     const tienePresup=esAdmin&&p.presupuesto_total>0&&p.tipo!=='en_blanco';
-    const pct=tienePresup?Math.min(100,Math.round((consumoProy[p.id]||0)/p.presupuesto_total*100)):null;
+    const consumoConGasto=(consumoProy[p.id]||0)+(p.gasto_previo||0);
+    const pct=tienePresup?Math.min(100,Math.round(consumoConGasto/p.presupuesto_total*100)):null;
     const colPct=pct>=90?'var(--rose)':pct>=70?'var(--amber)':'var(--green)';
     const semD=entsSemMap[p.id]||{total:0,done:0};
     const hrsP=hrsSemProy[p.id]||0;
@@ -1729,7 +1735,7 @@ async function renderDashboard(){
       proyHtml+='<div>';
       proyHtml+='<div style="display:flex;justify-content:space-between;margin-bottom:3px"><span style="font-size:9px;color:var(--ink3)">Presupuesto</span><span style="font-size:9px;color:'+colPct+';font-weight:600">'+pct+'%</span></div>';
       proyHtml+='<div style="height:6px;background:var(--bg2);border-radius:3px;overflow:hidden"><div style="height:100%;width:'+pct+'%;background:'+colPct+';border-radius:3px"></div></div>';
-      proyHtml+='<div style="font-size:9px;color:var(--ink3);margin-top:2px">$'+Math.round(consumoProy[p.id]||0).toLocaleString('es-MX')+' / $'+p.presupuesto_total.toLocaleString('es-MX')+'</div>';
+      proyHtml+='<div style="font-size:9px;color:var(--ink3);margin-top:2px">$'+Math.round(consumoConGasto).toLocaleString('es-MX')+' / $'+p.presupuesto_total.toLocaleString('es-MX')+'</div>';
       proyHtml+='</div>';
     }
     proyHtml+='</div>'; // grid
@@ -1883,8 +1889,8 @@ async function renderProy(){
   const psVisibles=(esAdmin?ps:ps.filter(p=>!archivadosIds.has(p.id))).filter(p=>p.codigo!=='VAC');
   const proyIds=psVisibles.map(p=>p.id);
 
-  const {data:es}=await sb.from('entregables').select('proyecto_id,done,eliminado');
-  const ep={};(es||[]).forEach(e=>{if(!ep[e.proyecto_id])ep[e.proyecto_id]={t:0,d:0};if(!e.eliminado){ep[e.proyecto_id].t++;if(e.done)ep[e.proyecto_id].d++;}});
+  const {data:es}=await sb.from('entregables').select('proyecto_id,done,eliminado,etapa_clave');
+  const ep={};(es||[]).forEach(e=>{if(e.etapa_clave==='PC')return;if(!ep[e.proyecto_id])ep[e.proyecto_id]={t:0,d:0};if(!e.eliminado){ep[e.proyecto_id].t++;if(e.done)ep[e.proyecto_id].d++;}});
 
   const {data:consumoRows}=proyIds.length?await sb.rpc('fn_consumo_proyectos',{p_proyecto_ids:proyIds}):{data:[]};
   const consumo={};(consumoRows||[]).forEach(r=>{consumo[r.proyecto_id]=r.costo||0;});
@@ -1913,7 +1919,8 @@ function renderProyTabla(filtro=''){
     const s=ep[p.id]||{t:0,d:0};
     const av=s.t>0?Math.round(s.d/s.t*100):0;
     const tienePresup=p.presupuesto_total>0&&p.tipo!=='en_blanco';
-    const pct=tienePresup?Math.min(100,Math.round((consumo[p.id]||0)/p.presupuesto_total*100)):null;
+    const consumoConGasto=(consumo[p.id]||0)+(p.gasto_previo||0);
+    const pct=tienePresup?Math.min(100,Math.round(consumoConGasto/p.presupuesto_total*100)):null;
     const colorPct=pct>=90?'var(--rose)':pct>=70?'var(--amber)':'var(--green)';
     const estadoTxt=p.estado==='pausado'?'⏸ Pausado':p.estado==='archivado'?'Archivado':'● Activo';
     const estadoColor=p.estado==='pausado'?'var(--amber)':p.estado==='archivado'?'var(--ink3)':'var(--green)';
@@ -2466,8 +2473,10 @@ async function renderReporteDetalle(){
     if(!avEtapa[k])avEtapa[k]={t:0,d:0};
     avEtapa[k].t++;if(e.done)avEtapa[k].d++;
   });
-  const totalEnt=Object.values(avEtapa).reduce((s,v)=>s+v.t,0);
-  const totalDone=Object.values(avEtapa).reduce((s,v)=>s+v.d,0);
+  // "Avance global" excluye Procesos (PC): son tareas recurrentes, no hitos de avance del proyecto.
+  // El desglose por etapa más abajo (avEtapa) sí conserva PC — ahí sigue siendo útil verla.
+  const totalEnt=Object.entries(avEtapa).filter(([k])=>k!=='PC').reduce((s,[,v])=>s+v.t,0);
+  const totalDone=Object.entries(avEtapa).filter(([k])=>k!=='PC').reduce((s,[,v])=>s+v.d,0);
   const pctGlobal=totalEnt>0?Math.round(totalDone/totalEnt*100):0;
 
   // ── Presupuesto por etapa ──
@@ -3527,8 +3536,8 @@ async function genRepQuincenal(){
 
   const [{data:colab},{data:completadas},{data:pendientes},{data:regs},{data:vacs},{data:festivos},{data:proyObjInd}]=await Promise.all([
     sb.from('colaboradores_seguro').select('*').eq('id',colabId).single(),
-    sb.from('entregables').select('id,nombre,etapa_clave,proyecto_id,completado_en,proyectos(id,codigo,nombre,tipo)').eq('asignado_id',colabId).eq('eliminado',false).eq('done',true).gte('completado_en',desde+'T00:00:00').lte('completado_en',hasta+'T23:59:59'),
-    sb.from('entregables').select('id,nombre,etapa_clave,proyecto_id,fecha_unica,fecha_fin,proyectos(id,codigo,nombre,tipo)').eq('asignado_id',colabId).eq('eliminado',false).eq('done',false),
+    sb.from('entregables').select('id,nombre,etapa_clave,proyecto_id,completado_en,proyectos(id,codigo,nombre,tipo,estado)').eq('asignado_id',colabId).eq('eliminado',false).eq('done',true).gte('completado_en',desde+'T00:00:00').lte('completado_en',hasta+'T23:59:59'),
+    sb.from('entregables').select('id,nombre,etapa_clave,proyecto_id,fecha_unica,fecha_fin,proyectos(id,codigo,nombre,tipo,estado)').eq('asignado_id',colabId).eq('eliminado',false).eq('done',false),
     sb.from('registros_horas').select('horas,fecha,nota,proyecto_id,entregable_id,proyectos(id,codigo,nombre,tipo),entregables(nombre)').eq('colaborador_id',colabId).gte('fecha',desde).lte('fecha',hasta),
     sb.from('vacaciones').select('fecha_inicio,fecha_fin').eq('colaborador_id',colabId),
     sb.from('festivos').select('fecha'),
@@ -3604,7 +3613,12 @@ async function genRepQuincenal(){
   const metaRegistro=100;
   const metaProd=colab?.meta_productivo_pct??80;
 
-  _rqData={colab,desde,hasta,proyMap,hTotal,hProd,hNoProd,pctProd,metaProd,diasHabTotales,diasVac,diasTrabajo,horasHabiles,pctRegistro,metaRegistro,tareaHoras,entregablesObjInd};
+  const hoyStr=hoy();
+  const d15=new Date(hoyStr+' 12:00');d15.setDate(d15.getDate()+15);
+  const limite15=d15.toISOString().split('T')[0];
+  const vacsProximas=(vacs||[]).filter(v=>v.fecha_inicio<=limite15&&v.fecha_fin>=hoyStr).sort((a,b)=>a.fecha_inicio<b.fecha_inicio?-1:1);
+
+  _rqData={colab,desde,hasta,proyMap,hTotal,hProd,hNoProd,pctProd,metaProd,diasHabTotales,diasVac,diasTrabajo,horasHabiles,pctRegistro,metaRegistro,tareaHoras,entregablesObjInd,vacsProximas,hoyStr};
   renderRepQuincenalResultado();
 }
 
@@ -3620,21 +3634,24 @@ function renderRepQuincenalResultado(){
   }
   proyEntries.forEach(([pid,pd])=>{
     const p=pd.proy;
-    const etapasComp={};pd.completadas.forEach(e=>{const k=e.etapa_clave||'_';(etapasComp[k]=etapasComp[k]||[]).push(e);});
-    const etapasPend={};pd.pendientes.forEach(e=>{const k=e.etapa_clave||'_';(etapasPend[k]=etapasPend[k]||[]).push(e);});
-    let bloqueComp='';
-    if(pd.completadas.length){
-      bloqueComp=`<div style="margin-bottom:10px"><div class="lbl-sm2">Completadas en el periodo</div>`+
-        Object.entries(etapasComp).map(([et,arr])=>`<div style="margin-bottom:6px"><span class="ec" style="font-size:8px">${et==='_'?'—':et}</span> `+arr.map(e=>`<div style="font-size:11px;color:var(--ink);padding:2px 0 2px 18px">✓ ${e.nombre}</div>`).join('')+`</div>`).join('')+`</div>`;
-    }
-    let bloquePend='';
-    if(pd.pendientes.length){
-      bloquePend=`<div style="margin-bottom:10px"><div class="lbl-sm2">Por completar</div>`+
-        Object.entries(etapasPend).map(([et,arr])=>`<div style="margin-bottom:6px"><span class="ec" style="font-size:8px">${et==='_'?'—':et}</span> `+arr.map(e=>`<div style="font-size:11px;color:var(--ink2);padding:2px 0 2px 18px">○ ${e.nombre} <span style="color:var(--ink3);font-size:9px">${fF(e.fecha_unica||e.fecha_fin)||''}</span></div>`).join('')+`</div>`).join('')+`</div>`;
+    const pausado=p?.estado==='pausado';
+    let bloqueComp='',bloquePend='';
+    if(!pausado){
+      const etapasComp={};pd.completadas.forEach(e=>{const k=e.etapa_clave||'_';(etapasComp[k]=etapasComp[k]||[]).push(e);});
+      const etapasPend={};pd.pendientes.forEach(e=>{const k=e.etapa_clave||'_';(etapasPend[k]=etapasPend[k]||[]).push(e);});
+      if(pd.completadas.length){
+        bloqueComp=`<div style="margin-bottom:10px"><div class="lbl-sm2">Completadas en el periodo</div>`+
+          Object.entries(etapasComp).map(([et,arr])=>`<div style="margin-bottom:6px"><span class="ec" style="font-size:8px">${et==='_'?'—':et}</span> `+arr.map(e=>`<div style="font-size:11px;color:var(--ink);padding:2px 0 2px 18px">✓ ${e.nombre}</div>`).join('')+`</div>`).join('')+`</div>`;
+      }
+      if(pd.pendientes.length){
+        bloquePend=`<div style="margin-bottom:10px"><div class="lbl-sm2">Por completar</div>`+
+          Object.entries(etapasPend).map(([et,arr])=>`<div style="margin-bottom:6px"><span class="ec" style="font-size:8px">${et==='_'?'—':et}</span> `+arr.map(e=>`<div style="font-size:11px;color:var(--ink2);padding:2px 0 2px 18px">○ ${e.nombre} <span style="color:var(--ink3);font-size:9px">${fF(e.fecha_unica||e.fecha_fin)||''}</span></div>`).join('')+`</div>`).join('')+`</div>`;
+      }
     }
     proyHtml+=`<div class="card" style="margin-bottom:12px;padding:14px 16px">
       <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;flex-wrap:wrap">
         <span class="cod">${p?.codigo||''}</span><span style="font-size:13px;color:var(--ink)">${p?.nombre||'Sin proyecto'}</span>
+        ${pausado?`<span style="font-size:9px;color:var(--amber);border:1px solid var(--amber);border-radius:20px;padding:2px 8px">⏸ Pausado</span>`:''}
       </div>
       <div style="display:flex;gap:16px;flex-wrap:wrap;margin-bottom:10px">
         ${pd.pctEntregables!==null?`<span style="font-size:10px;color:var(--ink3)">Entregables: <b style="color:var(--ink2)">${pd.pctEntregables}%</b> (${pd.entDone}/${pd.entTotal})</span>`:''}
@@ -3663,6 +3680,10 @@ function renderRepQuincenalResultado(){
     </div>
     <div class="sec">Asistentes</div>
     <div class="card" style="padding:14px 16px;margin-bottom:16px"><div id="rq-asist" style="display:flex;flex-wrap:wrap;gap:14px"></div></div>
+    <div class="sec">Vacaciones próximas (siguientes 15 días)</div>
+    <div class="card" style="padding:14px 16px;margin-bottom:16px">
+      ${d.vacsProximas&&d.vacsProximas.length?d.vacsProximas.map(v=>`<div style="font-size:11px;color:var(--ink);padding:2px 0">🏖 ${fF(v.fecha_inicio)} — ${fF(v.fecha_fin)}</div>`).join(''):'<div style="font-size:10px;color:var(--ink3)">Sin vacaciones programadas en los próximos 15 días</div>'}
+    </div>
     <div class="sec">Proyectos</div>
     ${proyHtml}
     <div class="sec">Objetivos individuales</div>
@@ -3740,21 +3761,30 @@ function generarPDFQuincenal(){
   p(asistentes.join(' · ')||'—');
   y+=6;
 
+  h2('Vacaciones próximas (siguientes 15 días)');
+  if(d.vacsProximas&&d.vacsProximas.length){
+    d.vacsProximas.forEach(v=>p(`🏖 ${fF(v.fecha_inicio)} — ${fF(v.fecha_fin)}`));
+  }else{
+    p('Sin vacaciones programadas en los próximos 15 días.');
+  }
+  y+=6;
+
   h2('Proyectos');
   const proyEntries=Object.entries(d.proyMap).filter(([pid])=>pid!=='sin');
   if(!proyEntries.length)p('Sin tareas completadas o próximas en el periodo.');
   proyEntries.forEach(([pid,pd])=>{
     const pr=pd.proy;
-    p(`${pr?.codigo?pr.codigo+' — ':''}${pr?.nombre||'Sin proyecto'}`,{bold:true,size:10.5,color:[20,20,20]});
+    const pausado=pr?.estado==='pausado';
+    p(`${pr?.codigo?pr.codigo+' — ':''}${pr?.nombre||'Sin proyecto'}${pausado?'  [PAUSADO]':''}`,{bold:true,size:10.5,color:pausado?[180,130,20]:[20,20,20]});
     const metricas=[];
     if(pd.pctEntregables!==null)metricas.push(`Entregables: ${pd.pctEntregables}% (${pd.entDone}/${pd.entTotal})`);
     if(pd.pctPresupuesto!==null)metricas.push(`Presupuesto: ${pd.pctPresupuesto}%`);
     if(metricas.length)p(metricas.join('   ·   '),{size:8.5,color:[120,120,120],indent:8});
-    if(pd.completadas.length){
+    if(!pausado&&pd.completadas.length){
       p('Completadas en el periodo:',{bold:true,size:9,color:[100,100,100],indent:8});
       pd.completadas.forEach(e=>p(`✓ ${e.nombre}`,{indent:16}));
     }
-    if(pd.pendientes.length){
+    if(!pausado&&pd.pendientes.length){
       p('Por completar:',{bold:true,size:9,color:[100,100,100],indent:8});
       pd.pendientes.forEach(e=>p(`○ ${e.nombre}  (${fF(e.fecha_unica||e.fecha_fin)||''})`,{indent:16}));
     }
